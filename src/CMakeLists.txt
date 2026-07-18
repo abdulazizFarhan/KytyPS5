@@ -295,6 +295,8 @@ add_kyty_full_emulator_test(virtual_memory_allocation_tests ../tests/VirtualMemo
 target_compile_definitions(virtual_memory_allocation_tests PRIVATE
 	KYTY_VIRTUAL_MEMORY_ALLOCATION_TESTS=1)
 
+add_kyty_full_emulator_test(guest_stack_tests ../tests/GuestStackTests.cpp)
+
 
 add_executable(kyty_emulator main.cpp ${kyty_emulator_src})
 

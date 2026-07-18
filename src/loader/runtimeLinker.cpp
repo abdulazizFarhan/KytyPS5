@@ -344,20 +344,42 @@ static KYTY_SYSV_ABI void RunEntry(uint64_t addr, EntryParams* params, atexit_fu
 		guest_root_frame[0]    = 0;
 		guest_root_frame[1]    = 0;
 
+		// Save host state to a static carrier. The previous implementation
+		// stuffed host rsp/rbp into r12/r13, which the guest is free to
+		// clobber; the result was an AccessViolation on the first guest
+		// instruction. See RunOnGuestStack in kernel/pthread.cpp for the
+		// full rationale.
+		struct EntryCarrier
+		{
+			uintptr_t host_rsp;
+			uintptr_t host_rbp;
+			uintptr_t saved_r12;
+			uintptr_t saved_r13;
+		} static carrier;
+		carrier.saved_r12 = 0;
+		carrier.saved_r13 = 0;
+		asm volatile("movq %%r12, %0\n\t"
+		             "movq %%r13, %1\n\t"
+		             : "=r"(carrier.saved_r12), "=r"(carrier.saved_r13)
+		             :
+		             : "memory");
+
 		asm volatile("pushq %%r12\n\t"
 		             "pushq %%r13\n\t"
-		             "movq %%rsp, %%r12\n\t"
-		             "movq %%rbp, %%r13\n\t"
+		             "movq %%rsp, %[carrier]\n\t"
+		             "movq %%rbp, 8+%[carrier]\n\t"
 		             "movq %[guest_rsp], %%rsp\n\t"
 		             "movq %[guest_rbp], %%rbp\n\t"
 		             "callq *%[func]\n\t"
-		             "movq %%r13, %%rbp\n\t"
-		             "movq %%r12, %%rsp\n\t"
-		             "popq %%r13\n\t"
-		             "popq %%r12\n\t"
+		             "movq %[carrier], %%rsp\n\t"
+		             "movq 8+%[carrier], %%rbp\n\t"
+		             "movq 16+%[carrier], %%r12\n\t"
+		             "movq 24+%[carrier], %%r13\n\t"
+		             "addq $0x10, %%rsp\n\t"
 		             :
-		             : [func] "r"(func), "D"(params),
-		               "S"(atexit_func), [guest_rsp] "r"(guest_rsp), [guest_rbp] "r"(guest_rbp)
+		             : [func]      "r"(func), "D"(params),
+		               "S"(atexit_func), [guest_rsp] "r"(guest_rsp), [guest_rbp] "r"(guest_rbp),
+		               [carrier]   "m"(carrier)
 		             : "cc", "memory", "rax", "rcx", "rdx", "r8", "r9", "r10", "r11", "xmm0",
 		               "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7", "xmm8", "xmm9",
 		               "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15");

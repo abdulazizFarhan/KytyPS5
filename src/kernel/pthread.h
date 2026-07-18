@@ -71,6 +71,7 @@ using pthread_key_destructor_func_t = KYTY_SYSV_ABI void (*)(void*);
 
 void  PthreadInitSelfForMainThread();
 void* PthreadCreateMainGuestStack();
+void* PthreadRunOnGuestStackForTest(void* arg, pthread_entry_func_t func, void* stack_top);
 void  PthreadDeleteStaticObjects(Loader::Program* program);
 
 int KYTY_SYSV_ABI PthreadMutexattrInit(PthreadMutexattr* attr);

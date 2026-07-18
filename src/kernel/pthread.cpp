@@ -776,6 +776,43 @@ static KYTY_SYSV_ABI void* RunOnGuestStack(void* arg, pthread_entry_func_t func,
 	             :
 	             : "memory");
 
+	struct HostCarrier
+	{
+		uintptr_t host_rbp;          // +0
+#if KYTY_PLATFORM == KYTY_PLATFORM_WINDOWS
+		uintptr_t host_gs8;          // +8
+		uintptr_t host_gs10;         // +16
+#endif
+		uintptr_t saved_r12;         // +24
+		uintptr_t saved_r13;         // +32
+#if KYTY_PLATFORM == KYTY_PLATFORM_WINDOWS
+		uintptr_t saved_r14;         // +40
+		uintptr_t saved_r15;         // +48
+#endif
+	} __attribute__((aligned(16))) static carrier;
+	carrier.host_rbp = host_rbp;
+	carrier.saved_r12 = 0;
+	carrier.saved_r13 = 0;
+	asm volatile("movq %%r12, %0\n\t"
+	             "movq %%r13, %1\n\t"
+#if KYTY_PLATFORM == KYTY_PLATFORM_WINDOWS
+	             "movq %%r14, %2\n\t"
+	             "movq %%r15, %3\n\t"
+#endif
+	             : "=r"(carrier.saved_r12), "=r"(carrier.saved_r13)
+#if KYTY_PLATFORM == KYTY_PLATFORM_WINDOWS
+	             , "=r"(carrier.saved_r14), "=r"(carrier.saved_r15)
+#endif
+	             :
+	             : "memory");
+#if KYTY_PLATFORM == KYTY_PLATFORM_WINDOWS
+	asm volatile("movq %%gs:0x08, %0\n\t"
+	             "movq %%gs:0x10, %1\n\t"
+	             : "=r"(carrier.host_gs8), "=r"(carrier.host_gs10)
+	             :
+	             : "memory");
+#endif
+
 	if (g_pthread_self != nullptr) {
 		g_pthread_self->guest_host_rbx = host_rbx;
 		g_pthread_self->guest_host_rsp = host_rsp - (2u * sizeof(uint64_t));
@@ -794,7 +831,22 @@ static KYTY_SYSV_ABI void* RunOnGuestStack(void* arg, pthread_entry_func_t func,
 #endif
 	}
 
-	// The guest ABI expects the entry argument in rdi and a 16-byte aligned stack before call.
+	// The guest ABI expects the entry argument in rdi and a 16-byte aligned
+	// stack before call. We do NOT trust r12/r13 (or any other callee-saved
+	// register) to survive across the guest call. Instead we capture the
+	// host's stack pointer into a static carrier *and* capture the host's
+	// r12/r13/r14/r15 into the same carrier BEFORE the asm block. The asm
+	// block then:
+	//   1. pushes 4 placeholders (the saved values come from the carrier
+	//      after restore, NOT from the popped values);
+	//   2. switches to the guest stack and calls the entry;
+	//   3. loads the host rsp from the carrier;
+	//   4. loads host rbp from the carrier;
+	//   5. restores Windows GS values;
+	//   6. loads host r12/r13/r14/r15 from the carrier;
+	//   7. removes the 4 placeholder slots.
+	// The guest entry is free to clobber every callee-saved register; we
+	// only ever read from the static carrier, whose address is fixed.
 	asm volatile("pushq %%r12\n\t"
 	             "pushq %%r13\n\t"
 #if KYTY_PLATFORM == KYTY_PLATFORM_WINDOWS
@@ -806,23 +858,28 @@ static KYTY_SYSV_ABI void* RunOnGuestStack(void* arg, pthread_entry_func_t func,
 	             "movq %%rcx, %%gs:0x08\n\t"
 	             "movq %%rcx, %%gs:0x10\n\t"
 #endif
-	             "movq %%rsp, %%r12\n\t"
-	             "movq %%rbp, %%r13\n\t"
+	             "movq %%rsp, %[carrier]\n\t"
 	             "movq %[guest_rsp], %%rsp\n\t"
 	             "movq %[guest_rbp], %%rbp\n\t"
 	             "callq *%%rsi\n\t"
-	             "movq %%r13, %%rbp\n\t"
-	             "movq %%r12, %%rsp\n\t"
+	             "movq %[carrier], %%rsp\n\t"
+	             "movq 0+%[carrier], %%rbp\n\t"
 #if KYTY_PLATFORM == KYTY_PLATFORM_WINDOWS
-	             "movq %%r14, %%gs:0x08\n\t"
-	             "movq %%r15, %%gs:0x10\n\t"
-	             "popq %%r15\n\t"
-	             "popq %%r14\n\t"
+	             "movq 8+%[carrier], %%rcx\n\t"
+	             "movq %%rcx, %%gs:0x08\n\t"
+	             "movq 16+%[carrier], %%rcx\n\t"
+	             "movq %%rcx, %%gs:0x10\n\t"
 #endif
-	             "popq %%r13\n\t"
-	             "popq %%r12\n\t"
+	             "movq 24+%[carrier], %%r12\n\t"
+	             "movq 32+%[carrier], %%r13\n\t"
+#if KYTY_PLATFORM == KYTY_PLATFORM_WINDOWS
+	             "movq 40+%[carrier], %%r14\n\t"
+	             "movq 48+%[carrier], %%r15\n\t"
+#endif
+	             "addq $0x20, %%rsp\n\t"
 	             : "=a"(ret), "+D"(arg), "+S"(func)
-	             : [guest_rsp] "r"(guest_rsp), [guest_rbp] "r"(guest_rbp)
+	             : [guest_rsp] "r"(guest_rsp), [guest_rbp] "r"(guest_rbp),
+	               [carrier]   "m"(carrier)
 	             : "cc", "memory", "rcx", "rdx", "r8", "r9", "r10", "r11", "xmm0", "xmm1", "xmm2",
 	               "xmm3", "xmm4", "xmm5", "xmm6", "xmm7", "xmm8", "xmm9", "xmm10", "xmm11",
 	               "xmm12", "xmm13", "xmm14", "xmm15");
@@ -843,6 +900,10 @@ static KYTY_SYSV_ABI void* RunOnGuestStack(void* arg, pthread_entry_func_t func,
 	(void)stack_top;
 	return func(arg);
 #endif
+}
+
+void* PthreadRunOnGuestStackForTest(void* arg, pthread_entry_func_t func, void* stack_top) {
+	return RunOnGuestStack(arg, func, stack_top);
 }
 
 static void UpdateCurrentThreadStackAttr(PthreadAttr* attr) {
