@@ -2171,9 +2171,18 @@ void RuntimeLinker::Relocate(Program* program) {
 	EXIT_NOT_IMPLEMENTED(program->dynamic_info->jmprela_table == nullptr);
 	EXIT_NOT_IMPLEMENTED(program->dynamic_info->rela_table == nullptr);
 	EXIT_NOT_IMPLEMENTED(program->dynamic_info->symbol_table == nullptr);
-	EXIT_NOT_IMPLEMENTED(program->dynamic_info->pltgot_vaddr == 0);
 
-	InstallRelocateHandler(program);
+	// Skip InstallRelocateHandler when the ELF has no PLT at all (no .got.plt
+	// and no DT_JMPREL records): InstallRelocateHandler unconditionally writes
+	// to pltgot[1]/[2] and JIT-compiles a custom_call_plt trampoline that
+	// dereferences pltgot, both of which would crash if pltgot_vaddr is 0.
+	// ELFs with a real .plt always set DT_PLTGOT to a non-zero vaddr.
+	const bool has_plt = (program->dynamic_info->pltgot_vaddr != 0) ||
+	                     (program->dynamic_info->jmprela_table != nullptr);
+	if (has_plt) {
+		EXIT_NOT_IMPLEMENTED(program->dynamic_info->pltgot_vaddr == 0);
+		InstallRelocateHandler(program);
+	}
 
 	std::vector<std::string> unresolved;
 	const bool               imports_only = program->relocated;
