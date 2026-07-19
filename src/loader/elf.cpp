@@ -502,8 +502,9 @@ bool Elf64::IsValid() const {
 		return false;
 	}
 
-	if (m_ehdr->e_type != ET_DYNEXEC && m_ehdr->e_type != ET_DYNAMIC) {
-		LOGF("ehdr->e_type (%04x) != ET_DYNEXEC && m_ehdr->e_type != ET_DYNAMIC\n", m_ehdr->e_type);
+	const auto etype = m_ehdr->e_type;
+	if (etype != ET_DYNEXEC && etype != ET_DYNAMIC && etype != 3 /* ET_DYN, standard ELF */) {
+		LOGF("ehdr->e_type (%04x) is not ET_DYNEXEC / ET_DYNAMIC / ET_DYN\n", etype);
 		return false;
 	}
 
