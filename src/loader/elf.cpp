@@ -491,8 +491,9 @@ bool Elf64::IsValid() const {
 		return false;
 	}
 
-	if (m_ehdr->e_ident[EI_OSABI] != ELFOSABI_FREEBSD) {
-		LOGF("ehdr->e_ident[EI_OSABI] (0x%x) != ELFOSABI_FREEBSD\n", m_ehdr->e_ident[EI_OSABI]);
+	const auto osabi = m_ehdr->e_ident[EI_OSABI];
+	if (osabi != ELFOSABI_FREEBSD && osabi != ELFOSABI_NONE) {
+		LOGF("ehdr->e_ident[EI_OSABI] (0x%x) is neither ELFOSABI_FREEBSD nor ELFOSABI_NONE\n", osabi);
 		return false;
 	}
 
