@@ -1887,7 +1887,14 @@ void RuntimeLinker::LoadProgramToMemory(Program* program) {
 	bool is_shared   = program->elf->IsShared();
 	bool is_next_gen = program->elf->IsNextGen();
 
-	EXIT_NOT_IMPLEMENTED(!is_shared && !is_next_gen);
+	// Treat legacy non-shared, non-next-gen executables (e.g. PS5 SDK
+	// samples, elfldr, ftpsrv, etc.) as next-gen so the rest of
+	// LoadProgramToMemory proceeds. The next-gen path is what these ELFs
+	// were built for; the IsNextGen() heuristic doesn't recognise them
+	// because their ELF headers predate the next-gen marker.
+	if (!is_shared && !is_next_gen) {
+		is_next_gen = true;
+	}
 
 	const auto* ehdr = program->elf->GetEhdr();
 	const auto* phdr = program->elf->GetPhdr();
