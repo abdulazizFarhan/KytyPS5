@@ -307,7 +307,8 @@ bool Elf64::IsShared() const {
 }
 
 bool Elf64::IsNextGen() const {
-	return (m_ehdr->e_ident[EI_ABIVERSION] == 2);
+	return (m_ehdr->e_ident[EI_ABIVERSION] == 2 ||
+	        m_ehdr->e_ident[EI_ABIVERSION] == 3);
 }
 
 const char* Elf64::GetSectionName(int index) const {
@@ -497,8 +498,10 @@ bool Elf64::IsValid() const {
 		return false;
 	}
 
-	if (m_ehdr->e_ident[EI_ABIVERSION] != 0 && m_ehdr->e_ident[EI_ABIVERSION] != 2) {
-		LOGF("ehdr->e_ident[EI_ABIVERSION] (0x%x) != (0 or 2)\n", m_ehdr->e_ident[EI_ABIVERSION]);
+	if (m_ehdr->e_ident[EI_ABIVERSION] != 0 && m_ehdr->e_ident[EI_ABIVERSION] != 2 &&
+	    m_ehdr->e_ident[EI_ABIVERSION] != 3) {
+		LOGF("ehdr->e_ident[EI_ABIVERSION] (0x%x) is not a supported ABI version (0, 2, or 3)\n",
+		     m_ehdr->e_ident[EI_ABIVERSION]);
 		return false;
 	}
 
