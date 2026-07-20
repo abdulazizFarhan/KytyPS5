@@ -159,22 +159,33 @@ static uint64_t                         g_unresolved_stub_thunk_offset = 0;
 
 static KYTY_SYSV_ABI uint64_t ResolveImportStubWithId(uint64_t record_id);
 
-static uint64_t AllocateUnresolvedImportThunk(uint64_t record_id) {
+static uint64_t AllocateUnresolvedImportThunk(uint64_t record_id, Program* program) {
 	constexpr uint64_t page_size  = 4096;
 	constexpr uint64_t thunk_size = 162;
 
-	if (g_unresolved_stub_thunk_pages.empty() ||
-	    g_unresolved_stub_thunk_offset + thunk_size > page_size) {
-		auto page = Common::VirtualMemory::Alloc(0, page_size,
-		                                         Common::VirtualMemory::Mode::ExecuteReadWrite);
-		EXIT_NOT_IMPLEMENTED(page == 0);
-		g_unresolved_stub_thunk_pages.push_back(page);
-		g_unresolved_stub_thunk_offset = 0;
+	// Prefer the per-program guest-mode thunk region (RWX, same allocation as
+	// base_vaddr). The guest's PLT `jmp [GOT]` then jumps into guest-executable
+	// memory instead of a low host address (which faults with Execute AV).
+	uint64_t code_vaddr = 0;
+	if (program != nullptr && program->thunk_region_vaddr != 0 && program->thunk_count < program->thunk_region_size / thunk_size) {
+		code_vaddr = program->thunk_region_vaddr + program->thunk_count * thunk_size;
+		program->thunk_count++;
+	} else {
+		// Fallback: host-mode thunk pages (used for shared libraries where the
+		// per-program region is not applicable, or when the region is exhausted).
+		if (g_unresolved_stub_thunk_pages.empty() ||
+		    g_unresolved_stub_thunk_offset + thunk_size > page_size) {
+			auto page = Common::VirtualMemory::Alloc(0, page_size,
+			                                         Common::VirtualMemory::Mode::ExecuteReadWrite);
+			EXIT_NOT_IMPLEMENTED(page == 0);
+			g_unresolved_stub_thunk_pages.push_back(page);
+			g_unresolved_stub_thunk_offset = 0;
+		}
+		code_vaddr = g_unresolved_stub_thunk_pages.back() + g_unresolved_stub_thunk_offset;
+		g_unresolved_stub_thunk_offset += thunk_size;
 	}
 
-	auto* code = reinterpret_cast<uint8_t*>(g_unresolved_stub_thunk_pages.back() +
-	                                        g_unresolved_stub_thunk_offset);
-	g_unresolved_stub_thunk_offset += thunk_size;
+	auto* code = reinterpret_cast<uint8_t*>(code_vaddr);
 
 	const auto target = reinterpret_cast<uint64_t>(ResolveImportStubWithId);
 	uint8_t    bytes[thunk_size] {};
@@ -276,7 +287,7 @@ static uint64_t AllocateUnresolvedImportThunk(uint64_t record_id) {
 	return reinterpret_cast<uint64_t>(code);
 }
 
-static uint64_t RegisterStubbedImport(uint32_t index, const Program* program,
+static uint64_t RegisterStubbedImport(uint32_t index, Program* program,
                                       const RelocationInfo& ri) {
 	const auto program_name = program != nullptr ? Common::PathToString(program->file_name) : "";
 
@@ -300,7 +311,7 @@ static uint64_t RegisterStubbedImport(uint32_t index, const Program* program,
 	record.program     = program_name;
 	g_stubbed_imports.push_back(record);
 	const auto record_id                     = g_stubbed_imports.size() - 1;
-	const auto thunk                         = AllocateUnresolvedImportThunk(record_id);
+	const auto thunk                         = AllocateUnresolvedImportThunk(record_id, program);
 	g_stubbed_imports[record_id].thunk_vaddr = thunk;
 	return thunk;
 }
@@ -1927,7 +1938,14 @@ void RuntimeLinker::LoadProgramToMemory(Program* program) {
 
 	uint64_t tls_handler_size = is_shared ? 0 : Jit::SafeCall::GetSize();
 	EXIT_IF(tls_handler_size > UINT64_MAX - program->base_size_aligned);
-	program->mapped_size = program->base_size_aligned + tls_handler_size;
+	// Reserve a guest-mode region for lazy-binding thunks so PLT `jmp [GOT]`
+	// reaches guest-executable memory instead of a host-mode VirtualMemory
+	// allocation. 64 KiB holds ~403 thunks (162 bytes each) — ample headroom
+	// for the largest ELF tested (websrv: ~80 unresolved imports).
+	constexpr uint64_t kThunkRegionSize = 0x10000;
+	program->thunk_region_size = kThunkRegionSize;
+	EXIT_IF(kThunkRegionSize > UINT64_MAX - program->base_size_aligned - tls_handler_size);
+	program->mapped_size = program->base_size_aligned + tls_handler_size + kThunkRegionSize;
 
 	program->base_vaddr = Common::VirtualMemory::Alloc(
 	    g_desired_base_addr, program->mapped_size, Common::VirtualMemory::Mode::ExecuteReadWrite);
@@ -1935,6 +1953,8 @@ void RuntimeLinker::LoadProgramToMemory(Program* program) {
 	if (!is_shared) {
 		program->tls.handler_vaddr = program->base_vaddr + program->base_size_aligned;
 	}
+	program->thunk_region_vaddr = program->base_vaddr + program->base_size_aligned + tls_handler_size;
+	program->thunk_count        = 0;
 
 	g_desired_base_addr += CODE_BASE_INCR * (1 + program->mapped_size / CODE_BASE_INCR);
 
@@ -2250,9 +2270,18 @@ void RuntimeLinker::Relocate(Program* program) {
 	EXIT_NOT_IMPLEMENTED(program->dynamic_info->rela_table_entry_size != sizeof(Elf64_Rela));
 	EXIT_NOT_IMPLEMENTED(program->dynamic_info->rela_table == nullptr);
 	EXIT_NOT_IMPLEMENTED(program->dynamic_info->symbol_table == nullptr);
-	EXIT_NOT_IMPLEMENTED(program->dynamic_info->pltgot_vaddr == 0);
 
-	InstallRelocateHandler(program);
+	// Skip InstallRelocateHandler when the ELF has no PLT at all (no .got.plt
+	// and no DT_JMPREL records): InstallRelocateHandler unconditionally writes
+	// to pltgot[1]/[2] and JIT-compiles a custom_call_plt trampoline that
+	// dereferences pltgot, both of which would crash if pltgot_vaddr is 0.
+	// ELFs with a real .plt always set DT_PLTGOT to a non-zero vaddr.
+	const bool has_plt = (program->dynamic_info->pltgot_vaddr != 0) ||
+	                     (program->dynamic_info->jmprela_table != nullptr);
+	if (has_plt) {
+		EXIT_NOT_IMPLEMENTED(program->dynamic_info->pltgot_vaddr == 0);
+		InstallRelocateHandler(program);
+	}
 
 	std::vector<std::string> unresolved;
 	const bool               imports_only = program->relocated;

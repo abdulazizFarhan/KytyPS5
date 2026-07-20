@@ -131,6 +131,12 @@ struct Program {
 	uint64_t                        proc_param_vaddr            = 0;
 	uint64_t                        custom_call_plt_vaddr       = 0;
 	uint32_t                        custom_call_plt_num         = 0;
+	// Guest-mode lazy-binding thunk region (RWX, carved out after the TLS handler
+	// in the same ExecuteReadWrite allocation as base_vaddr). Thunks placed here
+	// are reachable by guest PLT `jmp [GOT]` instead of forcing a host-mode AV.
+	uint64_t                        thunk_region_vaddr = 0;
+	uint64_t                        thunk_region_size  = 0;
+	uint64_t                        thunk_count        = 0;
 };
 
 class RuntimeLinker {
