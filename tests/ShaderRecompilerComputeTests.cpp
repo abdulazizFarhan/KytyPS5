@@ -8727,6 +8727,150 @@ TestCase DispatcherIrreducibleControlFlow() {
   return test;
 }
 
+// =============================================================================
+//  Coverage tests: SOP1 / SOP2 bitwise + flag ops
+// =============================================================================
+// These small tests exist to bring the previously-pending ALU opcodes
+// (s_not_b32, s_andn2_b32, s_orn2_b32, s_nand_b32, s_nor_b32, s_xnor_b32,
+//  s_subb_u32, s_bitset0_b32, s_ff1_i32_b32) under the coverage check.
+//
+// Each test:
+//   - issues 1-3 instructions of the targeted opcode(s)
+//   - stores the result at vgpr[0]
+//   - buffers the result to memory offset 30 (the test harness reads
+//     `expected` as the dword contents of that memory location)
+//   - declares the opcodes it covers via the `opcodes` initializer list
+
+TestCase ScalarNotB32() {
+  using O = ShaderOpcode;
+  // s_not_b32: dst = ~src
+  // 0x12345678 -> 0xEDCBA987
+  std::vector<u32> code = {
+      EncodeSMovB32(0, InlineU32(0x12345678u)),
+      EncodeSop1(0x07u, 1, 0),
+      EncodeVop1(0x01u, 0, 1),
+  };
+  AppendBufferStoreDword(&code, 0, 30);
+  AppendEnd(&code);
+  return {"ScalarNotB32", code, {}, {0xEDCBA987u},
+          {O::SMovB32, O::SNotB32, O::VMovB32, O::BufferStoreDword, O::SEndpgm}};
+}
+
+TestCase ScalarBitwiseNotAndOrB32() {
+  using O = ShaderOpcode;
+  // s_andn2_b32(dst = src0 & ~src1) with src0=0xAAAA, src1=0x5555
+  //   = 0xAAAA & ~0x5555 = 0xAAAA
+  // s_orn2_b32(dst = src0 | ~src1) with src0=0x5555, src1=0xAAAA
+  //   = 0x5555 | ~0xAAAA = 0x5555
+  std::vector<u32> code = {
+      EncodeSMovB32(0, InlineU32(0xAAAAu)),
+      EncodeSMovB32(1, InlineU32(0x5555u)),
+      EncodeSop2(0x14u, 2, 0, 1),
+      EncodeSop2(0x16u, 3, 1, 0),
+      // We want both ANDN2 and ORN2 stored; combine with VOP3 add (no-op adder)
+      // by packing results into vgpr[0] and vgpr[1], then store them.
+      EncodeVop1(0x01u, 0, 2),
+      EncodeVop1(0x01u, 1, 3),
+  };
+  AppendBufferStoreDword(&code, 0, 30);
+  AppendBufferStoreDword(&code, 1, 31);
+  AppendEnd(&code);
+  return {"ScalarBitwiseNotAndOrB32", code, {}, {0xAAAAu, 0x5555u},
+          {O::SMovB32, O::SAndn2B32, O::SOrn2B32, O::VMovB32,
+           O::BufferStoreDword, O::SEndpgm}};
+}
+
+TestCase ScalarNandNorXnorB32() {
+  using O = ShaderOpcode;
+  // s_nand_b32 = ~(src0 & src1)
+  // s_nor_b32  = ~(src0 | src1)
+  // s_xnor_b32 = ~(src0 ^ src1)
+  // With src0=0xAAAAAAAA, src1=0x55555555 (alternating):
+  //   nand  = ~(0xAAAAAAAA & 0x55555555) = ~0x00000000 = 0xFFFFFFFF
+  //   nor   = ~(0xAAAAAAAA | 0x55555555) = ~0xFFFFFFFF = 0x00000000
+  //   xnor  = ~(0xAAAAAAAA ^ 0x55555555) = ~0xFFFFFFFF = 0x00000000
+  std::vector<u32> code = {
+      EncodeSMovB32(0, InlineU32(0xAAAAAAAAu)),
+      EncodeSMovB32(1, InlineU32(0x55555555u)),
+      EncodeSop2(0x18u, 2, 0, 1), // NAND
+      EncodeSop2(0x1au, 3, 0, 1), // NOR
+      EncodeSop2(0x1cu, 4, 0, 1), // XNOR
+      EncodeVop1(0x01u, 0, 2),
+      EncodeVop1(0x01u, 1, 3),
+      EncodeVop1(0x01u, 2, 4),
+  };
+  AppendBufferStoreDword(&code, 0, 30);
+  AppendBufferStoreDword(&code, 1, 31);
+  AppendBufferStoreDword(&code, 2, 32);
+  AppendEnd(&code);
+  return {"ScalarNandNorXnorB32", code, {},
+          {0xFFFFFFFFu, 0x00000000u, 0x00000000u},
+          {O::SMovB32, O::SNandB32, O::SNorB32, O::SXnorB32, O::VMovB32,
+           O::BufferStoreDword, O::SEndpgm}};
+}
+
+TestCase ScalarBitset0B32() {
+  using O = ShaderOpcode;
+  // s_bitset0_b32(dst, src, idx): clear bit `idx` in src.
+  // With src=0xFFFFFFFF and idx=0, expect 0xFFFFFFFE.
+  std::vector<u32> code = {
+      EncodeSMovB32(0, InlineU32(0xFFFFFFFFu)),
+      EncodeSMovB32(1, InlineU32(0u)),          // bit index = 0
+      // bitset0 uses SOP1 encoding 0x1b; dst = src with bit idx cleared
+      EncodeSop1(0x1bu, 2, 0),
+      EncodeVop1(0x01u, 0, 2),
+  };
+  AppendBufferStoreDword(&code, 0, 30);
+  AppendEnd(&code);
+  return {"ScalarBitset0B32", code, {}, {0xFFFFFFFEu},
+          {O::SMovB32, O::SBitset0B32, O::VMovB32,
+           O::BufferStoreDword, O::SEndpgm}};
+}
+
+TestCase ScalarFf1I32B32() {
+  using O = ShaderOpcode;
+  // s_ff1_i32_b32: find first set bit index, returned as 0..31, or -1 (0xFFFFFFFF)
+  // if no bits set.
+  // src = 0x00000100 -> ff1 = 8
+  std::vector<u32> code = {
+      EncodeSMovB32(0, InlineU32(0x00000100u)),
+      EncodeSop1(0x13u, 1, 0),
+      EncodeVop1(0x01u, 0, 1),
+  };
+  AppendBufferStoreDword(&code, 0, 30);
+  AppendEnd(&code);
+  return {"ScalarFf1I32B32", code, {}, {8u},
+          {O::SMovB32, O::SFf1I32B32, O::VMovB32,
+           O::BufferStoreDword, O::SEndpgm}};
+}
+
+TestCase ScalarSubbU32() {
+  using O = ShaderOpcode;
+  // s_subb_u32: dst = src0 - src1 - SCC (carry-in from SCC).
+  // Need to first set SCC = 1, then perform subb. Use a simple SCC set trick:
+  // SccBranchCmpEq pattern uses SCmpEq. We use SAddU32 with src0=src1 to set SCC=1
+  // (per RDNA2: SCC = result == 0 for SUB or src0 == src1 for ADD). With src0=src1,
+  // ADD sets SCC to 1 (carry-out is 0 but `equal` flag is set in SCC; s_add_u32 uses
+  // SCC = (src0 == src1), not arithmetic carry). For s_subb_u32 the SCC is sub-out:
+  // when computing A-B with previous borrow SCC, the new SCC is "carry-out".
+  // To get a simple deterministic case: A=5, B=3, SCC=0.
+  //    sub(5,3,0)    => 5 - 3 - 0 = 2 (no borrow, SCC=0 result)
+  //                   dst = 2
+  // We can verify dst via VOP1 then buffer store.
+  std::vector<u32> code = {
+      // SCC starts at 0 on compute-shader entry (initial SCC = 0).
+      EncodeSMovB32(0, InlineU32(5u)),
+      EncodeSMovB32(1, InlineU32(3u)),
+      EncodeSop2(0x05u, 2, 0, 1), // s_subb_b32 dst=sgpr[2], src0=sgpr[0], src1=sgpr[1]
+      EncodeVop1(0x01u, 0, 2),
+  };
+  AppendBufferStoreDword(&code, 0, 30);
+  AppendEnd(&code);
+  return {"ScalarSubbU32", code, {}, {2u},
+          {O::SMovB32, O::SSubbU32, O::VMovB32,
+           O::BufferStoreDword, O::SEndpgm}};
+}
+
 std::vector<TestCase> MakeCases() {
   std::vector<TestCase> cases;
   cases.reserve(128);
@@ -8738,6 +8882,21 @@ std::vector<TestCase> MakeCases() {
   AddCase(BitwiseOps);
   AddCase(Shifts);
   AddCase(ScalarShiftCountsMaskLowBits);
+  // ===== 2026-07-20: coverage gap closures (graphics work) =====
+  // Each new test below targets an ALU opcode that the Decoder had
+  // declared "covered" (it's in LOWER_OPS and has a SPIR-V emitter)
+  // but the test corpus was not exercising it -- coverage checker
+  // flagged it as "NeedsAluCase". Adding the test brings the opcode
+  // under coverage and surfaces any subtle bugs in the IR lowering
+  // or SPIR-V emission path (e.g. ScalarNotB32 currently fails --
+  // expected 0xEDCBA987, actual 0xC1DD067C -- pointing at a
+  // scalar-SCC interaction issue in EmitUnaryU32's OpNot path).
+  AddCase(ScalarNotB32);
+  AddCase(ScalarBitwiseNotAndOrB32);
+  AddCase(ScalarNandNorXnorB32);
+  AddCase(ScalarBitset0B32);
+  AddCase(ScalarFf1I32B32);
+  AddCase(ScalarSubbU32);
   AddCase(Rdna2ScalarOpcodes);
   AddCase(ScalarExtendedArithmetic);
   AddCase(ScalarArithmeticSccCarryBorrowOverflow);
