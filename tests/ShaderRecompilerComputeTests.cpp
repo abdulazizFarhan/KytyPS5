@@ -7970,28 +7970,6 @@ SkippedCase ImageStoreMipWritesExplicitMip2D() {
           "OpImageWrite cannot take Lod"};
 }
 
-SkippedCase ScalarNotB32Skipped() {
-  // 2026-07-20: surfaces a bug in scalar SOP1 -> SPIR-V emission
-  // for BitwiseNotU32 combined with the SCC write that all SOP1
-  // results trigger (SNotB32 is in ScalarResultWritesSccNonZero at
-  // ShaderIROpcodes.cpp:491). The v_not_b32 path (same IR target)
-  // is unaffected -- the existing BitwiseOps test passes.
-  //
-  // Test code is in active TestCase ScalarNotB32() (would
-  // store ~0x12345678 = 0xEDCBA987 at offset 30 of the buffer);
-  // the harness reports actual 0xC1DD067C. Until root cause is
-  // fixed, this opcode is parked in MakeSkippedCases so the other
-  // 5 newly-added tests (Andn2/Orn2/Nand/Nor/Xnor/Bitset0/Ff1/Subb)
-  // run end-to-end under the harness.
-  return {"ScalarNotB32",
-          "scalar SOP1 NOT + SCC interaction emits wrong SPIR-V; "
-          "the bitwise BitwiseNotU32 IR is the same as v_not_b32 but "
-          "only the SOP1 source triggers the SCC write (in "
-          "ScalarResultWritesSccNonZero). Hypothesis: SCC write is "
-          "emitted before the NOT result is consumed. Diagnostic "
-          "pending."};
-}
-
 SkippedCase ScalarBitwiseNotAndOrB32Skipped() {
   // 2026-07-20: passes a known-good encoding (SOP2 encoding 0x14 +
   // 0x16) but the readback returns [0x55555555, 0x00000000] where
@@ -8955,14 +8933,12 @@ std::vector<TestCase> MakeCases() {
   AddCase(Shifts);
   AddCase(ScalarShiftCountsMaskLowBits);
   // ===== 2026-07-20: coverage gap closures (graphics work) =====
-  // All 6 new tests currently fail to some degree. ScalarNotB32
-  // exposes a bug in the SOP1+SCC emission path. ScalarBitwiseNotAndOrB32
-  // exposes a discrepancy in encoding/source-order. The others are
-  // pending diagnostic. Moved all 6 into MakeSkippedCases with
-  // detailed reasons so the harness still reports "all cases passed"
-  // for the active 223 baseline tests, while the 6 are surfaced as
-  // known-broken diagnostics. Reactivated as each is fixed.
-  // (kept the factory definitions and AddCase invocations removed)
+  // ScalarNotB32 reactivated 2026-07-20 19:45: ScalarProvenance
+  // UpdateScc now propagates SCC for the *_NOT family plus the
+  // bitwise AND/OR/XOR. ScalarFf1I32B32, ScalarSubbU32 same path.
+  AddCase(ScalarNotB32);
+  AddCase(ScalarFf1I32B32);
+  AddCase(ScalarSubbU32);
   AddCase(Rdna2ScalarOpcodes);
   AddCase(ScalarExtendedArithmetic);
   AddCase(ScalarArithmeticSccCarryBorrowOverflow);
@@ -9148,7 +9124,7 @@ std::vector<GraphicsCase> MakeGraphicsCases() {
 }
 
 std::vector<SkippedCase> MakeSkippedCases() {
-  return {ImageStoreMipWritesExplicitMip2D(), ScalarNotB32Skipped(),
+  return {ImageStoreMipWritesExplicitMip2D(),
           ScalarBitwiseNotAndOrB32Skipped(), ScalarNandNorXnorB32Skipped(),
           ScalarBitset0B32Skipped(), ScalarFf1I32B32Skipped(),
           ScalarSubbU32Skipped()};

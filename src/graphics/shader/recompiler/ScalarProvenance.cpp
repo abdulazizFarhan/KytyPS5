@@ -524,6 +524,36 @@ private:
 			case Opcode::ScalarShiftLeftAddCarryU32:
 				state->scc = Define(inst, ScalarValueOp::ShiftLeftAddCarry, before);
 				break;
+			case Opcode::BitwiseAndU32:
+			case Opcode::BitwiseAndNotU32:
+			case Opcode::BitwiseOrU32:
+			case Opcode::BitwiseOrNotU32:
+			case Opcode::BitwiseXorU32:
+			case Opcode::BitwiseNandU32:
+			case Opcode::BitwiseNorU32:
+			case Opcode::BitwiseXnorU32:
+			case Opcode::BitwiseNotU32:
+			case Opcode::BitwiseNotU64: {
+				// RDNA2 spec: SOP1/SOP2 bitwise ops all update SCC = (D != 0).
+				// Previously only AddCarry/SubBorrow/ShiftLeftAddCarry were
+				// handled here, so SOP1 NOT and the *_NOT family silently
+				// dropped the SCC side-effect (surfaced by graphics-coverage
+				// tests; ScalarNotB32 fails with v_not_b32 OK in same IR).
+				switch (inst.op) {
+					case Opcode::BitwiseAndU32:     state->scc = Define(inst, ScalarValueOp::And, before); break;
+					case Opcode::BitwiseAndNotU32: state->scc = Define(inst, ScalarValueOp::AndNot, before); break;
+					case Opcode::BitwiseOrU32:      state->scc = Define(inst, ScalarValueOp::Or, before); break;
+					case Opcode::BitwiseOrNotU32:  state->scc = Define(inst, ScalarValueOp::OrNot, before); break;
+					case Opcode::BitwiseXorU32:     state->scc = Define(inst, ScalarValueOp::Xor, before); break;
+					case Opcode::BitwiseNandU32:
+					case Opcode::BitwiseNorU32:
+					case Opcode::BitwiseXnorU32:
+					case Opcode::BitwiseNotU32:
+					case Opcode::BitwiseNotU64:    state->scc = ScalarProvenance::Unknown; break;
+					default: state->scc = ScalarProvenance::Unknown; break;
+				}
+				break;
+			}
 			default: break;
 		}
 	}
