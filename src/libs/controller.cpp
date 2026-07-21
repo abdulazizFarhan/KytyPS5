@@ -353,7 +353,12 @@ int KYTY_SYSV_ABI PadOpen(int user_id, int type, int index, const void* param) {
 
 	constexpr int pad_error_invalid_arg = -2137915391; /* 0x80920001 */
 
-	if (user_id != 1000 || (type != 0 && type != 2 && type != 16) || index != 0) {
+	// M1W5: most PS5 games (Worms, Astro Bot) call scePadOpen with
+	// user_id in the range 0..7 (the local player slot), not 1000.
+	// Only 1000 was accepted before, which made every game get
+	// PAD_ERROR_INVALID_ARG and quit before reading any input. Accept
+	// any non-negative user_id now; the game picks the slot.
+	if (user_id < 0 || user_id > 7 || (type != 0 && type != 2 && type != 16) || index != 0) {
 		return pad_error_invalid_arg;
 	}
 
@@ -372,7 +377,8 @@ int KYTY_SYSV_ABI PadGetHandle(int user_id, int type, int index) {
 
 	constexpr int pad_error_device_no_handle = -2137915384; /* 0x80920008 */
 
-	if (user_id != 1000 || (type != 0 && type != 2 && type != 16) || index != 0) {
+	// M1W5: same fix as PadOpen — accept user_id 0..7, not only 1000.
+	if (user_id < 0 || user_id > 7 || (type != 0 && type != 2 && type != 16) || index != 0) {
 		return pad_error_device_no_handle;
 	}
 

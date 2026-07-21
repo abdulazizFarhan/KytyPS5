@@ -55,6 +55,7 @@ static void PrintUsage() {
 	::printf("  --graphics-debug-dump <true|false>   Enable graphics debug dumps.\n");
 	::printf("  --printf-direction <value>           Silent, Console, or File.\n");
 	::printf("  --printf-output-file <path>          Guest printf output file.\n");
+	::printf("  --log-file <path>                    M1W5: enable file logging and write all output to <path>.\n");
 	::printf("  --profiler-direction <value>         None or Network.\n");
 		::printf("  --spirv-debug-printf <true|false>    Enable SPIR-V debug printf.\n");
 		::printf("  --pipeline-dump <true|false>         Enable pipeline dumps.\n");
@@ -197,6 +198,15 @@ static bool ParseArgs(int argc, char* argv[], RunOptions& options, bool& show_he
 			}
 		} else if (arg == "--printf-output-file") {
 			options.config.printf_output_file = value;
+		} else if (arg == "--log-file") {
+			// M1W5: shortcut that also flips printf_direction to File so the
+			// log actually gets written. Without this, the file is configured
+			// but the direction is still Console and nothing reaches it.
+			if (!ParseEnum("File", options.config.printf_direction)) {
+				::printf("internal error: cannot set printf direction to File\n");
+				return false;
+			}
+			options.config.printf_output_file  = value;
 		} else if (arg == "--profiler-direction") {
 			if (!ParseEnum(value, options.config.profiler_direction)) {
 				::printf("invalid profiler direction: %s\n", value.c_str());
