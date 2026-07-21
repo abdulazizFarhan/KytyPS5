@@ -420,6 +420,34 @@ void GameEventKeyboard(WindowGame* game, const EventKeyboard* key) {
 }
 
 void GameEventMouse([[maybe_unused]] WindowGame* game, [[maybe_unused]] const EventMouse* mb) {
+	// M1W5: route mouse motion to the right analog stick so M&K users
+	// can aim a camera (Worms reads right_stick_x/y). Mouse buttons map
+	// to Cross (LMB), Circle (RMB), Square (MMB). Sensitivity 1 unit per
+	// SDL pixel; SDL's xrel/yrel are already delta values.
+	if (mb->motion) {
+		const int sens = 8; // amplify small deltas so the stick reaches the edge
+		int rx = mb->motion_x * sens;
+		int ry = mb->motion_y * sens;
+		if (rx > 127) rx = 127;
+		if (rx < -128) rx = -128;
+		if (ry > 127) ry = 127;
+		if (ry < -128) ry = -128;
+		Controller::Axis rx_a = Controller::Axis::RightX;
+		Controller::Axis ry_a = Controller::Axis::RightY;
+		Controller::ControllerAxis(KEYBOARD_CONTROLLER_ID, rx_a, 128 + rx);
+		Controller::ControllerAxis(KEYBOARD_CONTROLLER_ID, ry_a, 128 + ry);
+	}
+	if (mb->down || mb->up) {
+		uint32_t btn = 0;
+		if (mb->left) btn = Controller::PAD_BUTTON_CROSS;
+		else if (mb->right) btn = Controller::PAD_BUTTON_CIRCLE;
+		else if (mb->middle) btn = Controller::PAD_BUTTON_SQUARE;
+		else if (mb->x1) btn = Controller::PAD_BUTTON_TRIANGLE;
+		else if (mb->x2) btn = Controller::PAD_BUTTON_R1;
+		if (btn != 0) {
+			Controller::ControllerButton(KEYBOARD_CONTROLLER_ID, btn, mb->down);
+		}
+	}
 #ifdef KYTY_DBG_INPUT
 	if (mb->wheel) {
 		LOGF("Mouse wheel: time = %.04f, %s[%d, %d]\n", mb->timestamp_seconds,
@@ -1027,6 +1055,17 @@ void WindowRun() {
 		WindowCreate(g_window_ctx);
 		VulkanCreate(g_window_ctx);
 
+		// M1W5: auto-connect the keyboard as controller 0 so M&K users
+		// don't have to press a key first. Games like Worms read
+		// PadGetHandle(1000, 0, 0) at startup and reject the run if no
+		// controller is connected — this gives them something to read.
+		// The real user_id=1000 is the standard "user 1" the game expects.
+		static bool kb_connected = false;
+		if (!kb_connected) {
+			Controller::ControllerConnect(KEYBOARD_CONTROLLER_ID);
+			kb_connected = true;
+		}
+
 		g_window_ctx->game = &game;
 
 		g_window_ctx->graphic_initialized = true;
@@ -1159,6 +1198,29 @@ void WindowUpdateTitle() {
 	                       g_window_ctx->game->m_current_fps);
 
 	SDL_SetWindowTitle(g_window_ctx->window, fps.c_str());
+
+		// M1W6: always-on per-second health log. The first thing to
+		// check when "the game isn't responding" is this line: it shows
+		// frame count, FPS, controller state, and the last button bitmask
+		// the game is actually being served. Designed to be cheap (one
+		// printf per second) so it stays in production builds.
+		{
+			static double last_health_t = 0.0;
+			const double  t_now_health  = g_window_ctx->game->m_current_time_seconds;
+			if (t_now_health - last_health_t >= FPS_UPDATE_TIME) {
+				Libs::Controller::ControllerHealth h {};
+				Libs::Controller::ControllerGetHealth(&h);
+				const char* conn = h.connected ? "yes" : "no";
+				LOGF("[HEALTH] t=%.1fs frame=%u fps=%.1f ctrl=%s(active_id=%d n=%d) "
+				     "pad_reads=%" PRIu64 "(rej=%" PRIu64
+				     ") btn=0x%08x sticks=L(%d,%d) R(%d,%d)\n",
+				     t_now_health, g_window_ctx->game->m_frame_num,
+				     g_window_ctx->game->m_current_fps, conn, h.active_id, h.connected_count,
+				     h.pad_read_count, h.pad_read_reject, h.last_buttons,
+				     h.last_left_x, h.last_left_y, h.last_right_x, h.last_right_y);
+				last_health_t = t_now_health;
+			}
+		}
 
 	// M1W3: optional stdout FPS summary for headless measurement runs.
 	// Prints once per FPS_UPDATE_TIME window to avoid log spam.

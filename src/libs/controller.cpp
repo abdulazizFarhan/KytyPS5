@@ -11,8 +11,17 @@
 #include "libs/padData.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cstring>
 #include <vector>
+
+// M1W6: per-second health-check counters. Incremented in the public
+// Pad* entry points so the per-second log can show "is the game even
+// polling the pad?" without having to grep the whole log.
+namespace {
+std::atomic<uint64_t> g_pad_read_total   {0};
+std::atomic<uint64_t> g_pad_read_reject  {0};
+} // namespace
 
 namespace Libs::Controller {
 
@@ -59,6 +68,8 @@ public:
 	void GetConnectionInfo(bool* flag, int* count);
 	void ReadState(ControllerState* state, bool* flag, int* count);
 	int  ReadStates(ControllerState* states, int states_num, bool* flag, int* count);
+	// M1W6: read-only accessor for the per-second health log.
+	int  ActiveIdForLog() { return GetActiveId(); }
 
 private:
 	static constexpr uint32_t STATES_MAX = 64;
@@ -70,6 +81,13 @@ private:
 	void                          CheckActive();
 	[[nodiscard]] ControllerState GetLastState() const;
 	void                          AddState(const ControllerState& state);
+
+	// M1W6: read-only accessor for the per-second health log. Locks
+	// the mutex so a concurrent state change can't tear the value.
+	int GetActiveId() {
+		Common::LockGuard lock(m_mutex);
+		return m_active_id;
+	}
 
 	Common::Mutex    m_mutex;
 	std::vector<int> m_connected_ids;
@@ -131,6 +149,13 @@ void GameController::Connect(int id) {
 		return;
 	}
 
+	// M1W5: log every connection — this is the single most useful
+	// signal for "is the game seeing a controller?". Without this
+	// log we had to guess.
+	PRINT_NAME();
+	LOGF("\t id = %d (active was %d, connected was %s)\n", id, m_active_id,
+	     (m_connected ? "true" : "false"));
+
 	m_connected_ids.push_back(id);
 
 	CheckActive();
@@ -141,6 +166,9 @@ void GameController::Disconnect(int id) {
 
 	const auto it = std::find(m_connected_ids.begin(), m_connected_ids.end(), id);
 	EXIT_IF(it == m_connected_ids.end());
+
+	PRINT_NAME();
+	LOGF("\t id = %d\n", id);
 
 	m_connected_ids.erase(it);
 
@@ -235,6 +263,13 @@ void GameController::Axis(int id, Controller::Axis axis, int value) {
 		int axis_id = static_cast<int>(axis);
 
 		EXIT_IF(axis_id < 0 || axis_id >= static_cast<int>(Controller::Axis::AxisMax));
+
+		// M1W5: only log axis changes (not every motion event — that
+		// floods the log at 1000Hz).
+		if (state.axes[axis_id] != value) {
+			PRINT_NAME();
+			LOGF("\t id = %d, axis = %d, value = %d\n", id, axis_id, value);
+		}
 
 		state.axes[axis_id] = value;
 
@@ -353,11 +388,21 @@ int KYTY_SYSV_ABI PadOpen(int user_id, int type, int index, const void* param) {
 
 	constexpr int pad_error_invalid_arg = -2137915391; /* 0x80920001 */
 
-	if (user_id != 1000 || (type != 0 && type != 2 && type != 16) || index != 0) {
+	// M1W5: accept either the local player slot (0..7) or the
+	// system-assigned id (1000). PS5 games are inconsistent: Worms
+	// passes 1000, Astro Bot passes 0, some other titles use both
+	// depending on the codepath. Only 1000 was accepted before
+	// (any other id returned PAD_ERROR_INVALID_ARG and the game
+	// never read input).
+	if (((user_id < 0 || user_id > 7) && user_id != 1000) ||
+	    (type != 0 && type != 2 && type != 16) || index != 0) {
+		LOGF("\t REJECTED: user_id/type/index out of range\n");
 		return pad_error_invalid_arg;
 	}
 
 	int handle = 1;
+
+	LOGF("\t -> handle = %d (game will read input via this handle)\n", handle);
 
 	return handle;
 }
@@ -372,7 +417,10 @@ int KYTY_SYSV_ABI PadGetHandle(int user_id, int type, int index) {
 
 	constexpr int pad_error_device_no_handle = -2137915384; /* 0x80920008 */
 
-	if (user_id != 1000 || (type != 0 && type != 2 && type != 16) || index != 0) {
+	// M1W5: same fix as PadOpen — accept 0..7 OR 1000.
+	if (((user_id < 0 || user_id > 7) && user_id != 1000) ||
+	    (type != 0 && type != 2 && type != 16) || index != 0) {
+		LOGF("\t REJECTED\n");
 		return pad_error_device_no_handle;
 	}
 
@@ -448,7 +496,9 @@ int KYTY_SYSV_ABI PadGetControllerInformation(int handle, PadControllerInformati
 int KYTY_SYSV_ABI PadReadState(int handle, PadData* data) {
 	PRINT_NAME();
 
+	g_pad_read_total.fetch_add(1, std::memory_order_relaxed);
 	if (handle != 1) {
+		g_pad_read_reject.fetch_add(1, std::memory_order_relaxed);
 		return PAD_ERROR_INVALID_HANDLE;
 	}
 	if (data == nullptr) {
@@ -471,8 +521,10 @@ int KYTY_SYSV_ABI PadReadState(int handle, PadData* data) {
 int KYTY_SYSV_ABI PadRead(int handle, PadData* data, int num) {
 	PRINT_NAME();
 
+	g_pad_read_total.fetch_add(1, std::memory_order_relaxed);
 	EXIT_NOT_IMPLEMENTED(num < 1 || num > 64);
 	if (handle != 1) {
+		g_pad_read_reject.fetch_add(1, std::memory_order_relaxed);
 		return PAD_ERROR_INVALID_HANDLE;
 	}
 	if (data == nullptr) {
@@ -541,6 +593,34 @@ int KYTY_SYSV_ABI PadSetLightBar(int handle, const PadLightBarParam* param) {
 	}
 
 	return OK;
+}
+
+// M1W6: full struct lives in the header. Just fill it here.
+void ControllerGetHealth(struct ControllerHealth* out)
+{
+	EXIT_IF(out == nullptr);
+	out->pad_read_count  = g_pad_read_total.load();
+	out->pad_read_reject = g_pad_read_reject.load();
+	if (Libs::Controller::g_controller == nullptr) {
+		out->active_id = -1;
+		out->connected = false;
+		out->connected_count = 0;
+		return;
+	}
+	bool            c = false;
+	int             n = 0;
+	Libs::Controller::g_controller->GetConnectionInfo(&c, &n);
+	Libs::Controller::ControllerState s = {};
+	Libs::Controller::g_controller->ReadState(&s, &c, &n);
+	// m_active_id is private; expose a small accessor for the health log.
+	out->active_id        = Libs::Controller::g_controller->ActiveIdForLog();
+	out->connected        = c;
+	out->connected_count  = n;
+	out->last_buttons     = s.buttons;
+	out->last_left_x      = s.axes[static_cast<int>(Libs::Controller::Axis::LeftX)];
+	out->last_left_y      = s.axes[static_cast<int>(Libs::Controller::Axis::LeftY)];
+	out->last_right_x     = s.axes[static_cast<int>(Libs::Controller::Axis::RightX)];
+	out->last_right_y     = s.axes[static_cast<int>(Libs::Controller::Axis::RightY)];
 }
 
 } // namespace Libs::Controller

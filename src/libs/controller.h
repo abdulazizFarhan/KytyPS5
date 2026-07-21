@@ -52,6 +52,22 @@ void ControllerDisconnect(int id);
 void ControllerButton(int id, uint32_t button, bool down);
 void ControllerAxis(int id, Axis axis, int value);
 
+// M1W6: cheap snapshot of the controller state for the per-second
+// health-check log. Layout must match between .cpp and window.cpp.
+struct ControllerHealth {
+	int      active_id        = -1;
+	bool     connected        = false;
+	uint32_t last_buttons     = 0;
+	int      last_left_x      = 128;
+	int      last_left_y      = 128;
+	int      last_right_x     = 128;
+	int      last_right_y     = 128;
+	int      connected_count  = 0;
+	uint64_t pad_read_count   = 0;
+	uint64_t pad_read_reject  = 0;
+};
+void ControllerGetHealth(struct ControllerHealth* out);
+
 int KYTY_SYSV_ABI PadInit();
 int KYTY_SYSV_ABI PadOpen(int user_id, int type, int index, const void* param);
 int KYTY_SYSV_ABI PadGetHandle(int user_id, int type, int index);
