@@ -48,6 +48,7 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vk_platform.h>
@@ -75,31 +76,49 @@ constexpr int   KEYBOARD_CONTROLLER_ID = -1000;
 static std::atomic<bool> g_print_fps_to_stdout {false};
 void SetFpsStdoutEnabled(bool enabled) { g_print_fps_to_stdout.store(enabled); }
 
-// M1W6+: scripted input — a thread-safe queue of timed input events
-// (key, button, mouse, stick, release-all) that the emulator replays
-// into the controller state-machine in the same way real SDL input
-// does. Lets us run headless scenario tests like "open Options menu
-// in Worms" without a human at the keyboard. Format is plain text —
-// one event per line:
+// M1W7+: scripted input — a thread-safe queue of timed input events
+// (key, button, mouse, stick, release-all, wait, label, goto) that the
+// emulator replays into the controller state-machine in the same way
+// real SDL input does. Let me run headless scenario tests like "open
+// the Options menu in Worms" without a human at the keyboard.
+//
+// Format is plain text — one event per line:
 //
 //   <time_s> <type> <arg...> [down|up]
 //
-//   type = key  | arg = SDL key name (Up Down Left Right Return Space Escape W A S D)
-//   type = btn  | arg = SDL controller button name (Cross Circle Square Triangle
-//                |       L1 R1 L2 R2 Options Touchpad Up Down Left Right)
-//   type = mouse| arg = LMB RMB MMB X1 X2
-//   type = stick| arg = axis (LeftX LeftY RightX RightY TriggerLeft TriggerRight) value
-//   type = rel  | (no args; releases all buttons + centers sticks)
+//   time          |   absolute game time in seconds (when the event fires)
+//   type = key    |   SDL keyboard (Up Down Left Right Return Space Escape W A S D ...)
+//   type = btn    |   SDL controller button (Cross Circle Square Triangle L1 R1 L2 R2
+//                 |     Options Touchpad Up Down Left Right)
+//   type = mouse  |   mouse button (LMB RMB MMB X1 X2)
+//   type = stick  |   analog stick (LeftX LeftY RightX RightY TriggerLeft TriggerRight) value
+//   type = rel    |   release all buttons + center sticks
+//   type = wait   |   arg = seconds to sleep before the next event (relative)
+//   type = goto   |   arg = label name; jump the timeline cursor to the named
+//                 |     label's time, optionally re-armed by appending "+N"
+//                 |     (e.g. "goto NAVIGATE 3" repeats 3 times total)
 //
-// Lines beginning with '#' or empty lines are ignored.
-enum class ScriptedEventType : uint8_t { Key, Btn, Mouse, Stick, ReleaseAll };
+//   :LABEL on its own line defines a label (goto targets)
+//   Lines beginning with '#' or empty lines are ignored.
+//
+// Examples:
+//   0.0  rel                       ; clean slate
+//   8.0  btn Cross   down          ; press X
+//   8.2  btn Cross   up            ; release X
+//   :NAVIGATE                      ; label
+//   9.0  btn Down    down          ; press Down (returns to this label from the goto)
+//   9.12 btn Down    up            ; release Down
+//   goto NAVIGATE 3               ; loop the above back 3 times
+//   20.0 rel                       ; cleanup
+enum class ScriptedEventType : uint8_t { Key, Btn, Mouse, Stick, ReleaseAll, Wait, Goto };
 
 struct ScriptedEvent {
 	double             time;
 	ScriptedEventType type;
-	int                arg1 = 0;
-	int                arg2 = 0;
-	bool               down = true;
+	int                arg1   = 0;        // axis value / repeat count / unused
+	int                arg2   = 0;        // unused (slots into label match)
+	std::string        label;             // for Goto targets (LABEL strings)
+	bool               down   = true;
 };
 
 static struct {
@@ -113,6 +132,19 @@ static struct {
 	// this the script and the human race to drive the game state and
 	// nothing useful happens.
 	double                     human_activity_until = 0.0;
+	// M1W7+: cumulative target clock. Wait/Goto advance this clock
+	// instead of inserting single events into the queue (which would
+	// overflow for long scripts) and let ScriptedInputAdvance catch
+	// up. Tracks the script's current "scheduled time".
+	double                     timeline_now    = 0.0;
+	// M1W7+: pending Goto target (label name + repeat counter).
+	// Non-empty means: when ScriptedInputAdvance reaches the next
+	// event-time boundary AND the linear index is at the goto
+	// event, jump rather than firing. Implemented as a flag the
+	// advance loop consumes.
+	bool                       goto_pending    = false;
+	std::string                goto_target;
+	int                        goto_remaining  = 0;
 } g_scripted;
 
 // forward decl — body is below struct WindowGame so we can poke the
@@ -188,79 +220,115 @@ bool LoadScriptedInput(const std::filesystem::path& path) {
 		LOGF("ScriptedInput: failed to open script '%s'\n", path.string().c_str());
 		return false;
 	}
-	auto buf = f.ReadWholeBuffer();
-	f.Close();
-	std::string content(reinterpret_cast<const char*>(buf.GetData()), buf.Size());
+		auto buf = f.ReadWholeBuffer();
+		f.Close();
+		std::string content(reinterpret_cast<const char*>(buf.GetData()), buf.Size());
 
-	int line_num = 0;
-	size_t pos   = 0;
-	while (pos <= content.size()) {
-		size_t eol = content.find('\n', pos);
-		std::string line;
-		if (eol == std::string::npos) {
-			line = content.substr(pos);
-			pos  = content.size() + 1;
-		} else {
-			line = content.substr(pos, eol - pos);
-			pos  = eol + 1;
-		}
-		++line_num;
-		// strip trailing \r / whitespace
-		while (!line.empty() && (line.back() == '\r' || line.back() == ' ' || line.back() == '\t')) {
-			line.pop_back();
-		}
-		if (line.empty() || line[0] == '#') {
-			continue;
-		}
-		std::istringstream iss(line);
-		double              t_s = 0.0;
-		std::string         type_str, arg1_str, arg2_str, down_str;
-		iss >> t_s >> type_str >> arg1_str >> arg2_str >> down_str;
+		// M1W7+: a :LABEL records the EVENT INDEX it sits at, not a
+		// timeline_now. `goto NAME` rewinds the linear cursor (next_idx)
+		// to that index. Timeline_now continues advancing (set by wait/goto),
+		// but the per-event e.time carries the absolute game-time stamp the
+		// ScriptedInputAdvance loop compares against the running clock.
+		std::unordered_map<std::string, size_t> label_to_event_idx;
 
-		ScriptedEvent e {};
-		e.time = t_s;
-		// For btn/key/mouse the 4th token IS the down|up specifier
-		// (e.g. "12.15 btn Cross up"). The 4th slot is the value for
-		// stick events. Detect this by checking whether arg2_str
-		// looks like an explicit down/up keyword; if so treat it as
-		// the down/up flag and shift down_str out of the picture.
-		const bool arg2_is_down_spec = (arg2_str == "down" || arg2_str == "up");
-		const std::string& down_spec = arg2_is_down_spec ? arg2_str : down_str;
+		// M1W7+: secondary pass for sorting + label resolution.
+		// First pass: collect events in source order so labels know their
+		// starting index, then sort.
+		std::vector<ScriptedEvent> raw_events;
 
-		if (type_str == "key") {
-			e.type  = ScriptedEventType::Key;
-			e.arg1  = ScriptedKeyCode(arg1_str);
-			e.down  = (down_spec.empty() || down_spec == "down");
-		} else if (type_str == "btn") {
-			e.type  = ScriptedEventType::Btn;
-			e.arg1  = ScriptedButtonId(arg1_str);
-			e.down  = (down_spec.empty() || down_spec == "down");
-		} else if (type_str == "mouse") {
-			e.type  = ScriptedEventType::Mouse;
-			e.arg1  = ScriptedMouseButton(arg1_str);
-			e.down  = (down_spec.empty() || down_spec == "down");
-		} else if (type_str == "stick") {
-			e.type  = ScriptedEventType::Stick;
-			e.arg1  = ScriptedAxisId(arg1_str);
-			if (arg2_is_down_spec) {
-				// 'btn lefty 128 down' — set axis and remember value
-				// to release later. For simplicity, use arg2 as value
-				// even when "down" token is present.
-				e.arg2 = 128;
+		int line_num = 0;
+		size_t pos   = 0;
+		while (pos <= content.size()) {
+			size_t eol = content.find('\n', pos);
+			std::string line;
+			if (eol == std::string::npos) {
+				line = content.substr(pos);
+				pos  = content.size() + 1;
 			} else {
-				e.arg2  = std::atoi(arg2_str.c_str());
+				line = content.substr(pos, eol - pos);
+				pos  = eol + 1;
 			}
-		} else if (type_str == "rel") {
-			e.type  = ScriptedEventType::ReleaseAll;
-		} else {
-			LOGF("ScriptedInput: unknown type '%s' on line %d, skipping\n", type_str.c_str(),
-			     line_num);
-			continue;
+			++line_num;
+			// strip trailing \r / whitespace
+			while (!line.empty() && (line.back() == '\r' || line.back() == ' ' || line.back() == '\t')) {
+				line.pop_back();
+			}
+			if (line.empty() || line[0] == '#') {
+				continue;
+			}
+			// :LABEL — record the index of the NEXT event so a later
+			// `goto NAME` rewinds the cursor here. If the label sits at
+			// the very end (no more events), the goto to it becomes a
+			// no-op and we drop the entry.
+			if (line[0] == ':') {
+				std::string name = line.substr(1);
+				if (!name.empty()) {
+					label_to_event_idx[name] = raw_events.size();
+				}
+				continue;
+			}
+			std::istringstream iss(line);
+			double              t_s = 0.0;
+			std::string         type_str, arg1_str, arg2_str, down_str;
+			iss >> t_s >> type_str >> arg1_str >> arg2_str >> down_str;
+
+			ScriptedEvent e {};
+			e.time = g_scripted.timeline_now + t_s;
+
+			const bool arg2_is_down_spec = (arg2_str == "down" || arg2_str == "up");
+			const std::string& down_spec = arg2_is_down_spec ? arg2_str : down_str;
+
+			if (type_str == "key") {
+				e.type  = ScriptedEventType::Key;
+				e.arg1  = ScriptedKeyCode(arg1_str);
+				e.down  = (down_spec.empty() || down_spec == "down");
+			} else if (type_str == "btn") {
+				e.type  = ScriptedEventType::Btn;
+				e.arg1  = ScriptedButtonId(arg1_str);
+				e.down  = (down_spec.empty() || down_spec == "down");
+			} else if (type_str == "mouse") {
+				e.type  = ScriptedEventType::Mouse;
+				e.arg1  = ScriptedMouseButton(arg1_str);
+				e.down  = (down_spec.empty() || down_spec == "down");
+			} else if (type_str == "stick") {
+				e.type  = ScriptedEventType::Stick;
+				e.arg1  = ScriptedAxisId(arg1_str);
+				e.arg2  = std::atoi(arg2_str.c_str());
+			} else if (type_str == "rel") {
+				e.type  = ScriptedEventType::ReleaseAll;
+			} else if (type_str == "wait") {
+				e.type = ScriptedEventType::Wait;
+				e.arg1 = static_cast<int>(t_s);
+				e.time = g_scripted.timeline_now;
+				raw_events.push_back(e);
+				g_scripted.timeline_now += t_s;
+				continue;
+			} else if (type_str == "goto") {
+				e.type  = ScriptedEventType::Goto;
+				e.label = arg1_str;
+				auto it = label_to_event_idx.find(e.label);
+				if (it == label_to_event_idx.end()) {
+					LOGF("ScriptedInput: unknown label '%s' on line %d, skipping\n",
+					     e.label.c_str(), line_num);
+					continue;
+				}
+				e.arg2 = static_cast<int>(it->second);     // target event index
+				e.arg1 = (!down_str.empty() && down_str != "0") ? std::atoi(down_str.c_str()) : 0;
+				e.time = g_scripted.timeline_now;          // not used for ordering
+				raw_events.push_back(e);
+				continue;
+			} else {
+				LOGF("ScriptedInput: unknown type '%s' on line %d, skipping\n", type_str.c_str(),
+				     line_num);
+				continue;
+			}
+			raw_events.push_back(e);
 		}
-		g_scripted.events.push_back(e);
-	}
-	std::sort(g_scripted.events.begin(), g_scripted.events.end(),
-	          [](const ScriptedEvent& a, const ScriptedEvent& b) { return a.time < b.time; });
+	// M1W7+: store in source order (not sorted) so label positions are
+	// stable. Control-flow events (Wait/Goto) and labeled blocks need
+	// their original positions; the Advance function uses next_idx (not
+	// event time) as its primary cursor, with the time check as a guard.
+	g_scripted.events = std::move(raw_events);
 
 	g_scripted.name   = path.filename().string();
 	g_scripted.active.store(!g_scripted.events.empty());
@@ -281,30 +349,60 @@ void StartScriptedInputFromCli(const std::string& path) {
 static void DispatchScriptedEvent(const ScriptedEvent& e);
 
 // Per-frame tick: fire any script events whose time has passed.
+//
+// M1W7+: handles Wait and Goto control flow.
+//   Wait: bump the timeline cursor by N seconds.
+//   Goto: rewind the linear event cursor (next_idx) to the label's
+//     recorded event index. If loop counter > 1, set up a single
+//     rewind that fires after the next dispatched event (so the
+//     goto itself counts as the original execution).
 static void ScriptedInputAdvance(double t_now) {
 	if (!g_scripted.active.load()) {
 		return;
 	}
-	// M1W6+: back off when the human is actively pressing buttons —
-	// prevents the script from racing the user to navigate the menu.
-	while (g_scripted.next_idx < g_scripted.events.size() &&
-	       g_scripted.events[g_scripted.next_idx].time <= t_now) {
-		if (t_now < g_scripted.human_activity_until) {
-			// Human is actively driving — pause the replay until
-			// the activity deadline passes. Events stay queued
-			// (not consumed) so the script can resume cleanly
-			// if the human goes quiet.
-			if (Log::IsAtLeast(Log::DebugLevel::Nid)) {
-				LOGF("ScriptedInput: paused (human active until %.3fs, now %.3fs)\n",
-				     g_scripted.human_activity_until, t_now);
-			}
-			return;
+	// M1W6+: back off when the human is actively pressing buttons.
+	if (t_now < g_scripted.human_activity_until) {
+		if (Log::IsAtLeast(Log::DebugLevel::Nid)) {
+			LOGF("ScriptedInput: paused (human active until %.3fs, now %.3fs)\n",
+			     g_scripted.human_activity_until, t_now);
 		}
-		const auto& e = g_scripted.events[g_scripted.next_idx++];
-		// Verify m_active_id at dispatch time — the controller
-		// subsystem resets state when the active controller changes
-		// (e.g. on AddDevice), so the id we sent at frame N may
-		// not match at frame N+1. Just dump and let Button() try.
+		return;
+	}
+	while (g_scripted.next_idx < g_scripted.events.size()) {
+		const auto& e = g_scripted.events[g_scripted.next_idx];
+		if (e.type == ScriptedEventType::Wait) {
+			// Wait bumps the timeline clock — useful for letting
+			// the script pause without scheduling real events.
+			g_scripted.timeline_now += e.arg1;
+			if (Log::IsAtLeast(Log::DebugLevel::Nid)) {
+				LOGF("ScriptedInput: wait %.3fs -> timeline now=%.3fs\n", e.arg1,
+				     g_scripted.timeline_now);
+			}
+			++g_scripted.next_idx;
+			continue;
+		}
+		if (e.type == ScriptedEventType::Goto) {
+			// Goto rewinds next_idx to the label's recorded event index
+			// (arg2). arg1 = total loop budget; first iteration counts
+			// as one, so we decrement AFTER consuming an event from
+			// the rewound range.
+			const size_t target = static_cast<size_t>(e.arg2);
+			if (Log::IsAtLeast(Log::DebugLevel::Nid)) {
+				LOGF("ScriptedInput: goto '%s' -> event idx=%zu (loop budget=%d)\n",
+				     e.label.c_str(), target, e.arg1);
+			}
+			if (e.arg1 > 0) {
+				g_scripted.goto_remaining = e.arg1;
+				g_scripted.goto_target    = e.label;
+			}
+			g_scripted.next_idx = target;
+			continue;
+		}
+		if (e.time > t_now) {
+			break;
+		}
+		// Real-world event past due — dispatch.
+		++g_scripted.next_idx;
 		if (Log::IsAtLeast(Log::DebugLevel::Nid) && e.type == ScriptedEventType::Btn) {
 			Libs::Controller::ControllerHealth h {};
 			Libs::Controller::ControllerGetHealth(&h);
@@ -316,10 +414,25 @@ static void ScriptedInputAdvance(double t_now) {
 			LOGF("ScriptedInput: t=%.3fs %s fired (idx=%zu/%zu)\n", e.time,
 			     g_scripted.name.c_str(), g_scripted.next_idx, g_scripted.events.size());
 		}
+		// M1W7+: pending goto-loop. After dispatching one event from
+		// the rewound range, if we still owe loops, seek next_idx back
+		// to the goto event so the range fires again.
+		if (g_scripted.goto_remaining > 0) {
+			--g_scripted.goto_remaining;
+			if (g_scripted.goto_remaining > 0) {
+				// Seek back to the goto event (already consumed — but
+				// we'll re-iterate the loop body, which is the labeled
+				// range AFTER the goto).
+				for (size_t i = 0; i < g_scripted.events.size(); ++i) {
+					if (g_scripted.events[i].type == ScriptedEventType::Goto &&
+					    g_scripted.events[i].label == g_scripted.goto_target) {
+						g_scripted.next_idx = i + 1;
+						break;
+					}
+				}
+			}
+		}
 	}
-	// When the script is fully consumed, leave it loaded (so the
-	// user can re-arm by sending SIGHUP or by reload via dev hook).
-	// No-op for now.
 }
 
 
@@ -900,6 +1013,12 @@ static void DispatchScriptedEvent(const ScriptedEvent& e) {
 			Controller::ControllerAxis(target_id, Controller::Axis::RightY, 128);
 			break;
 		}
+		case ScriptedEventType::Wait:
+		case ScriptedEventType::Goto:
+			// Control-flow events are handled in ScriptedInputAdvance,
+			// not here. Anything that reaches DispatchScriptedEvent
+			// means the timeline is malformed; silently skip.
+			break;
 	}
 }
 
