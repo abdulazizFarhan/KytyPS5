@@ -89,10 +89,20 @@ struct DynamicInfo {
 
 	Elf64_Rela* jmprela_table      = nullptr;
 	uint64_t    jmprela_table_size = 0;
+	// M1W4: owning pointer for the DT_REL upgrade buffer. When the
+	// binary uses DT_REL, UpgradeRelToRela() allocates a new
+	// Elf64_Rela[] (because DT_REL has no on-disk r_addend) and
+	// assigns it here. Without this, the allocation leaks on
+	// Program destruction. nullptr for DT_RELA binaries (the
+	// rela_table then points into the ELF's mmap'd region).
+	std::unique_ptr<Elf64_Rela[]> jmprela_owned;
 
 	Elf64_Rela* rela_table            = nullptr;
 	uint64_t    rela_table_total_size = 0;
 	uint64_t    rela_table_entry_size = 0;
+	// M1W4: see jmprela_owned above — same story for the main
+	// relocation table.
+	std::unique_ptr<Elf64_Rela[]> rela_owned;
 
 	uint64_t relative_count = 0;
 

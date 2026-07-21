@@ -59,15 +59,19 @@ struct Elf64_Rel
 	Elf64_Xword  r_info;
 };
 
-static Elf64_Rela* UpgradeRelToRela(uint64_t rel_addr, uint64_t rel_sz)
+// M1W4: returns a unique_ptr<Elf64_Rela[]> so the buffer is freed
+// automatically when the owning DynamicInfo is destroyed. Previously
+// this returned a raw new[] pointer stored in DynamicInfo, which
+// leaked every DT_REL ELF on Program teardown.
+static std::unique_ptr<Elf64_Rela[]> UpgradeRelToRela(uint64_t rel_addr, uint64_t rel_sz)
 {
 	if (rel_addr == 0 || rel_sz == 0)
 	{
 		return nullptr;
 	}
-	const uint64_t n_records = rel_sz / sizeof(Elf64_Rel);
-	auto*          rel       = reinterpret_cast<Elf64_Rel*>(rel_addr);
-	auto*          rela      = new Elf64_Rela[n_records];
+	const uint64_t               n_records = rel_sz / sizeof(Elf64_Rel);
+	auto*                        rel       = reinterpret_cast<Elf64_Rel*>(rel_addr);
+	std::unique_ptr<Elf64_Rela[]> rela(new Elf64_Rela[n_records]);
 	for (uint64_t i = 0; i < n_records; ++i)
 	{
 		rela[i].r_offset = rel[i].r_offset;
@@ -2447,7 +2451,8 @@ void RuntimeLinker::ParseProgramDynamicInfo(Program* program) {
 			rel_entsz = dyn->d_un.d_val;
 		}
 		EXIT_NOT_IMPLEMENTED(rel_entsz != 0 && rel_entsz != static_cast<Elf64_Sxword>(sizeof(Elf64_Rel)));
-		program->dynamic_info->jmprela_table      = UpgradeRelToRela(rel_addr, rel_sz);
+		program->dynamic_info->jmprela_owned = UpgradeRelToRela(rel_addr, rel_sz);
+		program->dynamic_info->jmprela_table = program->dynamic_info->jmprela_owned.get();
 		program->dynamic_info->jmprela_table_size = rel_sz / sizeof(Elf64_Rel) * sizeof(Elf64_Rela);
 	} else if (jmprel_type == 0) {
 		// No PLTREL tag, or DT_PLTREL == 0: the ELF has no procedure linkage
@@ -2471,8 +2476,9 @@ void RuntimeLinker::ParseProgramDynamicInfo(Program* program) {
 	GetDynValue(elf, &program->dynamic_info->rela_table_entry_size, DT_RELAENT);
 	if (rel_type == DT_REL) {
 		// Same DT_REL expansion for the main relocation table.
-		program->dynamic_info->rela_table            = UpgradeRelToRela(reinterpret_cast<uint64_t>(program->dynamic_info->rela_table),
-		                                                                 program->dynamic_info->rela_table_total_size);
+		program->dynamic_info->rela_owned = UpgradeRelToRela(reinterpret_cast<uint64_t>(program->dynamic_info->rela_table),
+		                                                      program->dynamic_info->rela_table_total_size);
+		program->dynamic_info->rela_table            = program->dynamic_info->rela_owned.get();
 		program->dynamic_info->rela_table_total_size = program->dynamic_info->rela_table_total_size / sizeof(Elf64_Rel) * sizeof(Elf64_Rela);
 		program->dynamic_info->rela_table_entry_size = sizeof(Elf64_Rela);
 	}
