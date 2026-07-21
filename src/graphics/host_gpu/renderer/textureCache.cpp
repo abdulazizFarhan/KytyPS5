@@ -1804,7 +1804,7 @@ DepthStencilVulkanImage* TextureCache::FindDepthTarget(CommandBuffer* command, G
 		if (!overlaps) {
 			continue;
 		}
-		DepthOverlap overlap = DepthOverlap::Unsupported;
+		DepthOverlap overlap = DepthOverlap::None;
 		switch (cached.kind) {
 			case CachedImage::Kind::Texture:
 				overlap = cached.ctx == ctx
@@ -1821,7 +1821,15 @@ DepthStencilVulkanImage* TextureCache::FindDepthTarget(CommandBuffer* command, G
 				                            : DepthOverlap::Unsupported;
 				break;
 			case CachedImage::Kind::RenderTarget:
-			case CachedImage::Kind::VideoOut: break;
+			case CachedImage::Kind::VideoOut:
+				// M1W6: depth-target overlap with a render-target or video-out
+				// is conceptually `None` (different surface, no alias) but
+				// the prior code left overlap at Unsupported, forcing a
+				// retire. For Worms' Options menu this fired hundreds of
+				// times and produced a degraded render. Treat these as
+				// non-overlapping for depth purposes.
+				overlap = DepthOverlap::None;
+				break;
 		}
 		bool supported = false;
 		switch (overlap) {

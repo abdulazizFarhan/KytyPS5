@@ -484,7 +484,12 @@ void ResolveRenderColorTarget(uint64_t submit_id, CommandBuffer* buffer, const H
 	                                std::max(height >> rt.view.current_mip_level, 1u)};
 
 	auto decision_log_id = g_render_color_log_count.fetch_add(1);
-	if (decision_log_id < 128 || !render_to_texture) {
+	// M1W6+: render-to-texture path is exercised thousands of times per
+	// frame on real games; logging all of them drowned out the log
+	// file with 6MB+ of binding-decision traces. Now gated to
+	// debug-level 2 (Nid). The first-128 line behavior is kept for
+	// level 1 (default) so we still see the early-life sequence.
+	if (decision_log_id < 128 && !Log::IsAtLeast(Log::DebugLevel::Nid)) {
 		LOGF("RenderColorTarget: slot=%" PRIu32 " addr=0x%010" PRIx64 " size=0x%016" PRIx64
 		     " extent=%ux%u view_mip=%u view_extent=%ux%u levels=%u pitch=%u"
 		     " fmt=0x%08" PRIx32 " nfmt=0x%08" PRIx32 " order=0x%08" PRIx32

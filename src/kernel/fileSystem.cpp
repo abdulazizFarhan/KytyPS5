@@ -13,6 +13,18 @@
 #include "libs/libs.h"
 #include "libs/network.h"
 
+// M1W6+: per-file IO trace gating. PS5 file IO fires hundreds of
+// times per second; logging every Lseek/Read/Close/Open produces
+// 25K+ lines per 30s run that drown out everything else. Default
+// silent. Enable with --debug-level 3 (Verbose) when chasing a
+// file-handle bug.
+#define FS_TRACE(...)                                                                          \
+	do {                                                                                       \
+		if (Log::IsAtLeast(Log::DebugLevel::Verbose)) {                                        \
+			::Log::Write(::fmt::sprintf(__VA_ARGS__));                                          \
+		}                                                                                      \
+	} while (0)
+
 #include <algorithm>
 #include <atomic>
 #include <climits>
@@ -307,7 +319,7 @@ int KYTY_SYSV_ABI KernelOpen(const char* path, int flags, uint16_t mode) {
 
 	auto flags_u = static_cast<uint32_t>(flags);
 
-	LOGF("\t path = %s\n"
+	FS_TRACE("\t path = %s\n"
 	     "\t flags = %08" PRIx32 "\n"
 	     "\t mode = %04" PRIx16 "\n",
 	     path, flags_u, mode);
@@ -323,7 +335,7 @@ int KYTY_SYSV_ABI KernelOpen(const char* path, int flags, uint16_t mode) {
 	bool directory = (flags_u & 0x00020000u) != 0;
 
 	if (direct) {
-		LOGF("\t O_DIRECT ignored on host file backend\n");
+		FS_TRACE("\t O_DIRECT ignored on host file backend\n");
 	}
 
 	flags_u &= 0x3u;
@@ -388,7 +400,7 @@ int KYTY_SYSV_ABI KernelOpen(const char* path, int flags, uint16_t mode) {
 		           static_cast<uint32_t>(file->dents.size()));
 
 		for (const auto& f: file->dents) {
-			LOGF("\t\t%s %s\n", f.is_file ? "[file]" : "[dir ]", f.name.c_str());
+			FS_TRACE("\t\t%s %s\n", f.is_file ? "[file]" : "[dir ]", f.name.c_str());
 		}
 	} else {
 		bool result = false;
@@ -455,7 +467,7 @@ int KYTY_SYSV_ABI KernelClose(int d) {
 
 	file->opened = false;
 
-	LOGF("\tClose: %s\n", Common::PathToString(file->real_name).c_str());
+	FS_TRACE("\tClose: %s\n", Common::PathToString(file->real_name).c_str());
 
 	g_files->DeleteDescriptor(d);
 
@@ -493,7 +505,7 @@ int64_t KYTY_SYSV_ABI KernelRead(int d, void* buf, size_t nbytes) {
 	if (file->special == SpecialFile::Random) {
 		FillRandomBuffer(buf, nbytes);
 
-		LOGF("\tRead %" PRIu64 " random bytes from: %s\n", static_cast<uint64_t>(nbytes),
+		FS_TRACE("\tRead %" PRIu64 " random bytes from: %s\n", static_cast<uint64_t>(nbytes),
 		     Common::PathToString(file->real_name).c_str());
 
 		return static_cast<int64_t>(nbytes);
@@ -508,11 +520,11 @@ int64_t KYTY_SYSV_ABI KernelRead(int d, void* buf, size_t nbytes) {
 	file->mutex.Unlock();
 
 	if (is_invalid) {
-		LOGF("\tfile is invalid\n");
+		FS_TRACE("\tfile is invalid\n");
 		return KERNEL_ERROR_EIO;
 	}
 
-	LOGF("\tRead %u bytes from: %s\n", bytes_read, Common::PathToString(file->real_name).c_str());
+	FS_TRACE("\tRead %u bytes from: %s\n", bytes_read, Common::PathToString(file->real_name).c_str());
 
 	return bytes_read;
 }
@@ -573,11 +585,11 @@ int64_t KYTY_SYSV_ABI KernelWrite(int d, const void* buf, size_t nbytes) {
 	file->mutex.Unlock();
 
 	if (is_invalid) {
-		LOGF("\tfile is invalid\n");
+		FS_TRACE("\tfile is invalid\n");
 		return KERNEL_ERROR_EIO;
 	}
 
-	LOGF("\tWrite %u bytes to: %s\n", bytes_written, Common::PathToString(file->real_name).c_str());
+	FS_TRACE("\tWrite %u bytes to: %s\n", bytes_written, Common::PathToString(file->real_name).c_str());
 
 	return bytes_written;
 }
@@ -612,7 +624,7 @@ int64_t KYTY_SYSV_ABI KernelPread(int d, void* buf, size_t nbytes, int64_t offse
 	if (file->special == SpecialFile::Random) {
 		FillRandomBuffer(buf, nbytes);
 
-		LOGF("\tRead %" PRIu64 " random bytes (pos = %" PRId64 ") from: %s\n",
+		FS_TRACE("\tRead %" PRIu64 " random bytes (pos = %" PRId64 ") from: %s\n",
 		     static_cast<uint64_t>(nbytes), offset, Common::PathToString(file->real_name).c_str());
 
 		return static_cast<int64_t>(nbytes);
@@ -630,11 +642,11 @@ int64_t KYTY_SYSV_ABI KernelPread(int d, void* buf, size_t nbytes, int64_t offse
 	file->mutex.Unlock();
 
 	if (is_invalid) {
-		LOGF("\tfile is invalid\n");
+		FS_TRACE("\tfile is invalid\n");
 		return KERNEL_ERROR_EIO;
 	}
 
-	LOGF("\tRead %u bytes (pos = %" PRId64 ") from: %s\n", bytes_read, offset,
+	FS_TRACE("\tRead %u bytes (pos = %" PRId64 ") from: %s\n", bytes_read, offset,
 	     Common::PathToString(file->real_name).c_str());
 
 	return bytes_read;
@@ -683,11 +695,11 @@ int64_t KYTY_SYSV_ABI KernelPwrite(int d, const void* buf, size_t nbytes, int64_
 	file->mutex.Unlock();
 
 	if (is_invalid) {
-		LOGF("\tfile is invalid\n");
+		FS_TRACE("\tfile is invalid\n");
 		return KERNEL_ERROR_EIO;
 	}
 
-	LOGF("\tWrite %u bytes (pos = %" PRId64 ") to: %s\n", bytes_written, offset,
+	FS_TRACE("\tWrite %u bytes (pos = %" PRId64 ") to: %s\n", bytes_written, offset,
 	     Common::PathToString(file->real_name).c_str());
 
 	return bytes_written;
@@ -742,11 +754,11 @@ int64_t KYTY_SYSV_ABI KernelLseek(int d, int64_t offset, int whence) {
 	file->mutex.Unlock();
 
 	if (is_invalid) {
-		LOGF("\tfile is invalid\n");
+		FS_TRACE("\tfile is invalid\n");
 		return KERNEL_ERROR_EIO;
 	}
 
-	LOGF("\tLseek (pos = %" PRId64 ") to: %s\n", offset,
+	FS_TRACE("\tLseek (pos = %" PRId64 ") to: %s\n", offset,
 	     Common::PathToString(file->real_name).c_str());
 
 	return pos;
@@ -759,7 +771,7 @@ int KYTY_SYSV_ABI KernelStat(const char* path, FileStat* sb) {
 		return KERNEL_ERROR_EINVAL;
 	}
 
-	LOGF("\t KernelStat: %s\n", path);
+	FS_TRACE("\t KernelStat: %s\n", path);
 
 	std::string path_s         = std::string(path);
 	auto        real_file_name = g_mount_points->GetRealFilename(path_s);
@@ -770,7 +782,7 @@ int KYTY_SYSV_ABI KernelStat(const char* path, FileStat* sb) {
 	bool is_file = Common::File::IsFileExisting(real_file_name);
 
 	if (!is_dir && !is_file) {
-		LOGF("\t file not found\n");
+		FS_TRACE("\t file not found\n");
 		return KERNEL_ERROR_ENOENT;
 	}
 
@@ -822,7 +834,7 @@ int KYTY_SYSV_ABI KernelFstat(int d, FileStat* sb) {
 
 	EXIT_IF(!file->opened);
 
-	LOGF("\tKernelFstat: %s\n", Common::PathToString(file->real_name).c_str());
+	FS_TRACE("\tKernelFstat: %s\n", Common::PathToString(file->real_name).c_str());
 
 	FileStat stat {};
 	stat.st_mode = 0000777u | (file->directory ? 0040000u : 0100000u);
@@ -853,7 +865,7 @@ int KYTY_SYSV_ABI KernelFstat(int d, FileStat* sb) {
 		file->mutex.Unlock();
 
 		if (is_invalid) {
-			LOGF("\tfile is invalid\n");
+			FS_TRACE("\tfile is invalid\n");
 			return KERNEL_ERROR_EIO;
 		}
 
@@ -907,7 +919,7 @@ int KYTY_SYSV_ABI KernelUnlink(const char* path) {
 		return KERNEL_ERROR_EIO;
 	}
 
-	LOGF("\tKernelUnlink: %s\n", path);
+	FS_TRACE("\tKernelUnlink: %s\n", path);
 
 	return OK;
 }
@@ -941,7 +953,7 @@ int KYTY_SYSV_ABI KernelRename(const char* from, const char* to) {
 		return KERNEL_ERROR_EIO;
 	}
 
-	LOGF("\tKernelRename: %s -> %s\n", from, to);
+	FS_TRACE("\tKernelRename: %s -> %s\n", from, to);
 
 	return OK;
 }
@@ -972,7 +984,7 @@ int KYTY_SYSV_ABI KernelGetdirentries(int fd, char* buf, int nbytes, int64_t* ba
 
 	EXIT_IF(!file->opened);
 
-	LOGF("\t dir    = %s\n"
+	FS_TRACE("\t dir    = %s\n"
 	     "\t nbytes = %d\n"
 	     "\t offset = %" PRIu64 "\n",
 	     Common::PathToString(file->real_name).c_str(), nbytes, file->dents_offset);
@@ -1022,7 +1034,7 @@ int KYTY_SYSV_ABI KernelGetdirentries(int fd, char* buf, int nbytes, int64_t* ba
 		last_reclen_offset = static_cast<int64_t>(dirent_offset + 4);
 		dirent_offset += reclen;
 
-		LOGF("\t name  = %s\n", str.data());
+		FS_TRACE("\t name  = %s\n", str.data());
 	}
 
 	if (last_reclen_offset >= 0) {
@@ -1087,7 +1099,7 @@ int KYTY_SYSV_ABI KernelMkdir(const char* path, uint16_t mode) {
 		return KERNEL_ERROR_ENAMETOOLONG;
 	}
 
-	LOGF("\t path = %s\n"
+	FS_TRACE("\t path = %s\n"
 	     "\t mode = %04" PRIx16 "\n",
 	     path, mode);
 
@@ -1115,7 +1127,7 @@ int KYTY_SYSV_ABI KernelRmdir(const char* path) {
 		return KERNEL_ERROR_EINVAL;
 	}
 
-	LOGF("\t path = %s\n", path);
+	FS_TRACE("\t path = %s\n", path);
 
 	auto real_name = g_mount_points->GetRealDirectory(std::string(path));
 
@@ -1141,7 +1153,7 @@ int KYTY_SYSV_ABI KernelCheckReachability(const char* path) {
 		return KERNEL_ERROR_ENAMETOOLONG;
 	}
 
-	LOGF("\t KernelCheckReachability: %s\n", path);
+	FS_TRACE("\t KernelCheckReachability: %s\n", path);
 
 	std::string mounted_path = std::string(path);
 

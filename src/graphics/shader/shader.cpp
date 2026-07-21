@@ -1,5 +1,15 @@
 #include "graphics/shader/shader.h"
 
+// M1W6+: per-vertex-input reg dump is useful when chasing shader
+// recompile issues but fires once per attribute per draw. Default
+// silent — use --debug-level 3 (Verbose) to re-enable.
+#define SHADER_REG_TRACE(...)                                                                  \
+	do {                                                                                       \
+		if (Log::IsAtLeast(Log::DebugLevel::Verbose)) {                                        \
+			::Log::Write(::fmt::sprintf(__VA_ARGS__));                                          \
+		}                                                                                      \
+	} while (0)
+
 #include "common/assert.h"
 #include "common/common.h"
 #include "common/emulatorConfig.h"
@@ -631,7 +641,7 @@ static void ShaderApplyAttribSemantics(ShaderVertexInputInfo* info,
 		uint32_t reg  = in.hardware_mapping;
 		uint32_t size = in.size_in_elements;
 
-		LOGF("reg = %u, size = %u, va[%u] = 0x%08" PRIx32 "\n", reg, size, i, attrib[in.semantic]);
+		SHADER_REG_TRACE("reg = %u, size = %u, va[%u] = 0x%08" PRIx32 "\n", reg, size, i, attrib[in.semantic]);
 
 		size_t   index       = attrib[in.semantic] & 0x1fu;
 		uint32_t format      = (attrib[in.semantic] >> 5u) & 0x1ffu;
