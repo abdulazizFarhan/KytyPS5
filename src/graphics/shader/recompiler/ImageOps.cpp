@@ -29,13 +29,21 @@ struct MimgAtomicInfo {
 };
 
 constexpr ImageDimension DecodeImageDimension(uint32_t dim) {
+	// M1W8: dimensions 0 (1D), 4 (Cube), 9 (1D Array), 10 (Cube Array)
+	// are now decoded. The binding kind for these is mapped down to
+	// 2D/2D-array in BindingLayout.cpp — the resource materialization
+	// layer treats cube textures as 6-face 2D-arrays on the host side.
 	switch (dim) {
-		case 1u: return ImageDimension::Dim2D;
-		case 2u: return ImageDimension::Dim3D;
-		case 3u: return ImageDimension::Dim2DArray;
+		case 0u:  return ImageDimension::Dim1D;
+		case 1u:  return ImageDimension::Dim2D;
+		case 2u:  return ImageDimension::Dim3D;
+		case 3u:  return ImageDimension::Dim2DArray;
+		case 4u:  return ImageDimension::DimCube;
 		case 5u:
-		case 7u: return ImageDimension::Dim2DArray;
-		case 6u: return ImageDimension::Dim2D;
+		case 7u:  return ImageDimension::Dim2DArray;
+		case 6u:  return ImageDimension::Dim2D;
+		case 9u:  return ImageDimension::Dim1DArray;
+		case 10u: return ImageDimension::DimCubeArray;
 		default: return ImageDimension::Unknown;
 	}
 }

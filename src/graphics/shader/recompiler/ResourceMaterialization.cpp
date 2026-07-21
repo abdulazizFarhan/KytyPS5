@@ -13,7 +13,7 @@ constexpr uint64_t AddressMask = 0x0000ffffffffffffull;
 Decoder::ImageDimension DescriptorDimension(const DescriptorValue& descriptor) {
 	switch (static_cast<Prospero::ImageType>((descriptor.dwords[3] >> 28u) & 0xfu)) {
 		case Prospero::ImageType::kColor3D: return Decoder::ImageDimension::Dim3D;
-		case Prospero::ImageType::kCube:
+		case Prospero::ImageType::kCube:     return Decoder::ImageDimension::DimCube;
 		case Prospero::ImageType::kColor1DArray:
 		case Prospero::ImageType::kColor2DArray:
 		case Prospero::ImageType::kColor2DMsaaArray: return Decoder::ImageDimension::Dim2DArray;

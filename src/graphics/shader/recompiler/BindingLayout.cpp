@@ -25,33 +25,49 @@ bool ImageBinding(const ImageResource& image, DescriptorBindingKind& result) {
 	using Dimension = Decoder::ImageDimension;
 	using Kind      = DescriptorBindingKind;
 
+	// M1W8: ImageDimension now also enumerates Dim1D, Dim1DArray,
+	// DimCube, DimCubeArray. The host descriptor layer maps them all
+	// down to 2D / 2D-array variants via ResourceMaterialization
+	// (cube is 6-face 2D-array on the host side), so the binding-kind
+	// switch only needs to extend with the same fallback mapping.
+	// Without this, any PS5 game using a cube-sampled CS or PS (e.g.
+	// Teardown's reflection probes, Astro Bot's skyboxes) would crash
+	// here at EXIT.
 	switch (image.kind) {
 		case ResourceKind::Image:
 			switch (image.dimension) {
-				case Dimension::Dim2D: result = Kind::Sampled2D; return true;
-				case Dimension::Dim2DArray: result = Kind::Sampled2DArray; return true;
-				case Dimension::Dim3D: result = Kind::Sampled3D; return true;
+				case Dimension::Dim2D:       result = Kind::Sampled2D;       return true;
+				case Dimension::Dim2DArray:  result = Kind::Sampled2DArray;  return true;
+				case Dimension::Dim3D:       result = Kind::Sampled3D;       return true;
+				case Dimension::DimCube:
+				case Dimension::DimCubeArray:
+				case Dimension::Dim1D:
+				case Dimension::Dim1DArray:   result = Kind::Sampled2DArray;  return true;
 				default: return false;
 			}
 		case ResourceKind::ImageUint:
 			switch (image.dimension) {
-				case Dimension::Dim2D: result = Kind::SampledUint2D; return true;
-				case Dimension::Dim2DArray: result = Kind::SampledUint2DArray; return true;
-				case Dimension::Dim3D: result = Kind::SampledUint3D; return true;
+				case Dimension::Dim2D:       result = Kind::SampledUint2D;       return true;
+				case Dimension::Dim2DArray:  result = Kind::SampledUint2DArray;  return true;
+				case Dimension::Dim3D:       result = Kind::SampledUint3D;       return true;
+				case Dimension::DimCube:
+				case Dimension::DimCubeArray:
+				case Dimension::Dim1D:
+				case Dimension::Dim1DArray:   result = Kind::SampledUint2DArray;  return true;
 				default: return false;
 			}
 		case ResourceKind::StorageImage:
 			switch (image.dimension) {
-				case Dimension::Dim2D: result = Kind::Storage2D; return true;
-				case Dimension::Dim2DArray: result = Kind::Storage2DArray; return true;
-				case Dimension::Dim3D: result = Kind::Storage3D; return true;
+				case Dimension::Dim2D:       result = Kind::Storage2D;       return true;
+				case Dimension::Dim2DArray:  result = Kind::Storage2DArray;  return true;
+				case Dimension::Dim3D:       result = Kind::Storage3D;       return true;
 				default: return false;
 			}
 		case ResourceKind::StorageImageUint:
 			switch (image.dimension) {
-				case Dimension::Dim2D: result = Kind::StorageUint2D; return true;
-				case Dimension::Dim2DArray: result = Kind::StorageUint2DArray; return true;
-				case Dimension::Dim3D: result = Kind::StorageUint3D; return true;
+				case Dimension::Dim2D:       result = Kind::StorageUint2D;       return true;
+				case Dimension::Dim2DArray:  result = Kind::StorageUint2DArray;  return true;
+				case Dimension::Dim3D:       result = Kind::StorageUint3D;       return true;
 				default: return false;
 			}
 		default: return false;

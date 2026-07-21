@@ -573,6 +573,15 @@ enum class ImageDimension : uint32_t {
 	Dim2D,
 	Dim3D,
 	Dim2DArray,
+	// M1W8: cube and 1D textures were missing from the recompiler's
+	// dimension enum. The host layer (textureCommon.cpp + gpu_defs.h)
+	// already understands kCube textures; we just couldn't reach them
+	// through the shader binding path. Teardown crashed at the first
+	// cube-sampled CS (reflection probe bake).
+	Dim1D,
+	Dim1DArray,
+	DimCube,
+	DimCubeArray,
 };
 
 constexpr uint32_t MaxInstructionRawWords       = 5u;

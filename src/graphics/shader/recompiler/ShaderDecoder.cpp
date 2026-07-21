@@ -136,10 +136,14 @@ std::string ImageSampleFlagsToString(uint32_t flags) {
 
 const char* ImageDimensionToString(ImageDimension dimension) {
 	switch (dimension) {
-		case ImageDimension::Dim2D: return "2d";
-		case ImageDimension::Dim3D: return "3d";
-		case ImageDimension::Dim2DArray: return "2d_array";
-		default: return "unknown";
+		case ImageDimension::Dim1D:       return "1d";
+		case ImageDimension::Dim2D:       return "2d";
+		case ImageDimension::Dim3D:       return "3d";
+		case ImageDimension::Dim1DArray:  return "1d_array";
+		case ImageDimension::Dim2DArray:  return "2d_array";
+		case ImageDimension::DimCube:     return "cube";
+		case ImageDimension::DimCubeArray: return "cube_array";
+		default:                          return "unknown";
 	}
 }
 

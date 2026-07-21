@@ -30,6 +30,13 @@ bool ImageBinding(const IR::ImageResource& image, IR::DescriptorBindingKind& kin
 			case Dim::Dim2DArray:
 				kind = integer ? Kind::SampledUint2DArray : Kind::Sampled2DArray;
 				return true;
+			// M1W8: cube / 1D textures collapse to 2D-array on the host.
+			case Dim::DimCube:
+			case Dim::DimCubeArray:
+			case Dim::Dim1D:
+			case Dim::Dim1DArray:
+				kind = integer ? Kind::SampledUint2DArray : Kind::Sampled2DArray;
+				return true;
 			case Dim::Unknown: return false;
 		}
 	}
@@ -41,6 +48,13 @@ bool ImageBinding(const IR::ImageResource& image, IR::DescriptorBindingKind& kin
 		case Dim::Dim2D: kind = uint_image ? Kind::StorageUint2D : Kind::Storage2D; return true;
 		case Dim::Dim3D: kind = uint_image ? Kind::StorageUint3D : Kind::Storage3D; return true;
 		case Dim::Dim2DArray:
+			kind = uint_image ? Kind::StorageUint2DArray : Kind::Storage2DArray;
+			return true;
+		// M1W8: cube / 1D storage images collapse to 2D-array on the host.
+		case Dim::DimCube:
+		case Dim::DimCubeArray:
+		case Dim::Dim1D:
+		case Dim::Dim1DArray:
 			kind = uint_image ? Kind::StorageUint2DArray : Kind::Storage2DArray;
 			return true;
 		case Dim::Unknown: return false;
