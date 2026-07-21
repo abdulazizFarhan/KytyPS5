@@ -24,24 +24,37 @@ enum class CpuFaultAction { Untracked, Continue, Download };
 
 class TrackingSpinLock final {
 public:
+	// M1W6: was strictly non-recursive — same-thread re-entry EXIT'd.
+	// The render path legitimately re-enters: a draw call takes the
+	// texture cache lock, then issues a buffer upload that needs to
+	// mark regions of memory GPU-modified via the same region's lock,
+	// which then wants to re-acquire the outer texture cache lock to
+	// retire overlaps. Recursion depth counter handles that without
+	// deadlocking the spin-loop. Cross-thread behavior unchanged —
+	// non-owner threads still spin until the lock is free.
 	void lock() noexcept {
 		const auto thread = CurrentThread();
 		if (m_owner.load(std::memory_order_relaxed) == thread) {
-			EXIT("recursive region tracking lock\n");
+			m_depth.fetch_add(1, std::memory_order_relaxed);
+			return;
 		}
 		while (m_lock.test_and_set(std::memory_order_acquire)) {
-			if (m_owner.load(std::memory_order_relaxed) == thread) {
-				EXIT("recursive region tracking lock while contended\n");
-			}
 			std::atomic_signal_fence(std::memory_order_seq_cst);
 		}
 		m_owner.store(thread, std::memory_order_relaxed);
+		m_depth.store(1, std::memory_order_relaxed);
 	}
 	void unlock() noexcept {
+		const auto current_depth = m_depth.load(std::memory_order_relaxed);
+		if (current_depth > 1) {
+			m_depth.store(current_depth - 1, std::memory_order_relaxed);
+			return;
+		}
 		if (m_owner.load(std::memory_order_relaxed) != CurrentThread()) {
 			EXIT("region tracking lock released by non-owner\n");
 		}
 		m_owner.store(0, std::memory_order_relaxed);
+		m_depth.store(0, std::memory_order_relaxed);
 		m_lock.clear(std::memory_order_release);
 	}
 
@@ -53,9 +66,9 @@ private:
 		EXIT("region tracking thread identity is unsupported on this platform\n");
 #endif
 	}
-
 	std::atomic_flag     m_lock = ATOMIC_FLAG_INIT;
 	std::atomic_uint32_t m_owner {0};
+	std::atomic_uint32_t m_depth {0};
 };
 
 static_assert(std::atomic_uint32_t::is_always_lock_free);

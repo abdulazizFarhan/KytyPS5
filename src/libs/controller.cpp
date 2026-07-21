@@ -150,11 +150,13 @@ void GameController::Connect(int id) {
 	}
 
 	// M1W5: log every connection — this is the single most useful
-	// signal for "is the game seeing a controller?". Without this
-	// log we had to guess.
-	PRINT_NAME();
-	LOGF("\t id = %d (active was %d, connected was %s)\n", id, m_active_id,
-	     (m_connected ? "true" : "false"));
+	// signal for "is the game seeing a controller?". M1W6: gate
+	// behind Nid level so default release doesn't spam the log.
+	if (Log::IsAtLeast(Log::DebugLevel::Nid)) {
+		PRINT_NAME();
+		LOGF("\t id = %d (active was %d, connected was %s)\n", id, m_active_id,
+		     (m_connected ? "true" : "false"));
+	}
 
 	m_connected_ids.push_back(id);
 
@@ -167,8 +169,10 @@ void GameController::Disconnect(int id) {
 	const auto it = std::find(m_connected_ids.begin(), m_connected_ids.end(), id);
 	EXIT_IF(it == m_connected_ids.end());
 
-	PRINT_NAME();
-	LOGF("\t id = %d\n", id);
+	if (Log::IsAtLeast(Log::DebugLevel::Nid)) {
+		PRINT_NAME();
+		LOGF("\t id = %d\n", id);
+	}
 
 	m_connected_ids.erase(it);
 
@@ -265,8 +269,8 @@ void GameController::Axis(int id, Controller::Axis axis, int value) {
 		EXIT_IF(axis_id < 0 || axis_id >= static_cast<int>(Controller::Axis::AxisMax));
 
 		// M1W5: only log axis changes (not every motion event — that
-		// floods the log at 1000Hz).
-		if (state.axes[axis_id] != value) {
+		// floods the log at 1000Hz). M1W6: gate behind Nid level too.
+		if (state.axes[axis_id] != value && Log::IsAtLeast(Log::DebugLevel::Nid)) {
 			PRINT_NAME();
 			LOGF("\t id = %d, axis = %d, value = %d\n", id, axis_id, value);
 		}
@@ -378,13 +382,18 @@ int KYTY_SYSV_ABI PadInit() {
 }
 
 int KYTY_SYSV_ABI PadOpen(int user_id, int type, int index, const void* param) {
-	PRINT_NAME();
-
-	LOGF("\t user_id = %d\n"
-	     "\t type    = %d\n"
-	     "\t index   = %d\n"
-	     "\t param   = 0x%016" PRIx64 "\n",
-	     user_id, type, index, reinterpret_cast<uint64_t>(param));
+	// M1W6: cheap check first. PRINT_NAME itself is gated by the
+	// thread-local flag (off by default in release), but the LOGF
+	// calls below are NOT — gate them behind Nid level so they
+	// don't spam the log on every PadOpen at default level.
+	if (Log::IsAtLeast(Log::DebugLevel::Nid)) {
+		PRINT_NAME();
+		LOGF("\t user_id = %d\n"
+		     "\t type    = %d\n"
+		     "\t index   = %d\n"
+		     "\t param   = 0x%016" PRIx64 "\n",
+		     user_id, type, index, reinterpret_cast<uint64_t>(param));
+	}
 
 	constexpr int pad_error_invalid_arg = -2137915391; /* 0x80920001 */
 
@@ -396,31 +405,38 @@ int KYTY_SYSV_ABI PadOpen(int user_id, int type, int index, const void* param) {
 	// never read input).
 	if (((user_id < 0 || user_id > 7) && user_id != 1000) ||
 	    (type != 0 && type != 2 && type != 16) || index != 0) {
-		LOGF("\t REJECTED: user_id/type/index out of range\n");
+		if (Log::IsAtLeast(Log::DebugLevel::Nid)) {
+			LOGF("\t REJECTED: user_id/type/index out of range\n");
+		}
 		return pad_error_invalid_arg;
 	}
 
 	int handle = 1;
 
-	LOGF("\t -> handle = %d (game will read input via this handle)\n", handle);
+	if (Log::IsAtLeast(Log::DebugLevel::Nid)) {
+		LOGF("\t -> handle = %d (game will read input via this handle)\n", handle);
+	}
 
 	return handle;
 }
 
 int KYTY_SYSV_ABI PadGetHandle(int user_id, int type, int index) {
-	PRINT_NAME();
-
-	LOGF("\t user_id = %d\n"
-	     "\t type    = %d\n"
-	     "\t index   = %d\n",
-	     user_id, type, index);
+	if (Log::IsAtLeast(Log::DebugLevel::Nid)) {
+		PRINT_NAME();
+		LOGF("\t user_id = %d\n"
+		     "\t type    = %d\n"
+		     "\t index   = %d\n",
+		     user_id, type, index);
+	}
 
 	constexpr int pad_error_device_no_handle = -2137915384; /* 0x80920008 */
 
 	// M1W5: same fix as PadOpen — accept 0..7 OR 1000.
 	if (((user_id < 0 || user_id > 7) && user_id != 1000) ||
 	    (type != 0 && type != 2 && type != 16) || index != 0) {
-		LOGF("\t REJECTED\n");
+		if (Log::IsAtLeast(Log::DebugLevel::Nid)) {
+			LOGF("\t REJECTED\n");
+		}
 		return pad_error_device_no_handle;
 	}
 

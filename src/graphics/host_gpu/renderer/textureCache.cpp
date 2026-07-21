@@ -34,6 +34,9 @@ namespace Libs::Graphics {
 
 namespace {
 
+// M1W6: now only used for logging (readback-worker safety check +
+// crash diagnostics). Same-thread re-entry is granted by TrackingSpinLock
+// via depth counter, so this is no longer a hard guard.
 thread_local const void* g_texture_cache_lock_owner = nullptr;
 thread_local const void* g_texture_fault_owner      = nullptr;
 
@@ -63,10 +66,15 @@ thread_local const void* g_texture_fault_owner      = nullptr;
 class FaultSafeTextureLock final {
 public:
 	FaultSafeTextureLock(const void* owner, TrackingSpinLock& mutex): m_mutex(mutex) {
-		if (g_texture_cache_lock_owner != nullptr) {
-			EXIT("TextureCache: recursive cache lock acquisition, current=%p\n",
-			     g_texture_cache_lock_owner);
-		}
+		// M1W6: was an EXIT() that aborted whenever a draw call took
+		// the texture cache lock and then needed to re-acquire it
+		// (e.g. retiring an overlap from inside an upload callback).
+		// TrackingSpinLock now tracks recursion depth and grants the
+		// same thread re-entry, so we just record the fact in the
+		// thread-local and let the lock proceed. Stays as a useful
+		// signal for the readback-worker's safety check (the
+		// destructor clears it again so the check sees nullptr when
+		// the lock is genuinely not held).
 		g_texture_cache_lock_owner = owner;
 		m_mutex.lock();
 	}
@@ -1851,10 +1859,21 @@ DepthStencilVulkanImage* TextureCache::FindDepthTarget(CommandBuffer* command, G
 			case DepthOverlap::Unsupported: break;
 		}
 		if (!supported) {
-			EXIT("TextureCache: unsupported depth-target alias, depth=0x%016" PRIx64
-			     "+0x%016" PRIx64 " existing_kind=%u existing=0x%016" PRIx64 "+0x%016" PRIx64 "\n",
+			// M1W6: previously this was an EXIT() that killed the
+			// emulator whenever a game asked for a depth-target alias
+			// that kyty's overlap classifier doesn't yet understand
+			// (Worms Options menu, others). The real PS5 hardware
+			// handles the alias; here we retire the cached image
+			// instead so the caller gets a fresh allocation, and log
+			// a warning so the case is still visible in the log.
+			LOGF("TextureCache: unsupported depth-target alias, depth=0x%016" PRIx64
+			     "+0x%016" PRIx64 " existing_kind=%u existing=0x%016" PRIx64 "+0x%016" PRIx64
+			     " (retiring cached image and retrying)\n",
 			     info.address, info.size, static_cast<uint32_t>(cached.kind), cached.Address(),
 			     cached.Size());
+			// Fall through and add the cached image to the retire list
+			// below — the next call to AcquireDepthTarget will allocate
+			// a fresh image for the new alias attempt.
 		}
 		retire.push_back(&cached);
 	}

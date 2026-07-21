@@ -14,6 +14,15 @@ KYTY_SUBSYSTEM_DEFINE(Log);
 
 enum class Direction { Silent, Console, File };
 
+// M1W6: numeric debug level. 0 = silent for verbose LOGFs, 1 =
+// per-second [HEALTH] only (cheap, always on), 2 = NID + axis/button
+// events, 3 = every LOGF. Defaults to 1 so release builds stay
+// snappy but you always have the one-line-per-second health status.
+enum class DebugLevel { Silent = 0, Health = 1, Nid = 2, Verbose = 3 };
+
+void          SetDebugLevel(DebugLevel level);
+DebugLevel    GetDebugLevel();
+bool          IsAtLeast(DebugLevel level);
 Direction GetDirection();
 void      Write(std::string_view text);
 void      Write(fmt::text_style style, std::string_view text);

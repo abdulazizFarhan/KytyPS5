@@ -73,6 +73,10 @@ static Direction                       g_direction   = Direction::Console;
 static std::filesystem::path           g_output_file;
 static std::mutex                      g_logger_mutex;
 static std::shared_ptr<spdlog::logger> g_logger;
+// M1W6: numeric debug level. 0 = silent, 1 = [HEALTH] only (default),
+// 2 = NID + axis/button events, 3 = every LOGF. Read via
+// Log::IsAtLeast(level) from the hot paths.
+static DebugLevel                      g_debug_level = DebugLevel::Health;
 
 void Flush() {
 	if (g_logger != nullptr) {
@@ -176,6 +180,24 @@ KYTY_SUBSYSTEM_DESTROY(Log) {
 Direction GetDirection() {
 	EXIT_IF(!g_initialized);
 	return g_direction;
+}
+
+void SetDebugLevel(DebugLevel level)
+{
+	std::lock_guard lock(g_logger_mutex);
+	g_debug_level = level;
+}
+
+DebugLevel GetDebugLevel()
+{
+	std::lock_guard lock(g_logger_mutex);
+	return g_debug_level;
+}
+
+bool IsAtLeast(DebugLevel level)
+{
+	std::lock_guard lock(g_logger_mutex);
+	return static_cast<int>(g_debug_level) >= static_cast<int>(level);
 }
 
 void Write(std::string_view text) {

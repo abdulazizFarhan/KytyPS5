@@ -16,6 +16,15 @@
 using namespace Common;
 using namespace Emulator;
 
+// M1W6+ scripted-input bridge. The implementation lives in
+// graphics/presentation/window/window.cpp under Libs::Graphics;
+// main.cpp doesn't pull that namespace in, so we forward-declare
+// the entry point here. The linker resolves the call against the
+// symbol in window.cpp.
+namespace Libs::Graphics {
+void StartScriptedInputFromCli(const std::string& path);
+} // namespace Libs::Graphics
+
 static std::string GetBuildString() {
 	Date date = Date::FromMacros(std::string(__DATE__));
 
@@ -56,6 +65,10 @@ static void PrintUsage() {
 	::printf("  --printf-direction <value>           Silent, Console, or File.\n");
 	::printf("  --printf-output-file <path>          Guest printf output file.\n");
 	::printf("  --log-file <path>                    M1W5: enable file logging and write all output to <path>.\n");
+	::printf("  --debug-level <0..3>                  M1W6: 0=silent, 1=[HEALTH] only (default),\n");
+	::printf("                                       2=+NID/axis/button events, 3=all LOGFs.\n");
+	::printf("  --replay-input <script.txt>           M1W6+: headless scenario replay. Format:\n");
+	::printf("                                       '<t> key|btn|mouse|stick|rel <name> [v] [down|up]'\n");
 	::printf("  --profiler-direction <value>         None or Network.\n");
 		::printf("  --spirv-debug-printf <true|false>    Enable SPIR-V debug printf.\n");
 		::printf("  --pipeline-dump <true|false>         Enable pipeline dumps.\n");
@@ -207,6 +220,25 @@ static bool ParseArgs(int argc, char* argv[], RunOptions& options, bool& show_he
 				return false;
 			}
 			options.config.printf_output_file  = value;
+		} else if (arg == "--debug-level") {
+			// M1W6: numeric level. The 0/1/2/3 values are well-known; we
+			// accept the level name too (Health/Nid/Verbose/Silent).
+			int level = -1;
+			if (value == "0" || value == "silent" || value == "Silent") level = 0;
+			else if (value == "1" || value == "health" || value == "Health") level = 1;
+			else if (value == "2" || value == "nid" || value == "Nid") level = 2;
+			else if (value == "3" || value == "verbose" || value == "Verbose") level = 3;
+			else {
+				::printf("invalid debug level: %s (use 0..3 or Silent/Health/Nid/Verbose)\n", value.c_str());
+				return false;
+			}
+			Log::SetDebugLevel(static_cast<Log::DebugLevel>(level));
+		} else if (arg == "--replay-input") {
+			// M1W6+: load a script of timed input events and replay it
+			// into the controller state-machine. See window.cpp for the
+			// script format. Used for headless scenario tests like
+			// "open Options menu in Worms".
+			Libs::Graphics::StartScriptedInputFromCli(value);
 		} else if (arg == "--profiler-direction") {
 			if (!ParseEnum(value, options.config.profiler_direction)) {
 				::printf("invalid profiler direction: %s\n", value.c_str());

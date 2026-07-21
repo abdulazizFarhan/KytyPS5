@@ -2,6 +2,7 @@
 #define EMULATOR_SRC_GRAPHICS_HOST_GPU_MEMORYTRACKER_H_
 
 #include "common/assert.h"
+#include "common/logging/log.h"
 #include "graphics/host_gpu/pageManager.h"
 #include "graphics/host_gpu/regionManager.h"
 
@@ -125,10 +126,23 @@ public:
 private:
 	static constexpr size_t REGION_COUNT = TRACKER_ADDRESS_SIZE / TRACKER_REGION_SIZE;
 	inline static thread_local const MemoryTracker* s_upload_owner = nullptr;
+	// M1W6: one-shot per thread so the log doesn't get spammed under
+	// re-entry (it can fire many times per frame under recursive_mutex).
+	inline static thread_local bool                  s_reentry_warned = false;
 
+	// M1W6: was an EXIT() that aborted the emulator whenever a
+	// render-time path legitimately re-entered the tracker from inside
+	// an upload callback (texture cache marks regions GPU-modified
+	// while uploading color/depth attachments — see worms-debug4.log
+	// around line 322810). Combined with m_access_mutex now being a
+	// std::recursive_mutex, re-entry is safe; this just records the
+	// fact in the log (once per thread) so it stays visible without
+	// killing the process.
 	static void CheckNotInUploadCallback() noexcept {
-		if (s_upload_owner != nullptr) {
-			EXIT("memory tracker re-entered from upload callback\n");
+		if (s_upload_owner != nullptr && !s_reentry_warned) {
+			LOGF("memory tracker re-entry from upload callback (allowed under "
+			     "recursive_mutex)\n");
+			s_reentry_warned = true;
 		}
 	}
 
@@ -175,7 +189,14 @@ private:
 	std::unique_ptr<std::atomic<RegionManager*>[]> m_regions;
 	std::vector<std::unique_ptr<RegionManager>>    m_region_storage;
 	std::mutex                                     m_region_mutex;
-	std::mutex                                     m_access_mutex;
+	// M1W6: was std::mutex, but the render path legitimately re-enters
+	// MemoryTracker from inside an upload callback (texture cache marks
+	// regions GPU-modified while uploading color/depth attachments,
+	// which is when the actual REENTRY happened — see worms-debug4.log
+	// around line 322810). recursive_mutex lets the same thread take
+	// the lock again without deadlock, which is what std::mutex would
+	// otherwise do.
+	std::recursive_mutex                           m_access_mutex;
 	PageManager&                                   m_page_manager;
 	PageWatchMode                                  m_gpu_watch_mode = PageWatchMode::ReadWrite;
 };

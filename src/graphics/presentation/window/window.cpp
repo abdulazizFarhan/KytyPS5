@@ -44,7 +44,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <vector>
 #include <vulkan/vk_enum_string_helper.h>
@@ -72,6 +74,254 @@ constexpr int   KEYBOARD_CONTROLLER_ID = -1000;
 // headless measurement runs and CI logs.
 static std::atomic<bool> g_print_fps_to_stdout {false};
 void SetFpsStdoutEnabled(bool enabled) { g_print_fps_to_stdout.store(enabled); }
+
+// M1W6+: scripted input — a thread-safe queue of timed input events
+// (key, button, mouse, stick, release-all) that the emulator replays
+// into the controller state-machine in the same way real SDL input
+// does. Lets us run headless scenario tests like "open Options menu
+// in Worms" without a human at the keyboard. Format is plain text —
+// one event per line:
+//
+//   <time_s> <type> <arg...> [down|up]
+//
+//   type = key  | arg = SDL key name (Up Down Left Right Return Space Escape W A S D)
+//   type = btn  | arg = SDL controller button name (Cross Circle Square Triangle
+//                |       L1 R1 L2 R2 Options Touchpad Up Down Left Right)
+//   type = mouse| arg = LMB RMB MMB X1 X2
+//   type = stick| arg = axis (LeftX LeftY RightX RightY TriggerLeft TriggerRight) value
+//   type = rel  | (no args; releases all buttons + centers sticks)
+//
+// Lines beginning with '#' or empty lines are ignored.
+enum class ScriptedEventType : uint8_t { Key, Btn, Mouse, Stick, ReleaseAll };
+
+struct ScriptedEvent {
+	double             time;
+	ScriptedEventType type;
+	int                arg1 = 0;
+	int                arg2 = 0;
+	bool               down = true;
+};
+
+static struct {
+	std::vector<ScriptedEvent> events;
+	size_t                     next_idx   = 0;
+	std::atomic<bool>          active     {false};
+	std::string                name       = "(none)";
+	// M1W6+: when the human uses a real controller/keyboard while a
+	// script is replaying, set this timestamp (game time seconds) and
+	// skip scripted events until it decays past the timeout. Without
+	// this the script and the human race to drive the game state and
+	// nothing useful happens.
+	double                     human_activity_until = 0.0;
+} g_scripted;
+
+// forward decl — body is below struct WindowGame so we can poke the
+// current_time_seconds field of the active WindowGame. Forward
+// declaration lets the SDL dispatcher call this safely.
+static void ScriptedInputNotifyHumanActivity();
+
+// Map a script "btn" name to an SDL_CONTROLLER_BUTTON_* constant.
+[[maybe_unused]] static int ScriptedButtonId(const std::string& name) {
+	if (name == "Cross" || name == "A")   return SDL_CONTROLLER_BUTTON_A;
+	if (name == "Circle" || name == "B")  return SDL_CONTROLLER_BUTTON_B;
+	if (name == "Square" || name == "X")  return SDL_CONTROLLER_BUTTON_X;
+	if (name == "Triangle" || name == "Y") return SDL_CONTROLLER_BUTTON_Y;
+	if (name == "L1")   return SDL_CONTROLLER_BUTTON_LEFTSHOULDER;
+	if (name == "R1")   return SDL_CONTROLLER_BUTTON_RIGHTSHOULDER;
+	if (name == "L3")   return SDL_CONTROLLER_BUTTON_LEFTSTICK;
+	if (name == "R3")   return SDL_CONTROLLER_BUTTON_RIGHTSTICK;
+	if (name == "Options") return SDL_CONTROLLER_BUTTON_START;
+	if (name == "Touchpad") return SDL_CONTROLLER_BUTTON_BACK;
+	if (name == "Up")    return SDL_CONTROLLER_BUTTON_DPAD_UP;
+	if (name == "Down")  return SDL_CONTROLLER_BUTTON_DPAD_DOWN;
+	if (name == "Left")  return SDL_CONTROLLER_BUTTON_DPAD_LEFT;
+	if (name == "Right") return SDL_CONTROLLER_BUTTON_DPAD_RIGHT;
+	return -1;
+}
+
+// Map a script "key" name to an SDLK_* constant.
+static int ScriptedKeyCode(const std::string& name) {
+	if (name == "Up")   return SDLK_UP;
+	if (name == "Down") return SDLK_DOWN;
+	if (name == "Left") return SDLK_LEFT;
+	if (name == "Right") return SDLK_RIGHT;
+	if (name == "Return") return SDLK_RETURN;
+	if (name == "Space")  return SDLK_SPACE;
+	if (name == "Escape") return SDLK_ESCAPE;
+	if (name == "W") return SDLK_w;
+	if (name == "A") return SDLK_a;
+	if (name == "S") return SDLK_s;
+	if (name == "D") return SDLK_d;
+	if (name == "Tab") return SDLK_TAB;
+	if (name == "Backspace") return SDLK_BACKSPACE;
+	return -1;
+}
+
+// Map a script "mouse" name to a button id (1=LMB 2=MID 3=RMB X1=4 X2=5).
+static int ScriptedMouseButton(const std::string& name) {
+	if (name == "LMB") return SDL_BUTTON_LEFT;
+	if (name == "MMB") return SDL_BUTTON_MIDDLE;
+	if (name == "RMB") return SDL_BUTTON_RIGHT;
+	if (name == "X1")  return SDL_BUTTON_X1;
+	if (name == "X2")  return SDL_BUTTON_X2;
+	return 0;
+}
+
+// Map a script "stick" name to a Controller::Axis.
+static int ScriptedAxisId(const std::string& name) {
+	if (name == "LeftX")   return static_cast<int>(Controller::Axis::LeftX);
+	if (name == "LeftY")   return static_cast<int>(Controller::Axis::LeftY);
+	if (name == "RightX")  return static_cast<int>(Controller::Axis::RightX);
+	if (name == "RightY")  return static_cast<int>(Controller::Axis::RightY);
+	if (name == "TriggerLeft")  return static_cast<int>(Controller::Axis::TriggerLeft);
+	if (name == "TriggerRight") return static_cast<int>(Controller::Axis::TriggerRight);
+	return -1;
+}
+
+bool LoadScriptedInput(const std::filesystem::path& path) {
+	g_scripted.events.clear();
+	g_scripted.next_idx = 0;
+	g_scripted.active.store(false);
+
+	Common::File f(path, Common::File::Mode::Read);
+	if (f.IsInvalid()) {
+		LOGF("ScriptedInput: failed to open script '%s'\n", path.string().c_str());
+		return false;
+	}
+	auto buf = f.ReadWholeBuffer();
+	f.Close();
+	std::string content(reinterpret_cast<const char*>(buf.GetData()), buf.Size());
+
+	int line_num = 0;
+	size_t pos   = 0;
+	while (pos <= content.size()) {
+		size_t eol = content.find('\n', pos);
+		std::string line;
+		if (eol == std::string::npos) {
+			line = content.substr(pos);
+			pos  = content.size() + 1;
+		} else {
+			line = content.substr(pos, eol - pos);
+			pos  = eol + 1;
+		}
+		++line_num;
+		// strip trailing \r / whitespace
+		while (!line.empty() && (line.back() == '\r' || line.back() == ' ' || line.back() == '\t')) {
+			line.pop_back();
+		}
+		if (line.empty() || line[0] == '#') {
+			continue;
+		}
+		std::istringstream iss(line);
+		double              t_s = 0.0;
+		std::string         type_str, arg1_str, arg2_str, down_str;
+		iss >> t_s >> type_str >> arg1_str >> arg2_str >> down_str;
+
+		ScriptedEvent e {};
+		e.time = t_s;
+		// For btn/key/mouse the 4th token IS the down|up specifier
+		// (e.g. "12.15 btn Cross up"). The 4th slot is the value for
+		// stick events. Detect this by checking whether arg2_str
+		// looks like an explicit down/up keyword; if so treat it as
+		// the down/up flag and shift down_str out of the picture.
+		const bool arg2_is_down_spec = (arg2_str == "down" || arg2_str == "up");
+		const std::string& down_spec = arg2_is_down_spec ? arg2_str : down_str;
+
+		if (type_str == "key") {
+			e.type  = ScriptedEventType::Key;
+			e.arg1  = ScriptedKeyCode(arg1_str);
+			e.down  = (down_spec.empty() || down_spec == "down");
+		} else if (type_str == "btn") {
+			e.type  = ScriptedEventType::Btn;
+			e.arg1  = ScriptedButtonId(arg1_str);
+			e.down  = (down_spec.empty() || down_spec == "down");
+		} else if (type_str == "mouse") {
+			e.type  = ScriptedEventType::Mouse;
+			e.arg1  = ScriptedMouseButton(arg1_str);
+			e.down  = (down_spec.empty() || down_spec == "down");
+		} else if (type_str == "stick") {
+			e.type  = ScriptedEventType::Stick;
+			e.arg1  = ScriptedAxisId(arg1_str);
+			if (arg2_is_down_spec) {
+				// 'btn lefty 128 down' — set axis and remember value
+				// to release later. For simplicity, use arg2 as value
+				// even when "down" token is present.
+				e.arg2 = 128;
+			} else {
+				e.arg2  = std::atoi(arg2_str.c_str());
+			}
+		} else if (type_str == "rel") {
+			e.type  = ScriptedEventType::ReleaseAll;
+		} else {
+			LOGF("ScriptedInput: unknown type '%s' on line %d, skipping\n", type_str.c_str(),
+			     line_num);
+			continue;
+		}
+		g_scripted.events.push_back(e);
+	}
+	std::sort(g_scripted.events.begin(), g_scripted.events.end(),
+	          [](const ScriptedEvent& a, const ScriptedEvent& b) { return a.time < b.time; });
+
+	g_scripted.name   = path.filename().string();
+	g_scripted.active.store(!g_scripted.events.empty());
+	LOGF("ScriptedInput: loaded %zu events from '%s', active=%d\n", g_scripted.events.size(),
+	     path.string().c_str(), g_scripted.active.load());
+	return true;
+}
+
+// Public: kick off replay (CLI calls this from main() before RunWindowMain).
+void StartScriptedInputFromCli(const std::string& path) {
+	if (!LoadScriptedInput(std::filesystem::path(path))) {
+		g_scripted.active.store(false);
+	}
+}
+
+// Dispatcher forward decl (defined after the SDL-style event structs +
+// the actual GameEvent* dispatcher functions in this file).
+static void DispatchScriptedEvent(const ScriptedEvent& e);
+
+// Per-frame tick: fire any script events whose time has passed.
+static void ScriptedInputAdvance(double t_now) {
+	if (!g_scripted.active.load()) {
+		return;
+	}
+	// M1W6+: back off when the human is actively pressing buttons —
+	// prevents the script from racing the user to navigate the menu.
+	while (g_scripted.next_idx < g_scripted.events.size() &&
+	       g_scripted.events[g_scripted.next_idx].time <= t_now) {
+		if (t_now < g_scripted.human_activity_until) {
+			// Human is actively driving — pause the replay until
+			// the activity deadline passes. Events stay queued
+			// (not consumed) so the script can resume cleanly
+			// if the human goes quiet.
+			if (Log::IsAtLeast(Log::DebugLevel::Nid)) {
+				LOGF("ScriptedInput: paused (human active until %.3fs, now %.3fs)\n",
+				     g_scripted.human_activity_until, t_now);
+			}
+			return;
+		}
+		const auto& e = g_scripted.events[g_scripted.next_idx++];
+		// Verify m_active_id at dispatch time — the controller
+		// subsystem resets state when the active controller changes
+		// (e.g. on AddDevice), so the id we sent at frame N may
+		// not match at frame N+1. Just dump and let Button() try.
+		if (Log::IsAtLeast(Log::DebugLevel::Nid) && e.type == ScriptedEventType::Btn) {
+			Libs::Controller::ControllerHealth h {};
+			Libs::Controller::ControllerGetHealth(&h);
+			LOGF("ScriptedInput: pre-dispatch active_id=%d connected=%d\n", h.active_id,
+			     h.connected ? 1 : 0);
+		}
+		DispatchScriptedEvent(e);
+		if (Log::IsAtLeast(Log::DebugLevel::Nid)) {
+			LOGF("ScriptedInput: t=%.3fs %s fired (idx=%zu/%zu)\n", e.time,
+			     g_scripted.name.c_str(), g_scripted.next_idx, g_scripted.events.size());
+		}
+	}
+	// When the script is fully consumed, leave it loaded (so the
+	// user can re-arm by sending SIGHUP or by reload via dev hook).
+	// No-op for now.
+}
+
 
 struct EventKeyboard {
 	bool     down;
@@ -242,6 +492,20 @@ struct WindowGame {
 	double   m_fps_start_time        = {0};
 };
 
+// M1W6+: body of the human-activity forward decl above. Set when
+// real SDL events arrive; ScriptedInputAdvance uses this to back
+// off so the script doesn't fight the live user during scenario
+// test debugging. Lives here (after the WindowGame definition)
+// because it touches g_window_ctx->game->m_current_time_seconds.
+static void ScriptedInputNotifyHumanActivity() {
+	if (!g_scripted.active.load()) {
+		return;
+	}
+	if (g_window_ctx != nullptr && g_window_ctx->game != nullptr) {
+		g_scripted.human_activity_until = g_window_ctx->game->m_current_time_seconds + 1.5;
+	}
+}
+
 struct WindowGamePrivate {
 	WindowGamePrivate() = default;
 
@@ -292,6 +556,11 @@ static void SetPause(WindowGame* game, bool flag) {
 
 static bool RenderAndUpdate(WindowGame* game) {
 	static double lag = 0.0;
+
+	// M1W6+: per-frame scripted-input tick. Fires queued key/btn/mouse
+	// events whose scheduled time has passed. Cheap when no script is
+	// loaded (atomic load + return).
+	ScriptedInputAdvance(game->m_current_time_seconds);
 
 	lag += game->m_current_time_seconds - game->m_previous_time_seconds;
 
@@ -414,6 +683,7 @@ void GameEventKeyboard(WindowGame* game, const EventKeyboard* key) {
 			Controller::ControllerConnect(KEYBOARD_CONTROLLER_ID);
 			keyboard_connected = true;
 		}
+		ScriptedInputNotifyHumanActivity();
 		Controller::ControllerButton(KEYBOARD_CONTROLLER_ID, button, key->down);
 	}
 #endif
@@ -445,6 +715,7 @@ void GameEventMouse([[maybe_unused]] WindowGame* game, [[maybe_unused]] const Ev
 		else if (mb->x1) btn = Controller::PAD_BUTTON_TRIANGLE;
 		else if (mb->x2) btn = Controller::PAD_BUTTON_R1;
 		if (btn != 0) {
+			ScriptedInputNotifyHumanActivity();
 			Controller::ControllerButton(KEYBOARD_CONTROLLER_ID, btn, mb->down);
 		}
 	}
@@ -518,6 +789,12 @@ void GameEventController([[maybe_unused]] WindowGame*            game,
 	if (f->down || f->up) {
 		const auto button = ControllerButtonToPadButton(f->button);
 		if (button != 0) {
+			// M1W6+: a real SDL button event arrived — this is the
+			// human taking over. Flag scripted input to back off so
+			// the replay doesn't fight the live user. Decays off
+			// after a short timeout so the script can resume if the
+			// human goes quiet.
+			ScriptedInputNotifyHumanActivity();
 			Controller::ControllerButton(f->id, button, f->down);
 		}
 	}
@@ -525,8 +802,103 @@ void GameEventController([[maybe_unused]] WindowGame*            game,
 	if (f->axis) {
 		const auto axis = ControllerAxisFromSdl(f->axis_id);
 		if (axis != Controller::Axis::AxisMax) {
+			ScriptedInputNotifyHumanActivity();
 			Controller::ControllerAxis(f->id, axis,
 			                           ControllerAxisValueFromSdl(f->axis_id, f->axis_value));
+		}
+	}
+}
+
+// M1W6+: dispatcher for scripted input (headless scenario tests).
+// Routes around the SDL<GameControllerButton>→ControllerButton mapping
+// because the active gamepad id depends on whatever SDL connected
+// (real Xbox controller, virtual joystick, etc). Instead we ask the
+// controller subsystem for the currently active id and push the input
+// straight into the state machine — the game sees an identical event
+// stream regardless of the physical controller source.
+static void DispatchScriptedEvent(const ScriptedEvent& e) {
+	auto* game = g_window_ctx->game;
+
+	Libs::Controller::ControllerHealth ch {};
+	Libs::Controller::ControllerGetHealth(&ch);
+	const int target_id = (ch.connected && ch.active_id >= 0) ? ch.active_id : KEYBOARD_CONTROLLER_ID;
+
+	switch (e.type) {
+		case ScriptedEventType::Key: {
+			EventKeyboard key {};
+			key.down              = e.down;
+			key.up                = !e.down;
+			key.pressed           = e.down;
+			key.released          = !e.down;
+			key.repeat            = false;
+			key.scan_code         = 0;
+			key.key_code          = e.arg1;
+			key.mod               = 0;
+			key.timestamp_seconds = e.time;
+			Libs::Graphics::GameEventKeyboard(game, &key);
+			break;
+		}
+		case ScriptedEventType::Btn: {
+			// SDL→Pad translation is the same the dispatch functions
+			// use, so we just inline it here rather than synthesizing
+			// an EventController and risk SDL opening a non-existent
+			// joystick.
+			const uint32_t btn = ControllerButtonToPadButton(e.arg1);
+			if (btn != 0) {
+				Controller::ControllerButton(target_id, btn, e.down);
+				if (Log::IsAtLeast(Log::DebugLevel::Nid)) {
+					// Read back state immediately to confirm the press
+					// actually landed. If not, the active_id mismatch
+					// problem is biting and we need to fix the dispatch.
+					Libs::Controller::ControllerHealth h {};
+					Libs::Controller::ControllerGetHealth(&h);
+					LOGF("ScriptedInput: pressed pad_btn=0x%08x down=%d target_id=%d "
+					     "active=%d last_buttons=0x%08x\n",
+					     btn, e.down ? 1 : 0, target_id, h.active_id, h.last_buttons);
+				}
+			}
+			break;
+		}
+		case ScriptedEventType::Mouse: {
+			EventMouse m {};
+			m.down              = e.down;
+			m.up                = !e.down;
+			m.pressed           = e.down;
+			m.released          = !e.down;
+			m.left              = (e.arg1 == SDL_BUTTON_LEFT);
+			m.middle            = (e.arg1 == SDL_BUTTON_MIDDLE);
+			m.right             = (e.arg1 == SDL_BUTTON_RIGHT);
+			m.x1                = (e.arg1 == SDL_BUTTON_X1);
+			m.x2                = (e.arg1 == SDL_BUTTON_X2);
+			m.timestamp_seconds = e.time;
+			Libs::Graphics::GameEventMouse(game, &m);
+			break;
+		}
+		case ScriptedEventType::Stick:
+			Controller::ControllerAxis(target_id, static_cast<Controller::Axis>(e.arg1), e.arg2);
+			break;
+		case ScriptedEventType::ReleaseAll: {
+			// Send "up" for every button we know about, plus center sticks.
+			const int all_btns[] = {SDL_CONTROLLER_BUTTON_A,     SDL_CONTROLLER_BUTTON_B,
+			                        SDL_CONTROLLER_BUTTON_X,     SDL_CONTROLLER_BUTTON_Y,
+			                        SDL_CONTROLLER_BUTTON_START, SDL_CONTROLLER_BUTTON_BACK,
+			                        SDL_CONTROLLER_BUTTON_LEFTSTICK,
+			                        SDL_CONTROLLER_BUTTON_RIGHTSTICK,
+			                        SDL_CONTROLLER_BUTTON_LEFTSHOULDER,
+			                        SDL_CONTROLLER_BUTTON_RIGHTSHOULDER,
+			                        SDL_CONTROLLER_BUTTON_DPAD_UP,    SDL_CONTROLLER_BUTTON_DPAD_DOWN,
+			                        SDL_CONTROLLER_BUTTON_DPAD_LEFT,  SDL_CONTROLLER_BUTTON_DPAD_RIGHT};
+			for (int b: all_btns) {
+				const uint32_t btn = ControllerButtonToPadButton(b);
+				if (btn != 0) {
+					Controller::ControllerButton(target_id, btn, false);
+				}
+			}
+			Controller::ControllerAxis(target_id, Controller::Axis::LeftX, 128);
+			Controller::ControllerAxis(target_id, Controller::Axis::LeftY, 128);
+			Controller::ControllerAxis(target_id, Controller::Axis::RightX, 128);
+			Controller::ControllerAxis(target_id, Controller::Axis::RightY, 128);
+			break;
 		}
 	}
 }
@@ -1199,28 +1571,28 @@ void WindowUpdateTitle() {
 
 	SDL_SetWindowTitle(g_window_ctx->window, fps.c_str());
 
-		// M1W6: always-on per-second health log. The first thing to
-		// check when "the game isn't responding" is this line: it shows
-		// frame count, FPS, controller state, and the last button bitmask
-		// the game is actually being served. Designed to be cheap (one
-		// printf per second) so it stays in production builds.
-		{
-			static double last_health_t = 0.0;
-			const double  t_now_health  = g_window_ctx->game->m_current_time_seconds;
-			if (t_now_health - last_health_t >= FPS_UPDATE_TIME) {
-				Libs::Controller::ControllerHealth h {};
-				Libs::Controller::ControllerGetHealth(&h);
-				const char* conn = h.connected ? "yes" : "no";
-				LOGF("[HEALTH] t=%.1fs frame=%u fps=%.1f ctrl=%s(active_id=%d n=%d) "
-				     "pad_reads=%" PRIu64 "(rej=%" PRIu64
-				     ") btn=0x%08x sticks=L(%d,%d) R(%d,%d)\n",
-				     t_now_health, g_window_ctx->game->m_frame_num,
-				     g_window_ctx->game->m_current_fps, conn, h.active_id, h.connected_count,
-				     h.pad_read_count, h.pad_read_reject, h.last_buttons,
-				     h.last_left_x, h.last_left_y, h.last_right_x, h.last_right_y);
-				last_health_t = t_now_health;
-			}
+	// M1W6: per-second health log. Gated by Log::IsAtLeast(Health) —
+	// defaults to true (level 1) so it's always on in release. Set
+	// --debug-level 0 to silence it; --debug-level 2/3 enables the
+	// verbose per-call LOGFs in controller.cpp as well.
+	{
+		static double last_health_t = 0.0;
+		const double  t_now_health  = g_window_ctx->game->m_current_time_seconds;
+		if (t_now_health - last_health_t >= FPS_UPDATE_TIME &&
+		    Log::IsAtLeast(Log::DebugLevel::Health)) {
+			Libs::Controller::ControllerHealth h {};
+			Libs::Controller::ControllerGetHealth(&h);
+			const char* conn = h.connected ? "yes" : "no";
+			LOGF("[HEALTH] t=%.1fs frame=%u fps=%.1f ctrl=%s(active_id=%d n=%d) "
+			     "pad_reads=%" PRIu64 "(rej=%" PRIu64
+			     ") btn=0x%08x sticks=L(%d,%d) R(%d,%d)\n",
+			     t_now_health, g_window_ctx->game->m_frame_num,
+			     g_window_ctx->game->m_current_fps, conn, h.active_id, h.connected_count,
+			     h.pad_read_count, h.pad_read_reject, h.last_buttons,
+			     h.last_left_x, h.last_left_y, h.last_right_x, h.last_right_y);
+			last_health_t = t_now_health;
 		}
+	}
 
 	// M1W3: optional stdout FPS summary for headless measurement runs.
 	// Prints once per FPS_UPDATE_TIME window to avoid log spam.
