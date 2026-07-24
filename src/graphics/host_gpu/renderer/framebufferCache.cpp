@@ -68,7 +68,7 @@ VulkanFramebuffer* FramebufferCache::CreateFramebuffer(RenderColorInfo* colors,
 			     "depth=%ux%u format=%s\n",
 			     first_color_extent.width, first_color_extent.height,
 			     depth->vulkan_buffer->extent.width, depth->vulkan_buffer->extent.height,
-			     string_VkFormat(depth->format));
+			     string_VkFormat(depth->format).c_str());
 		}
 		depth->format                   = VK_FORMAT_UNDEFINED;
 		depth->vulkan_buffer            = nullptr;

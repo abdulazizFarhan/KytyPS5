@@ -1100,6 +1100,12 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 	EXIT_IF(program == nullptr);
 	EXIT_IF(program->elf == nullptr);
 
+	if (address == 0) {
+		// K-0007 / KRN-003: NULL address causes NULL deref inside the TLS-pattern
+		// scan below. Skip the patch instead of crashing the host. Reproduced 6/6 SDK ELFs.
+		return;
+	}
+
 	if (size >= 12) {
 		// Replace guest stack-canary/errno stores through fs:[0x28] with nops.
 		// Windows x64 cannot host guest FS directly, and an unpatched shared-library access faults

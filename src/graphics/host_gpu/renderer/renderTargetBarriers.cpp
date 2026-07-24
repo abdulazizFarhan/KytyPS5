@@ -161,7 +161,7 @@ void GraphicsRenderDepthStencilBarrier(VkCommandBuffer vk_buffer, VulkanImage* i
 		if (log_count.fetch_add(1, std::memory_order_relaxed) < 16) {
 			LOGF(
 			    "DepthTexture: decompressing depth target for shader read format=%s extent=%ux%u\n",
-			    string_VkFormat(depth->format), depth->extent.width, depth->extent.height);
+			    string_VkFormat(depth->format).c_str(), depth->extent.width, depth->extent.height);
 		}
 		depth->compressed = false;
 	}

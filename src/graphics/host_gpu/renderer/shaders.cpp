@@ -105,7 +105,7 @@ static void GetInputFormat(const ShaderBufferResource& res, VkFormat* format, ui
 		*size   = 4;
 		if (NarrowInputFormat(format, size, used_components)) {
 			LOGF("InputFormat: narrowing fmt=%u to %s for used_components=%u\n", fmt,
-			     string_VkFormat(*format), used_components);
+			     string_VkFormat(*format).c_str(), used_components);
 		}
 		return;
 	}
@@ -119,7 +119,7 @@ static void GetInputFormat(const ShaderBufferResource& res, VkFormat* format, ui
 		*size   = 2;
 		if (NarrowInputFormat(format, size, used_components)) {
 			LOGF("InputFormat: narrowing fmt=%u to %s for used_components=%u\n", fmt,
-			     string_VkFormat(*format), used_components);
+			     string_VkFormat(*format).c_str(), used_components);
 		}
 		return;
 	}

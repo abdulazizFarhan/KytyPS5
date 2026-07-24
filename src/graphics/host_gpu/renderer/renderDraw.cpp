@@ -88,7 +88,7 @@ static void LogFramebufferSkip(const char* draw_name, const RenderColorInfo& col
 	    " color_image=%s depth_format=%s depth_image=%s depth_vaddr_num=%d target_mask=0x%08" PRIx32
 	    " prim=%u index_count=%u flags=0x%08" PRIx32 "\n",
 	    log_id, draw_name, RenderColorTypeName(color.type), color.base_addr, color.buffer_size,
-	    color.vulkan_buffer != nullptr ? "yes" : "no", string_VkFormat(depth.format),
+	    color.vulkan_buffer != nullptr ? "yes" : "no", string_VkFormat(depth.format).c_str(),
 	    depth.vulkan_buffer != nullptr ? "yes" : "no", depth.vaddr_num,
 	    ctx != nullptr ? ctx->GetRenderTargetMask() : 0, ucfg != nullptr ? ucfg->GetPrimType() : 0,
 	    index_count, flags);

@@ -239,7 +239,7 @@ void ResolveRenderDepthTarget(uint64_t submit_id, CommandBuffer* buffer, const H
 	    ResolveHostDepthAttachmentFormat(g_render_ctx->GetGraphicCtx(), *policy, has_stencil);
 	if (r->format == VK_FORMAT_UNDEFINED) {
 		DepthFatal("no host depth/stencil format supports required usage for %s",
-		           string_VkFormat(ideal_format));
+		           string_VkFormat(ideal_format).c_str());
 	}
 	const uint32_t guest_format = Prospero::GpuEnumValue(policy->guest_format);
 	const uint32_t bytes        = policy->bytes_per_element;
