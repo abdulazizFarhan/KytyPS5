@@ -965,6 +965,8 @@ void EmitDeviceAtomicMemoryBarrier(EmitterState* state);
 
 void EmitAtomicU32(EmitterState* state, const IR::Instruction& inst, uint32_t opcode);
 
+void EmitAtomicFMinF32(EmitterState* state, const IR::Instruction& inst);
+
 void EmitSLoadDword(EmitterState* state, const IR::Instruction& inst);
 
 void EmitLoadSrtDword(EmitterState* state, const IR::Instruction& inst);
@@ -1525,18 +1527,21 @@ uint32_t EmitValueOrZeroIfCondition(EmitterState* state, uint32_t condition, Fn&
 	}
 
 	const auto then_label  = state->builder.AllocateId();
+	const auto then_exit   = state->builder.AllocateId();
 	const auto else_label  = state->builder.AllocateId();
 	const auto merge_label = state->builder.AllocateId();
 	state->builder.AddFunction({OpSelectionMerge, merge_label, SelectionControlNone});
 	state->builder.AddFunction({OpBranchConditional, condition, then_label, else_label});
 	state->builder.AddFunction({OpLabel, then_label});
 	const auto then_value = fn();
+	state->builder.AddFunction({OpBranch, then_exit});
+	state->builder.AddFunction({OpLabel, then_exit});
 	state->builder.AddFunction({OpBranch, merge_label});
 	state->builder.AddFunction({OpLabel, else_label});
 	state->builder.AddFunction({OpBranch, merge_label});
 	state->builder.AddFunction({OpLabel, merge_label});
 	const auto value = state->builder.AllocateId();
-	state->builder.AddFunction({OpPhi, state->uint_type, value, then_value, then_label,
+	state->builder.AddFunction({OpPhi, state->uint_type, value, then_value, then_exit,
 	                            ConstantU32(state, 0), else_label});
 	return value;
 }
