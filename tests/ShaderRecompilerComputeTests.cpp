@@ -3161,6 +3161,7 @@ CoverageClass ClassifyOpcode(ShaderOpcode opcode,
   case Opcode::ImageStoreMip:
   case Opcode::ImageAtomicAdd:
   case Opcode::ImageAtomicUMin:
+  case Opcode::ImageAtomicUMax:
   case Opcode::ImageAtomicAnd:
   case Opcode::ImageAtomicOr:
   case Opcode::ImageAtomicXor:
@@ -3168,6 +3169,7 @@ CoverageClass ClassifyOpcode(ShaderOpcode opcode,
   case Opcode::ImageGather4Lz:
   case Opcode::ImageGather4C:
   case Opcode::ImageGather4CLz:
+  case Opcode::ImageGather4H:
   case Opcode::ImageGather4LzO:
   case Opcode::ImageGather4CO:
   case Opcode::ImageGather4CLzO:
