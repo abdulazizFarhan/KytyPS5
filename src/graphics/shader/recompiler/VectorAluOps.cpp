@@ -801,7 +801,7 @@ constexpr uint32_t SdwaSelAll() {
 }
 
 constexpr Vop2SdwaRule VOP2_SDWA_RULES[] = {
-    {Opcode::VCndmaskB32, SdwaSelWords(), SdwaSelWords() | SdwaSelFull(),
+    {Opcode::VCndmaskB32, SdwaSelWords() | SdwaSelFull(), SdwaSelWords() | SdwaSelFull(),
      SdwaSelWords() | SdwaSelFull(), true, false},
     {Opcode::VAddF32, SdwaSelFull(), SdwaSelFull(), SdwaSelFull(), false, true},
     {Opcode::VSubF32, SdwaSelFull(), SdwaSelFull(), SdwaSelFull(), false, true},
@@ -820,7 +820,7 @@ constexpr Vop2SdwaRule VOP2_SDWA_RULES[] = {
      SdwaSelWords() | SdwaSelFull(), true, true},
     {Opcode::VMulI32I24, SdwaSelFull(), SdwaSelAll(), SdwaSelAll(), false, false},
     {Opcode::VMulU32U24, SdwaSelFull(), SdwaSelAll(), SdwaSelAll(), false, false},
-    {Opcode::VMinU32, SdwaSelFull(), SdwaSelAll(), SdwaSelAll(), false, false},
+    {Opcode::VMinU32, SdwaSelAll(), SdwaSelAll(), SdwaSelAll(), true, false},
     {Opcode::VMaxU32, SdwaSelFull(), SdwaSelAll(), SdwaSelAll(), false, false},
     {Opcode::VLshrrevB32, SdwaSelFull(), SdwaSelFull(), SdwaSelWords() | SdwaSelFull(), false,
      false},
@@ -830,7 +830,7 @@ constexpr Vop2SdwaRule VOP2_SDWA_RULES[] = {
     {Opcode::VXorB32, SdwaSelWords() | SdwaSelFull(), SdwaSelAll(), SdwaSelAll(), true, false},
     {Opcode::VXnorB32, SdwaSelWords() | SdwaSelFull(), SdwaSelAll(), SdwaSelAll(), true, false},
     {Opcode::VAddNcU32, SdwaSelFull(), SdwaSelAll(), SdwaSelAll(), false, false},
-    {Opcode::VSubNcU32, SdwaSelFull(), SdwaSelAll(), SdwaSelAll(), false, false},
+    {Opcode::VSubNcU32, SdwaSelAll(), SdwaSelAll(), SdwaSelAll(), true, false},
     {Opcode::VSubrevNcU32, SdwaSelFull(), SdwaSelAll(), SdwaSelAll(), false, false},
 };
 
