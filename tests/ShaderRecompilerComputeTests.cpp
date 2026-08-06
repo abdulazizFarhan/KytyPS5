@@ -9893,6 +9893,23 @@ bool CacheFault(void *opaque, PageFaultAccess access, uint64_t vaddr,
   std::_Exit(0x7f);
 }
 
+void CheckRenderTargetFormatContract() {
+  // R8 uint render target: maps ChannelLayout::k8 + ChannelType::kUInt +
+  // ChannelOrder::kStandard to VK_FORMAT_R8_UINT (1 byte / element). This is
+  // a [host] (non-compute) test that just exercises the format mapping table
+  // since R8-unorm, R16-unorm, R16-uint, etc. are all there but R8-uint was
+  // missing.
+  const auto r8_uint =
+      TextureGetRenderTargetFormat(static_cast<uint32_t>(Prospero::ChannelLayout::k8),
+                                   static_cast<uint32_t>(Prospero::ChannelType::kUInt),
+                                   static_cast<uint32_t>(Prospero::ChannelOrder::kStandard));
+  Require("RenderTargetFormat", "R8 uint",
+          r8_uint.format == VK_FORMAT_R8_UINT && r8_uint.bytes_per_element == 1u,
+          "R8 uint render-target tuple was rejected");
+
+  std::printf("[host]    %-32s ok\n", "RenderTargetFormat");
+}
+
 void CheckReverseRenderTargetFormatContract() {
   const auto format = TextureGetRenderTargetFormat(12u, 7u, 2u);
   Require("ReverseRenderTarget", "exact format",
@@ -14003,6 +14020,7 @@ int main(int argc, char **argv) {
   vulkan.CheckRenderTargetViewCache();
   vulkan.CheckDepthTargetSampledViewCache();
   vulkan.CheckVideoOutSampledViewCache();
+  CheckRenderTargetFormatContract();
   const auto tests = MakeCases();
   const auto graphics_tests = MakeGraphicsCases();
   for (const auto &test : tests) {

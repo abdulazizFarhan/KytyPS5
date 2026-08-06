@@ -30,6 +30,10 @@ RenderTargetFormatInfo TextureGetRenderTargetFormat(uint32_t raw_layout, uint32_
 	    raw_order <= Prospero::GpuEnumValue(Prospero::ChannelOrder::kAltReversed)) {
 		return {VK_FORMAT_R8_UNORM, 1};
 	}
+	if (layout == Prospero::ChannelLayout::k8 && type == Prospero::ChannelType::kUInt &&
+	    order == Prospero::ChannelOrder::kStandard) {
+		return {VK_FORMAT_R8_UINT, 1};
+	}
 	if (is(Prospero::ChannelLayout::k8_8, Prospero::ChannelType::kUNorm,
 	       Prospero::ChannelOrder::kStandard)) {
 		return {VK_FORMAT_R8G8_UNORM, 2};
