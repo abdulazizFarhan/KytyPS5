@@ -322,6 +322,7 @@ enum class Opcode {
 	AtomicOrU32,
 	AtomicXorU32,
 	AtomicFMinF32,
+	AtomicFMaxF32,
 	FlatLoadUbyte,
 	FlatLoadSbyte,
 	FlatLoadUshort,

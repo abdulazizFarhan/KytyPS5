@@ -3102,6 +3102,7 @@ CoverageClass ClassifyOpcode(ShaderOpcode opcode,
   case Opcode::BufferAtomicOr:
   case Opcode::BufferAtomicXor:
   case Opcode::BufferAtomicFMin:
+  case Opcode::BufferAtomicFMax:
   case Opcode::FlatLoadUbyte:
   case Opcode::FlatLoadSbyte:
   case Opcode::FlatLoadUshort:
@@ -8425,6 +8426,93 @@ TestCase DsAppendConsumeUsesEncodedLdsSelector() {
            O::DsConsume, O::BufferStoreDword, O::SEndpgm}};
 }
 
+
+TestCase BufferAtomicFMaxExactRawGlcModes() {
+  using O = ShaderOpcode;
+
+  std::vector<u32> code;
+  AppendVMovLiteral(&code, 0, 0x40000000u); // 2.0
+  code.push_back(0xe1000000u);
+  code.push_back(0x80010000u); // exact failing buffer_atomic_fmax, GLC=0
+  AppendStoreVgpr(&code, 0, 1);
+  AppendVMovLiteral(&code, 0, 0x3f800000u); // 1.0
+  code.push_back(0xe1004000u);
+  code.push_back(0x80010000u); // same instruction with GLC=1
+  AppendStoreVgpr(&code, 0, 2);
+  AppendEnd(&code);
+
+  TestCase test;
+  test.name     = "BufferAtomicFMaxExactRawGlcModes";
+  test.code     = code;
+  test.initial  = {0x3f800000u, 0, 0}; // 1.0
+  test.expected = {0x40000000u, 0x40000000u, 0x40000000u};
+  test.opcodes  = {O::VMovB32, O::BufferAtomicFMax, O::BufferStoreDword, O::SEndpgm};
+  const auto descriptor =
+      MakeStructuredStorageBufferData(0, static_cast<u32>(test.initial.size() * sizeof(u32)));
+  std::copy_n(descriptor.begin(), 4, test.user_data.begin() + 4);
+  test.user_data[50] = 1u << 20u;
+  test.has_user_data = true;
+  return test;
+}
+
+TestCase BufferAtomicFMaxSpecialValues() {
+  using O = ShaderOpcode;
+
+  const u32 values[] = {
+      0x40000000u, // 2.0
+      0x7f800000u, // +infinity
+      0xff800000u, // -infinity
+      0x3f800000u, // 1.0
+      0x7fc00000u, // quiet NaN
+      0x00000000u, // +0.0
+      0x80000000u, // -0.0
+      0x00000000u, // +0.0
+      0x80000001u, // smallest negative denorm
+  };
+  std::vector<u32> code;
+  for (u32 i = 0; i < static_cast<u32>(std::size(values)); i++) {
+    AppendVMovU32(&code, 20, i * 4u);
+    AppendVMovLiteral(&code, i, values[i]);
+    AppendBufferStoreOpcode(&code, 0x40, i, 20, true);
+  }
+  for (u32 i = 0; i < static_cast<u32>(std::size(values)); i++) {
+    AppendStoreVgpr(&code, i, i + static_cast<u32>(std::size(values)));
+  }
+  AppendEnd(&code);
+
+  return {"BufferAtomicFMaxSpecialValues",
+          code,
+          {0x3f800000u, 0x40800000u, 0xc0800000u, 0x7f7fffffu, 0x00800000u, 0x7f800000u,
+           0x7f800000u, 0x7fffffffu, 0x7f800000u, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+          {0x40000000u, 0x7f800000u, 0xc0800000u, 0x7f7fffffu, 0x00800000u, 0x7f800000u,
+           0x7f800000u, 0x7fffffffu, 0x7f800000u, 0x3f800000u, 0x40800000u, 0xc0800000u,
+           0x7f7fffffu, 0x00800000u, 0x7f800000u, 0x7f800000u, 0x7fffffffu, 0x7f800000u},
+          {O::VMovB32, O::BufferAtomicFMax, O::BufferStoreDword, O::SEndpgm}};
+}
+
+TestCase BufferAtomicFMaxContendedWorkgroup() {
+  using O = ShaderOpcode;
+
+  std::vector<u32> code;
+  code.push_back(EncodeVop1(0x06, 1, Vgpr(0))); // v_cvt_f32_u32 v1, thread_id.x
+  AppendVMovU32(&code, 20, 0);
+  AppendBufferStoreOpcode(&code, 0x40, 1, 20);
+  AppendEnd(&code);
+
+  TestCase test;
+  test.name     = "BufferAtomicFMaxContendedWorkgroup";
+  test.code     = code;
+  test.initial  = {0x3e000000u}; // 0.125
+  test.expected = {0x427c0000u}; // max(0.125, 0.0 .. 63.0) = 63.0
+  test.opcodes  = {O::VCvtF32U32, O::VMovB32, O::BufferAtomicFMax, O::SEndpgm};
+  test.compute_info.threads_num[0] = 64;
+  test.compute_info.threads_num[1] = 1;
+  test.compute_info.threads_num[2] = 1;
+  test.compute_info.thread_ids_num = 1;
+  test.has_compute_info            = true;
+  return test;
+}
+
 TestCase DsAppendUsesEncodedGdsSelector() {
   using O = ShaderOpcode;
 
@@ -9659,6 +9747,9 @@ std::vector<TestCase> MakeCases() {
   AddCase(BufferAtomicFMinExactRawGlcModes);
   AddCase(BufferAtomicFMinSpecialValues);
   AddCase(BufferAtomicFMinContendedWorkgroup);
+  AddCase(BufferAtomicFMaxExactRawGlcModes);
+  AddCase(BufferAtomicFMaxSpecialValues);
+  AddCase(BufferAtomicFMaxContendedWorkgroup);
   AddCase(VectorMbcntUsesThreadMask);
   AddCase(VectorAddcWritesPerLaneCarryOut);
   AddCase(VectorAddcUsesPerLaneCarryIn);

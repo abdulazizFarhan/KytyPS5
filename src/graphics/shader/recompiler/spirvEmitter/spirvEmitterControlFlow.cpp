@@ -780,6 +780,9 @@ void EmitInstruction(EmitterState* state, const IR::Instruction& inst) {
 		case IR::Opcode::AtomicFMinF32:
 			EmitGuardedByExec(state, [&]() { EmitAtomicFMinF32(state, inst); });
 			break;
+		case IR::Opcode::AtomicFMaxF32:
+			EmitGuardedByExec(state, [&]() { EmitAtomicFMaxF32(state, inst); });
+			break;
 		case IR::Opcode::FlatLoadUbyte: EmitFlatLoadUbyte(state, inst); break;
 		case IR::Opcode::FlatLoadSbyte: EmitFlatLoadSbyte(state, inst); break;
 		case IR::Opcode::FlatLoadUshort: EmitFlatLoadUshort(state, inst); break;

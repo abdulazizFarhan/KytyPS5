@@ -1227,6 +1227,27 @@ void EmitAtomicFMinF32(EmitterState* state, const IR::Instruction& inst) {
 	EmitStoreU32(state, inst.dst, old);
 }
 
+
+void EmitAtomicFMaxF32(EmitterState* state, const IR::Instruction& inst) {
+	const auto index =
+	    EmitMemoryDwordIndex(state, inst, inst.memory, 1, AddressSourceCount(inst, 1));
+	const auto in_bounds = EmitStorageBufferElementInBounds(state, inst.memory, index, inst.pc);
+	const auto src_u32   = EmitValueLoad(state, inst.src[0]);
+	const auto old       = EmitValueOrZeroIfCondition(state, in_bounds, [&]() {
+		const auto pointer = EmitStorageBufferElementPointer(state, inst.memory, index, inst.pc);
+		return EmitAtomicUpdateU32(state, pointer, inst.memory.kind, [&](uint32_t old_u32) {
+			const auto replace_old = state->builder.AllocateId();
+			// ordered > of (src, old) = ordered < of (old, src) by swapping sides.
+			const auto greater = EmitF32BitsOrderedLessThan(state, old_u32, src_u32);
+			state->builder.AddFunction(
+			    {OpSelect, state->uint_type, replace_old, greater, src_u32, old_u32});
+			return replace_old;
+		});
+	});
+	EmitStoreU32(state, inst.dst, old);
+}
+
+
 void EmitSLoadDword(EmitterState* state, const IR::Instruction& inst) {
 	if (state->address_memory_variable == 0) {
 		ExitDescriptorBindingFailure(*state, IR::DescriptorBindingKind::AddressMemory,
