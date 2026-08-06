@@ -5930,6 +5930,177 @@ TestCase VectorCompareInvertedMaskSelect() {
            O::BufferStoreDword, O::SEndpgm}};
 }
 
+TestCase VectorF16ConvertOps() {
+  using O = ShaderOpcode;
+  // F16 convert opcodes (VOP1):
+  //   v_cvt_f16_i16 (0x51) - signed i16 -> f16
+  //   v_cvt_u16_f16 (0x52) - f16 -> unsigned u16
+  //   v_cvt_i16_f16 (0x53) - f16 -> signed i16
+  // Note: v_cvt_f16_u16 is covered separately in VectorCvtF16U16.
+  // F16 is packed in the low 16 bits of the destination; high 16 bits zeroed.
+  std::vector<u32> code;
+  // v_cvt_f16_i16: -1 (0xFFFF as signed) -> -1.0 f16 = 0xBC00
+  AppendVMovLiteral(&code, 0, 0x0000FFFFu);
+  code.push_back(EncodeVop1(0x51u, 3, Vgpr(0)));
+  // v_cvt_u16_f16: 1.0 f16 (0x3C00) -> u16 = 1
+  AppendVMovLiteral(&code, 1, 0x00003C00u);
+  code.push_back(EncodeVop1(0x52u, 4, Vgpr(1)));
+  // v_cvt_i16_f16: -1.0 f16 (0xBC00) -> i16 = -1 = 0xFFFF
+  AppendVMovLiteral(&code, 2, 0x0000BC00u);
+  code.push_back(EncodeVop1(0x53u, 5, Vgpr(2)));
+  AppendStoreVgpr(&code, 3, 0);
+  AppendStoreVgpr(&code, 4, 1);
+  AppendStoreVgpr(&code, 5, 2);
+  AppendEnd(&code);
+  return {"VectorF16ConvertOps",
+          code,
+          {},
+          {0x0000BC00u, 0x00000001u, 0x0000FFFFu},
+          {O::VMovB32, O::VCvtF16I16, O::VCvtU16F16, O::VCvtI16F16,
+           O::BufferStoreDword, O::SEndpgm}};
+}
+
+TestCase VectorF16MathOps() {
+  using O = ShaderOpcode;
+  // F16 math opcodes (VOP1):
+  //   v_sqrt_f16 (0x55), v_floor_f16 (0x5b), v_ceil_f16 (0x5c),
+  //   v_trunc_f16 (0x5d), v_rndne_f16 (0x5e).
+  // F16 is packed in the low 16 bits of the destination.
+  // Use literal 2.0 f16 (0x4000) and 4.0 f16 (0x4080) which are exact.
+  std::vector<u32> code;
+  // v_sqrt_f16: sqrt(4.0) = 2.0 -> f16 = 0x4000
+  AppendVMovLiteral(&code, 0, 0x00004080u);  // 4.0 f16
+  code.push_back(EncodeVop1(0x55u, 3, Vgpr(0)));
+  // v_floor_f16: floor(2.5) = 2.0 -> f16 = 0x4000
+  AppendVMovLiteral(&code, 1, 0x00004200u);  // 2.5 f16 (approx; 2.5 is exact in f16 actually = 0x4200)
+  code.push_back(EncodeVop1(0x5bu, 4, Vgpr(1)));
+  // v_ceil_f16: ceil(2.5) = 3.0 -> f16 = 0x4200
+  AppendVMovLiteral(&code, 1, 0x00004200u);
+  code.push_back(EncodeVop1(0x5cu, 5, Vgpr(1)));
+  // v_trunc_f16: trunc(2.5) = 2.0 -> f16 = 0x4000
+  AppendVMovLiteral(&code, 1, 0x00004200u);
+  code.push_back(EncodeVop1(0x5du, 6, Vgpr(1)));
+  // v_rndne_f16: round_even(2.5) = 2.0 (rounds to even) -> f16 = 0x4000
+  AppendVMovLiteral(&code, 1, 0x00004200u);
+  code.push_back(EncodeVop1(0x5eu, 7, Vgpr(1)));
+  AppendStoreVgpr(&code, 3, 0);
+  AppendStoreVgpr(&code, 4, 1);
+  AppendStoreVgpr(&code, 5, 2);
+  AppendStoreVgpr(&code, 6, 3);
+  AppendStoreVgpr(&code, 7, 4);
+  AppendEnd(&code);
+  return {"VectorF16MathOps",
+          code,
+          {},
+          {0x00004000u, 0x00004000u, 0x00004200u, 0x00004000u, 0x00004000u},
+          {O::VMovB32, O::VSqrtF16, O::VFloorF16, O::VCeilF16,
+           O::VTruncF16, O::VRndneF16, O::BufferStoreDword, O::SEndpgm}};
+}
+
+TestCase VectorFmacF16() {
+  using O = ShaderOpcode;
+  // v_fmac_f16 (VOP2 0x36): dst = src0 * src1 + dst (FMA). F16 packed in low 16 bits.
+  // 2.0 * 3.0 + 1.0 = 7.0 = 0x4700
+  std::vector<u32> code;
+  AppendVMovLiteral(&code, 0, 0x00004000u);  // v0 = 2.0 f16
+  AppendVMovLiteral(&code, 1, 0x00004200u);  // v1 = 3.0 f16
+  AppendVMovLiteral(&code, 2, 0x00003C00u);  // v2 = 1.0 f16 (initial dst)
+  code.push_back(EncodeVop2(0x36u, 2, Vgpr(0), Vgpr(1)));  // v_fmac_f16 v2, v0, v1
+  AppendStoreVgpr(&code, 2, 0);
+  AppendEnd(&code);
+  return {"VectorFmacF16",
+          code,
+          {},
+          {0x00004700u},
+          {O::VMovB32, O::VFmacF16, O::BufferStoreDword, O::SEndpgm}};
+}
+
+TestCase VectorFmaakF16() {
+  using O = ShaderOpcode;
+  // v_fmaak_f16 (VOP2 0x38): vdst = vsrc1 * INLINE_K + vdst.
+  // The inline K is interpreted as f16 from the lower 16 bits of an inline constant.
+  // 3.0 * 2.0 + 1.0 = 7.0 (0x4700)
+  std::vector<u32> code;
+  AppendVMovLiteral(&code, 0, 0x00004200u);  // v0 = 3.0 f16
+  AppendVMovLiteral(&code, 1, 0x00003C00u);  // v1 = 1.0 f16 (initial dst)
+  code.push_back(EncodeVop2(0x38u, 1, Vgpr(0), InlineU32(2)));  // v_fmaak_f16 v1, v0, 2
+  AppendStoreVgpr(&code, 1, 0);
+  AppendEnd(&code);
+  return {"VectorFmaakF16",
+          code,
+          {},
+          {0x00004700u},
+          {O::VMovB32, O::VFmaakF16, O::BufferStoreDword, O::SEndpgm}};
+}
+
+TestCase VectorFmamkF16() {
+  using O = ShaderOpcode;
+  // v_fmamk_f16 (VOP2 0x37): vdst = INLINE_K * vsrc1 + vdst.
+  // The inline K is interpreted as f16 from the lower 16 bits of an inline constant.
+  // 2.0 * 3.0 + 1.0 = 7.0 (0x4700)
+  std::vector<u32> code;
+  AppendVMovLiteral(&code, 0, 0x00004000u);  // v0 = 2.0 f16
+  AppendVMovLiteral(&code, 1, 0x00004200u);  // v1 = 3.0 f16
+  AppendVMovLiteral(&code, 2, 0x00003C00u);  // v2 = 1.0 f16 (initial dst)
+  code.push_back(EncodeVop2(0x37u, 2, InlineU32(2), Vgpr(0)));  // v_fmamk_f16 v2, 2, v0
+  AppendStoreVgpr(&code, 2, 0);
+  AppendEnd(&code);
+  return {"VectorFmamkF16",
+          code,
+          {},
+          {0x00004700u},
+          {O::VMovB32, O::VFmamkF16, O::BufferStoreDword, O::SEndpgm}};
+}
+
+TestCase VectorPackB32F16() {
+  using O = ShaderOpcode;
+  // v_pack_b32_f16 (VOP3 0x311): pack two f16 values into one 32-bit dword.
+  // dst = (hi_f16 << 16) | lo_f16
+  // lo = 1.0 f16 = 0x3C00, hi = 2.0 f16 = 0x4000
+  // result = 0x40003C00
+  std::vector<u32> code;
+  AppendVMovLiteral(&code, 0, 0x00003C00u);  // v0 = 1.0 f16 (lo)
+  AppendVMovLiteral(&code, 1, 0x00004000u);  // v1 = 2.0 f16 (hi)
+  // v_pack_b32_f16 v2, v0, v1 (lo, hi)
+  code.push_back(EncodeVop3Word0(0x311, 2, 0, 0, 0));
+  code.push_back(EncodeVop3Word1(Vgpr(0), Vgpr(1), 0, 0, 0));
+  AppendStoreVgpr(&code, 2, 0);
+  AppendEnd(&code);
+  return {"VectorPackB32F16",
+          code,
+          {},
+          {0x40003C00u},
+          {O::VMovB32, O::VPackB32F16, O::BufferStoreDword, O::SEndpgm}};
+}
+
+TestCase VectorCvtF16U16() {
+  using O = ShaderOpcode;
+  // v_cvt_f16_u16: convert a 16-bit unsigned integer to a 16-bit float,
+  // packed in the low 16 bits of the destination VGPR.
+  // Test values: 0 -> 0.0, 100 -> 100.0, 65535 -> 65535.0 (max u16 -> inf likely).
+  // 0 and 100 are exact; 65535 may overflow to inf in f16.
+  std::vector<u32> code;
+  AppendVMovLiteral(&code, 0, 0x00000000u);  // v0 = 0
+  AppendVMovLiteral(&code, 1, 0x00000064u);  // v1 = 100 (exact f16: 0x5640)
+  AppendVMovLiteral(&code, 2, 0x0000FFFFu);  // v2 = 65535 (overflows f16 max=65504)
+  // v_cvt_f16_u16 v3, v0  (0 -> 0.0)
+  code.push_back(EncodeVop1(0x50u, 3, Vgpr(0)));
+  // v_cvt_f16_u16 v4, v1  (100 -> 100.0 = 0x5640)
+  code.push_back(EncodeVop1(0x50u, 4, Vgpr(1)));
+  // v_cvt_f16_u16 v5, v2  (65535 -> inf in f16)
+  code.push_back(EncodeVop1(0x50u, 5, Vgpr(2)));
+  AppendStoreVgpr(&code, 3, 0);
+  AppendStoreVgpr(&code, 4, 1);
+  AppendStoreVgpr(&code, 5, 2);
+  AppendEnd(&code);
+
+  return {"VectorCvtF16U16",
+          code,
+          {},
+          {0x00000000u, 0x00005640u, 0x00007C00u},  // f16: 0, 100, inf
+          {O::VMovB32, O::VCvtF16U16, O::BufferStoreDword, O::SEndpgm}};
+}
+
 TestCase VectorU16ArithmeticOps() {
   using O = ShaderOpcode;
   // 16-bit unsigned arithmetic: v_add_nc_u16, v_sub_nc_u16, v_max_u16, v_min_u16,
@@ -9233,6 +9404,13 @@ std::vector<TestCase> MakeCases() {
   AddCase(VectorVop3CmpxWritesExecMask);
   AddCase(VectorVopcSdwaCmpxWritesExecMask);
   AddCase(VectorCompareInvertedMaskSelect);
+  AddCase(VectorF16ConvertOps);
+  AddCase(VectorF16MathOps);
+  AddCase(VectorFmacF16);
+  AddCase(VectorFmamkF16);
+  AddCase(VectorFmaakF16);
+  AddCase(VectorPackB32F16);
+  AddCase(VectorCvtF16U16);
   // ===== 2026-07-23: 16-bit integer ALU coverage =====
   // VOP3/VOPC 16-bit unsigned and signed arithmetic, shift, min/max, compare.
   // The Spirv-emitter's IAddU16 / ISubI16 / EmitBinaryU16 paths handle the
