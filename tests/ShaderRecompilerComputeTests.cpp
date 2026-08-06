@@ -6075,6 +6075,70 @@ TestCase VectorI16CompareOps() {
            O::VCndmaskB32, O::BufferStoreDword, O::SEndpgm}};
 }
 
+TestCase VectorU16CompareEdgesOps() {
+  using O = ShaderOpcode;
+  // 16-bit unsigned compares for LE/NE/GE (VOPC opcodes 0xab=le, 0xad=ne, 0xae=ge).
+  // Spirv-emitter operates only on low 16 bits. v5=1 used as cndmask src1.
+  std::vector<u32> code;
+  AppendVMovLiteral(&code, 0, 0x00000003u);  // v0 low 16 = 3
+  AppendVMovLiteral(&code, 1, 0x00000003u);  // v1 low 16 = 3 (same as v0)
+  code.push_back(EncodeVop1(0x01, 5, InlineU32(1)));  // v5 = 1
+
+  // v_cmp_le_u16: 3<=3=true -> 1
+  code.push_back(EncodeVopc(0xab, Vgpr(0), Vgpr(1)));
+  code.push_back(EncodeVop2(0x01, 2, InlineU32(0), Vgpr(5)));
+  // v_cmp_ne_u16: 3!=3=false -> 0
+  code.push_back(EncodeVopc(0xad, Vgpr(0), Vgpr(1)));
+  code.push_back(EncodeVop2(0x01, 3, InlineU32(0), Vgpr(5)));
+  // v_cmp_ge_u16: 3>=3=true -> 1
+  code.push_back(EncodeVopc(0xae, Vgpr(0), Vgpr(1)));
+  code.push_back(EncodeVop2(0x01, 4, InlineU32(0), Vgpr(5)));
+
+  AppendStoreVgpr(&code, 2, 0);
+  AppendStoreVgpr(&code, 3, 1);
+  AppendStoreVgpr(&code, 4, 2);
+  AppendEnd(&code);
+
+  return {"VectorU16CompareEdgesOps",
+          code,
+          {},
+          {1u, 0u, 1u},
+          {O::VMovB32, O::VCmpLeU16, O::VCmpNeU16, O::VCmpGeU16,
+           O::VCndmaskB32, O::BufferStoreDword, O::SEndpgm}};
+}
+
+TestCase VectorI16CompareEdgesOps() {
+  using O = ShaderOpcode;
+  // 16-bit signed compares for LE/NE/GE (VOPC opcodes 0x8b=le, 0x8d=ne, 0x8e=ge).
+  // Spirv-emitter operates only on low 16 bits. v5=1 used as cndmask src1.
+  std::vector<u32> code;
+  AppendVMovLiteral(&code, 0, 0x00000003u);  // v0 low 16 = 3
+  AppendVMovLiteral(&code, 1, 0x00000003u);  // v1 low 16 = 3 (same)
+  code.push_back(EncodeVop1(0x01, 5, InlineU32(1)));  // v5 = 1
+
+  // v_cmp_le_i16: 3<=3=true -> 1
+  code.push_back(EncodeVopc(0x8b, Vgpr(0), Vgpr(1)));
+  code.push_back(EncodeVop2(0x01, 2, InlineU32(0), Vgpr(5)));
+  // v_cmp_ne_i16: 3!=3=false -> 0
+  code.push_back(EncodeVopc(0x8d, Vgpr(0), Vgpr(1)));
+  code.push_back(EncodeVop2(0x01, 3, InlineU32(0), Vgpr(5)));
+  // v_cmp_ge_i16: 3>=3=true -> 1
+  code.push_back(EncodeVopc(0x8e, Vgpr(0), Vgpr(1)));
+  code.push_back(EncodeVop2(0x01, 4, InlineU32(0), Vgpr(5)));
+
+  AppendStoreVgpr(&code, 2, 0);
+  AppendStoreVgpr(&code, 3, 1);
+  AppendStoreVgpr(&code, 4, 2);
+  AppendEnd(&code);
+
+  return {"VectorI16CompareEdgesOps",
+          code,
+          {},
+          {1u, 0u, 1u},
+          {O::VMovB32, O::VCmpLeI16, O::VCmpNeI16, O::VCmpGeI16,
+           O::VCndmaskB32, O::BufferStoreDword, O::SEndpgm}};
+}
+
 TestCase BranchSelect() {
   using O = ShaderOpcode;
 
@@ -9177,6 +9241,8 @@ std::vector<TestCase> MakeCases() {
   AddCase(VectorI16ArithmeticOps);
   AddCase(VectorU16CompareOps);
   AddCase(VectorI16CompareOps);
+  AddCase(VectorU16CompareEdgesOps);
+  AddCase(VectorI16CompareEdgesOps);
   AddCase(BranchSelect);
   AddCase(SimpleLoop);
   AddCase(BranchVccnzUsesWholeMask);
