@@ -530,6 +530,7 @@ struct TestCase {
   std::optional<uint64_t> flat_memory_base;
   std::vector<u32> gds_initial;
   std::vector<u32> expected_gds;
+  mutable bool passed = false;
 };
 
 struct SkippedCase {
@@ -548,6 +549,7 @@ struct GraphicsCase {
   std::vector<u32> pixel_interpolator_settings;
   bool pixel_no_perspective = false;
   std::vector<u32> vertices;
+  mutable bool passed = false;
 };
 
 struct CompiledShader {
@@ -2879,6 +2881,7 @@ void RunCase(VulkanHarness *vulkan, const TestCase &test) {
   vulkan->DestroyBuffer(&gds_buffer);
   vulkan->DestroyBuffer(&buffer);
   CompareWords(test, "readback", test.expected, actual);
+  test.passed = true;
   std::printf("[compute] %-32s ok\n", test.name);
 }
 
@@ -2886,6 +2889,7 @@ void RunGraphicsCase(VulkanHarness *vulkan, const GraphicsCase &test) {
   auto compiled = CompileFragmentCase(test);
   auto actual = vulkan->RenderFragment(test, compiled);
   CompareGraphicsWords(test, actual);
+  test.passed = true;
   std::printf("[graphics] %-31s ok\n", test.name);
 }
 
@@ -3226,16 +3230,29 @@ void CheckOpcodeCoverage(const std::vector<TestCase> &tests,
   using ShaderRecompiler::Decoder::Opcode;
 
   std::set<Opcode> covered;
+  uint32_t compute_ran = 0, compute_passed = 0, graphics_ran = 0, graphics_passed = 0;
   for (const auto &test : tests) {
+    compute_ran++;
+    if (!test.passed) {
+      continue;
+    }
+    compute_passed++;
     for (auto opcode : test.opcodes) {
       covered.insert(opcode);
     }
   }
   for (const auto &test : graphics_tests) {
+    graphics_ran++;
+    if (!test.passed) {
+      continue;
+    }
+    graphics_passed++;
     for (auto opcode : test.opcodes) {
       covered.insert(opcode);
     }
   }
+  std::printf("[coverage] compute tests: ran=%u passed=%u, graphics tests: ran=%u passed=%u\n",
+              compute_ran, compute_passed, graphics_ran, graphics_passed);
 
   uint32_t counts[7] = {};
   std::vector<ShaderOpcode> pending[7];
@@ -13988,7 +14005,6 @@ int main(int argc, char **argv) {
   vulkan.CheckVideoOutSampledViewCache();
   const auto tests = MakeCases();
   const auto graphics_tests = MakeGraphicsCases();
-  CheckOpcodeCoverage(tests, graphics_tests);
   for (const auto &test : tests) {
     RunCase(&vulkan, test);
   }
@@ -13998,6 +14014,12 @@ int main(int argc, char **argv) {
   for (const auto &test : graphics_tests) {
     RunGraphicsCase(&vulkan, test);
   }
+  // Coverage report runs AFTER all test loops so the count reflects opcodes
+  // actually exercised by passing tests, not just opcodes declared in
+  // MakeCases(). A test whose RunCase never returns (e.g. STATUS_STACK_BUFFER_OVERRUN
+  // crashes the process) leaves test.passed == false and therefore does not
+  // contribute to coverage.
+  CheckOpcodeCoverage(tests, graphics_tests);
   std::printf("ShaderRecompilerComputeTests: all cases passed\n");
   return 0;
 }
