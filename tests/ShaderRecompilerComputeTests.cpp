@@ -5650,6 +5650,52 @@ TestCase VectorVop3CompareNeU64OnGpu() {
            O::BufferStoreDword, O::SEndpgm}};
 }
 
+
+TestCase VectorVop3CompareEqI64OnGpu() {
+  using O = ShaderOpcode;
+
+  std::vector<u32> code;
+  code.push_back(EncodeVop1(0x01, 1, InlineU32(1)));
+
+  // Case 1: exec == exec -> true -> dst = 0
+  code.push_back(EncodeSop1(0x04, 106, 126)); // s_mov_b64 vcc, exec
+  code.push_back(0xd4a2006au);                // v_cmp_eq_i64 vcc, exec, vcc (VOP3A)
+  code.push_back(0x0000d47eu);                //   vcc_hi, exec_lo (126), vcc_lo (106)
+  code.push_back(EncodeVop2(0x01, 2, InlineU32(0), 1));
+  AppendStoreVgpr(&code, 2, 0);
+
+  // Case 2: 0 == 0 -> true -> dst = 1
+  AppendSMovLiteral(&code, 106, 0);
+  AppendSMovLiteral(&code, 107, 0);
+  code.push_back(0xd4a2006au);                // v_cmp_eq_i64 vcc, vcc, vcc
+  code.push_back(0x0000d46au);                //   vcc_lo (106), vcc_lo (106) (==0, ==0)
+  code.push_back(EncodeVop2(0x01, 3, InlineU32(0), 1));
+  AppendStoreVgpr(&code, 3, 1);
+
+  // Case 3: exec == 0 -> false -> dst = 2
+  AppendSMovLiteral(&code, 106, 0);
+  AppendSMovLiteral(&code, 107, 0);
+  code.push_back(0xd4a2006au);                // v_cmp_eq_i64 vcc, exec, vcc
+  code.push_back(0x0000d47eu);                //   vcc_lo (106), exec_lo (126) (0 != exec)
+  code.push_back(EncodeVop2(0x01, 4, InlineU32(0), 1));
+  AppendStoreVgpr(&code, 4, 2);
+
+  AppendEnd(&code);
+
+  return {"VectorVop3CompareEqI64OnGpu",
+          code,
+          {},
+          // v_cmp_eq_i64 semantics:
+          //   sources EQUAL     -> vcc = 1 (true)  -> cndmask -> 1 (src1)
+          //   sources NOT-EQUAL -> vcc = 0 (false) -> cndmask -> 0 (src0)
+          // Case 1: exec == exec -> eq       -> dst = 1
+          // Case 2: 0 == 0       -> eq       -> dst = 1
+          // Case 3: exec != 0    -> not-eq   -> dst = 0
+          {1, 1, 0},
+          {O::VMovB32, O::SMovB64, O::VCmpEqI64, O::VCndmaskB32, O::SMovB32,
+           O::BufferStoreDword, O::SEndpgm}};
+}
+
 TestCase VectorCompareClassF32() {
   using O = ShaderOpcode;
 
@@ -9520,6 +9566,7 @@ std::vector<TestCase> MakeCases() {
   AddCase(VectorVop3IntegerOps);
   AddCase(VectorBfeI32ArithmeticShiftMasksField);
   AddCase(VectorCarryAndBitCountOps);
+  AddCase(VectorVop3CompareEqI64OnGpu);
   AddCase(VectorMbcntUsesThreadMask);
   AddCase(VectorAddcWritesPerLaneCarryOut);
   AddCase(VectorAddcUsesPerLaneCarryIn);

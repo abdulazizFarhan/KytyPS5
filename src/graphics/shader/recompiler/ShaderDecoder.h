@@ -375,6 +375,7 @@ enum class Opcode {
 	VCmpNeU32,
 	VCmpGeU32,
 	VCmpTU32,
+	VCmpEqI64,
 	VCmpNeU64,
 	VCmpxLtU32,
 	VCmpxEqU32,
