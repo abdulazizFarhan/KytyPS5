@@ -8857,14 +8857,20 @@ TestCase ScalarNandNorXnorB32() {
 
 TestCase ScalarBitset0B32() {
   using O = ShaderOpcode;
-  // s_bitset0_b32(dst, src, idx): clear bit `idx` in src.
-  // With src=0xFFFFFFFF and idx=0, expect 0xFFFFFFFE.
+  // s_bitset0_b32(dst, src, idx): clear bit `idx` in `dst`.
+  // The hardware reuses SDST as both destination and source value.
+  // With dst=0xFFFFFFFF and idx=0, expect 0xFFFFFFFE.
   std::vector<u32> code;
-  AppendSMovLiteral(&code, 0, 0xFFFFFFFFu);
-  AppendSMovLiteral(&code, 1, 0u);          // bit index = 0
-  // bitset0 uses SOP1 encoding 0x1b; dst = src with bit idx cleared
-  code.push_back(EncodeSop1(0x1bu, 2, 0));
-  code.push_back(EncodeVop1(0x01u, 0, 2));
+  AppendSMovLiteral(&code, 0, 0xFFFFFFFFu);   // s0 = 0xFFFFFFFF (value at bit index)
+  AppendSMovLiteral(&code, 1, 0xFFFFFFFFu);   // s1 = 0xFFFFFFFF (value to modify = SDST)
+  AppendSMovLiteral(&code, 2, 0u);            // s2 = 0 (bit index)
+  // s_bitset0_b32 dst=s1, src0=s2  (SDST is reused as source)
+  // Hardware: s1 = s1 with bit s2 cleared
+  code.push_back(EncodeSop1(0x1bu, 1, 2));
+  code.push_back(EncodeVop1(0x01u, 0, 1));
+  // Set vgpr[30] = 0 (in-bounds BYTE address for dword 0)
+  code.push_back(EncodeVop1(0x01u, 30, 0xffu));
+  code.push_back(0u);
   AppendBufferStoreDword(&code, 0, 30);
   AppendEnd(&code);
   return {"ScalarBitset0B32", code, {}, {0xFFFFFFFEu},
@@ -8941,6 +8947,9 @@ std::vector<TestCase> MakeCases() {
   // (SSRC0=bits[7:0], SSRC1=bits[15:8], SDST=bits[22:16]).
   AddCase(ScalarBitwiseNotAndOrB32);
   AddCase(ScalarNandNorXnorB32);
+  // ===== 2026-07-23: SOP1 s_bitset0_b32 reactivated =====
+  // ScalarBitset0B32 exercises s_bitset0_b32 (SDST-as-value source).
+  AddCase(ScalarBitset0B32);
   AddCase(Rdna2ScalarOpcodes);
   AddCase(ScalarExtendedArithmetic);
   AddCase(ScalarArithmeticSccCarryBorrowOverflow);
@@ -9129,7 +9138,8 @@ std::vector<SkippedCase> MakeSkippedCases() {
   // ===== 2026-07-23: SOP2 *_NOT family moved to MakeCases (see notes) =====
   // ScalarBitwiseNotAndOrB32 + ScalarNandNorXnorB32 now pass; coverage
   // for s_andn2/s_orn2/s_nand/s_nor/s_xnor is restored.
-  return {ImageStoreMipWritesExplicitMip2D(), ScalarBitset0B32Skipped()};
+  // ===== 2026-07-23: ScalarBitset0B32 also moved to MakeCases =====
+  return {ImageStoreMipWritesExplicitMip2D()};
 }
 
 void CheckPs5GameExampleImageClearRuntimeShape() {
