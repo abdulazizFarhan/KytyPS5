@@ -5930,6 +5930,151 @@ TestCase VectorCompareInvertedMaskSelect() {
            O::BufferStoreDword, O::SEndpgm}};
 }
 
+TestCase VectorU16ArithmeticOps() {
+  using O = ShaderOpcode;
+  // 16-bit unsigned arithmetic: v_add_nc_u16, v_sub_nc_u16, v_max_u16, v_min_u16,
+  // v_lshlrev_b16, v_lshrrev_b16. VOP3 opcodes 0x303..0x30b, 0x314, 0x307.
+  // Note: Spirv-emitter currently only operates on the low 16 bits of each
+  // VGPR (EmitBinaryU16 path). High 16 bits are zeroed in the destination.
+  std::vector<u32> code;
+  AppendVMovLiteral(&code, 0, 0x00000005u);  // v0 low 16 = 5
+  AppendVMovLiteral(&code, 1, 0x00000004u);  // v1 low 16 = 4
+
+  // v_add_nc_u16 v2, v0, v1 (low: 5+4=9, high: 0)
+  AppendVop3(&code, 0x303, 2, Vgpr(0), Vgpr(1));
+  // v_sub_nc_u16 v3, v0, v1 (low: 5-4=1, high: 0)
+  AppendVop3(&code, 0x304, 3, Vgpr(0), Vgpr(1));
+  // v_max_u16 v4, v0, v1 (low: max(5,4)=5, high: 0)
+  AppendVop3(&code, 0x309, 4, Vgpr(0), Vgpr(1));
+  // v_min_u16 v5, v0, v1 (low: min(5,4)=4, high: 0)
+  AppendVop3(&code, 0x30b, 5, Vgpr(0), Vgpr(1));
+  // v_lshlrev_b16 v6, v0, v1: shift v1 left by v0 bits. (low: 4<<5=128, high: 0)
+  AppendVop3(&code, 0x314, 6, Vgpr(0), Vgpr(1));
+  // v_lshrrev_b16 v7, v0, v1: shift v1 right by v0 bits. (low: 4>>5=0, high: 0)
+  AppendVop3(&code, 0x307, 7, Vgpr(0), Vgpr(1));
+
+  AppendStoreVgpr(&code, 2, 0);
+  AppendStoreVgpr(&code, 3, 1);
+  AppendStoreVgpr(&code, 4, 2);
+  AppendStoreVgpr(&code, 5, 3);
+  AppendStoreVgpr(&code, 6, 4);
+  AppendStoreVgpr(&code, 7, 5);
+  AppendEnd(&code);
+
+  return {"VectorU16ArithmeticOps",
+          code,
+          {},
+          {0x00000009u, 0x00000001u, 0x00000005u, 0x00000004u, 0x00000080u,
+           0x00000000u},
+          {O::VMovB32, O::VAddNcU16, O::VSubNcU16, O::VMaxU16, O::VMinU16,
+           O::VLshlrevB16, O::VLshrrevB16, O::BufferStoreDword, O::SEndpgm}};
+}
+
+
+TestCase VectorI16ArithmeticOps() {
+  using O = ShaderOpcode;
+  // 16-bit signed arithmetic: v_add_nc_i16, v_sub_nc_i16, v_max_i16, v_min_i16,
+  // v_ashrrev_i16. VOP3 opcodes 0x30a, 0x30c, 0x30d, 0x30e, 0x308.
+  // Note: Spirv-emitter currently only operates on the low 16 bits of each
+  // VGPR (EmitBinaryU16 path). High 16 bits are zeroed in the destination.
+  std::vector<u32> code;
+  AppendVMovLiteral(&code, 0, 0x00000005u);  // v0 low 16 = 5 (signed)
+  AppendVMovLiteral(&code, 1, 0x00000002u);  // v1 low 16 = 2 (signed)
+
+  // v_add_nc_i16 v2, v0, v1 (low: 5+2=7, high: 0)
+  AppendVop3(&code, 0x30d, 2, Vgpr(0), Vgpr(1));
+  // v_sub_nc_i16 v3, v0, v1 (low: 5-2=3, high: 0)
+  AppendVop3(&code, 0x30e, 3, Vgpr(0), Vgpr(1));
+  // v_max_i16 v4, v0, v1 (low: max(5, 2)=5, high: 0)
+  AppendVop3(&code, 0x30a, 4, Vgpr(0), Vgpr(1));
+  // v_min_i16 v5, v0, v1 (low: min(5, 2)=2, high: 0)
+  AppendVop3(&code, 0x30c, 5, Vgpr(0), Vgpr(1));
+  // v_ashrrev_i16 v6, v0, v1: arithmetic shift right. (low: 2>>5=0, high: 0)
+  AppendVop3(&code, 0x308, 6, Vgpr(0), Vgpr(1));
+
+  AppendStoreVgpr(&code, 2, 0);
+  AppendStoreVgpr(&code, 3, 1);
+  AppendStoreVgpr(&code, 4, 2);
+  AppendStoreVgpr(&code, 5, 3);
+  AppendStoreVgpr(&code, 6, 4);
+  AppendEnd(&code);
+
+  return {"VectorI16ArithmeticOps",
+          code,
+          {},
+          {0x00000007u, 0x00000003u, 0x00000005u, 0x00000002u, 0x00000000u},
+          {O::VMovB32, O::VAddNcI16, O::VSubNcI16, O::VMaxI16, O::VMinI16,
+           O::VAshrrevI16, O::BufferStoreDword, O::SEndpgm}};
+}
+
+TestCase VectorU16CompareOps() {
+  using O = ShaderOpcode;
+  // 16-bit unsigned compares (VOPC opcodes 0xa9=lt, 0xaa=eq, 0xac=gt).
+  // Note: Spirv-emitter currently only operates on the low 16 bits of each
+  // VGPR (EmitBinaryU16 path).
+  // v_cndmask_b32 picks the src1 VGPR when VCC is set; we set v5=1 first so the
+  // result is 1 when the compare is true, 0 otherwise.
+  std::vector<u32> code;
+  AppendVMovLiteral(&code, 0, 0x00000003u);  // v0 low 16 = 3
+  AppendVMovLiteral(&code, 1, 0x00000002u);  // v1 low 16 = 2
+  code.push_back(EncodeVop1(0x01, 5, InlineU32(1)));  // v5 = 1 (literal)
+
+  // v_cmp_lt_u16: 3<2=false -> 0
+  code.push_back(EncodeVopc(0xa9, Vgpr(0), Vgpr(1)));
+  code.push_back(EncodeVop2(0x01, 2, InlineU32(0), Vgpr(5)));
+  // v_cmp_eq_u16: 3==2=false -> 0
+  code.push_back(EncodeVopc(0xaa, Vgpr(0), Vgpr(1)));
+  code.push_back(EncodeVop2(0x01, 3, InlineU32(0), Vgpr(5)));
+  // v_cmp_gt_u16: 3>2=true -> 1
+  code.push_back(EncodeVopc(0xac, Vgpr(0), Vgpr(1)));
+  code.push_back(EncodeVop2(0x01, 4, InlineU32(0), Vgpr(5)));
+
+  AppendStoreVgpr(&code, 2, 0);
+  AppendStoreVgpr(&code, 3, 1);
+  AppendStoreVgpr(&code, 4, 2);
+  AppendEnd(&code);
+
+  return {"VectorU16CompareOps",
+          code,
+          {},
+          {0u, 0u, 1u},
+          {O::VMovB32, O::VCmpLtU16, O::VCmpEqU16, O::VCmpGtU16,
+           O::VCndmaskB32, O::BufferStoreDword, O::SEndpgm}};
+}
+
+TestCase VectorI16CompareOps() {
+  using O = ShaderOpcode;
+  // 16-bit signed compares (VOPC opcodes 0x89=lt, 0x8a=eq, 0x8c=gt).
+  // Note: Spirv-emitter currently only operates on the low 16 bits of each
+  // VGPR (EmitBinaryU16 path). v5=1 used as cndmask src1 (see U16 compare).
+  std::vector<u32> code;
+  AppendVMovLiteral(&code, 0, 0x00000003u);  // v0 low 16 = 3 (signed)
+  AppendVMovLiteral(&code, 1, 0x00000004u);  // v1 low 16 = 4 (signed)
+  code.push_back(EncodeVop1(0x01, 5, InlineU32(1)));  // v5 = 1
+
+  // v_cmp_lt_i16: 3<4=true -> 1
+  code.push_back(EncodeVopc(0x89, Vgpr(0), Vgpr(1)));
+  code.push_back(EncodeVop2(0x01, 2, InlineU32(0), Vgpr(5)));
+  // v_cmp_eq_i16: 3==4=false -> 0
+  code.push_back(EncodeVopc(0x8a, Vgpr(0), Vgpr(1)));
+  code.push_back(EncodeVop2(0x01, 3, InlineU32(0), Vgpr(5)));
+  // v_cmp_gt_i16: 3>4=false -> 0
+  code.push_back(EncodeVopc(0x8c, Vgpr(0), Vgpr(1)));
+  code.push_back(EncodeVop2(0x01, 4, InlineU32(0), Vgpr(5)));
+
+  AppendStoreVgpr(&code, 2, 0);
+  AppendStoreVgpr(&code, 3, 1);
+  AppendStoreVgpr(&code, 4, 2);
+  AppendEnd(&code);
+
+  return {"VectorI16CompareOps",
+          code,
+          {},
+          {1u, 0u, 0u},
+          {O::VMovB32, O::VCmpLtI16, O::VCmpEqI16, O::VCmpGtI16,
+           O::VCndmaskB32, O::BufferStoreDword, O::SEndpgm}};
+}
+
 TestCase BranchSelect() {
   using O = ShaderOpcode;
 
@@ -9024,6 +9169,14 @@ std::vector<TestCase> MakeCases() {
   AddCase(VectorVop3CmpxWritesExecMask);
   AddCase(VectorVopcSdwaCmpxWritesExecMask);
   AddCase(VectorCompareInvertedMaskSelect);
+  // ===== 2026-07-23: 16-bit integer ALU coverage =====
+  // VOP3/VOPC 16-bit unsigned and signed arithmetic, shift, min/max, compare.
+  // The Spirv-emitter's IAddU16 / ISubI16 / EmitBinaryU16 paths handle the
+  // 16-bit packing (top 16 bits zeroed on store).
+  AddCase(VectorU16ArithmeticOps);
+  AddCase(VectorI16ArithmeticOps);
+  AddCase(VectorU16CompareOps);
+  AddCase(VectorI16CompareOps);
   AddCase(BranchSelect);
   AddCase(SimpleLoop);
   AddCase(BranchVccnzUsesWholeMask);
