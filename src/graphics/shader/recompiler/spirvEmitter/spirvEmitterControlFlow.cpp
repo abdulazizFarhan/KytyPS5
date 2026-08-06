@@ -750,6 +750,12 @@ void EmitInstruction(EmitterState* state, const IR::Instruction& inst) {
 		case IR::Opcode::AtomicSwapU32:
 			EmitGuardedByExec(state, [&]() { EmitAtomicU32(state, inst, OpAtomicExchange); });
 			break;
+		case IR::Opcode::AtomicCmpSwapU32:
+			EmitGuardedByExec(state, [&]() { EmitAtomicCmpSwapU32(state, inst); });
+			break;
+		case IR::Opcode::AtomicCSubU32:
+			EmitGuardedByExec(state, [&]() { EmitAtomicCSubU32(state, inst); });
+			break;
 		case IR::Opcode::AtomicAddU32:
 			EmitGuardedByExec(state, [&]() { EmitAtomicU32(state, inst, OpAtomicIAdd); });
 			break;

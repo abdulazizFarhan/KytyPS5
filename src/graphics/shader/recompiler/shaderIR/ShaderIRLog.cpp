@@ -466,6 +466,8 @@ std::string InstructionToString(const Instruction& inst) {
 		case Opcode::BufferStoreShort: text += "BufferStoreShort"; break;
 		case Opcode::BufferStoreDword: text += "BufferStoreDword"; break;
 		case Opcode::AtomicSwapU32: text += "AtomicSwapU32"; break;
+		case Opcode::AtomicCmpSwapU32: text += "AtomicCmpSwapU32"; break;
+		case Opcode::AtomicCSubU32: text += "AtomicCSubU32"; break;
 		case Opcode::AtomicAddU32: text += "AtomicAddU32"; break;
 		case Opcode::AtomicSubU32: text += "AtomicSubU32"; break;
 		case Opcode::AtomicSMinI32: text += "AtomicSMinI32"; break;

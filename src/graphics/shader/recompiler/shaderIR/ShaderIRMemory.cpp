@@ -111,15 +111,28 @@ bool LowerBufferStore(const Decoder::Instruction& decoded, BasicBlock* block, st
 }
 
 bool LowerBufferAtomicDword(const Decoder::Instruction& decoded, BasicBlock* block, Opcode op,
-                            std::string* error) {
+                            std::string* error, uint32_t extra_src_count = 0) {
 	Instruction inst;
 	inst.pc       = decoded.pc;
 	inst.op       = op;
 	inst.memory   = MemoryInfoFromDecoded(decoded, ResourceKind::Buffer);
 	inst.dst.kind = OperandKind::Null;
 	if ((decoded.glc && !LowerRegisterOperand(decoded.dst, &inst.dst, error)) ||
-	    !LowerSourceOperand(decoded.dst, &inst.src[0], error) ||
-	    !LowerBufferAddressSources(decoded, &inst, 1, error)) {
+	    !LowerSourceOperand(decoded.dst, &inst.src[0], error)) {
+		return false;
+	}
+	// Extra source operands (data, comparator) - source registers come from
+	// decoded.src1, decoded.src2, ...
+	if (extra_src_count >= 1 && !LowerSourceOperand(decoded.src1, &inst.src[1], error)) {
+		return false;
+	}
+	if (extra_src_count >= 2 && !LowerSourceOperand(decoded.src2, &inst.src[2], error)) {
+		return false;
+	}
+	if (extra_src_count >= 3 && !LowerSourceOperand(decoded.src3, &inst.src[3], error)) {
+		return false;
+	}
+	if (!LowerBufferAddressSources(decoded, &inst, 1 + extra_src_count, error)) {
 		return false;
 	}
 	block->instructions.push_back(inst);
@@ -519,6 +532,28 @@ bool LowerMemoryInstruction(const Decoder::Instruction& decoded, BasicBlock* blo
 			return LowerBufferStore(decoded, block, error);
 		case Decoder::Opcode::BufferAtomicSwap:
 			return LowerBufferAtomicDword(decoded, block, Opcode::AtomicSwapU32, error);
+		case Decoder::Opcode::BufferAtomicCmpSwap: {
+			// CmpSwap uses VDATA as 64-bit register pair: VDATA[31:0] = data,
+			// VDATA[63:32] = compare. Add the compare as a +1 register offset.
+			// Hardware reads VDATA (data) before the atomic, then writes the
+			// original memory value back to VDATA. So inst.dst = decoded.dst
+			// for the result, AND src[0] = decoded.dst for the input data.
+			Instruction inst;
+			inst.pc       = decoded.pc;
+			inst.op       = Opcode::AtomicCmpSwapU32;
+			inst.memory   = MemoryInfoFromDecoded(decoded, ResourceKind::Buffer);
+			inst.dst.kind = OperandKind::Null;
+			if ((decoded.glc && !LowerRegisterOperand(decoded.dst, &inst.dst, error)) ||
+			    !LowerSourceOperand(decoded.dst, &inst.src[0], error) ||
+			    !LowerSourceOperand(OffsetDecodedRegister(decoded.dst, 1), &inst.src[1], error) ||
+			    !LowerBufferAddressSources(decoded, &inst, 2, error)) {
+				return false;
+			}
+			block->instructions.push_back(inst);
+			return true;
+		}
+		case Decoder::Opcode::BufferAtomicCSub:
+			return LowerBufferAtomicDword(decoded, block, Opcode::AtomicCSubU32, error);
 		case Decoder::Opcode::BufferAtomicAdd:
 			return LowerBufferAtomicDword(decoded, block, Opcode::AtomicAddU32, error);
 		case Decoder::Opcode::BufferAtomicSub:
@@ -694,6 +729,8 @@ bool IsMemoryOpcode(Decoder::Opcode opcode) {
 		case Decoder::Opcode::BufferAtomicSwap:
 		case Decoder::Opcode::BufferAtomicAdd:
 		case Decoder::Opcode::BufferAtomicSub:
+		case Decoder::Opcode::BufferAtomicCSub:
+		case Decoder::Opcode::BufferAtomicCmpSwap:
 		case Decoder::Opcode::BufferAtomicSMin:
 		case Decoder::Opcode::BufferAtomicUMin:
 		case Decoder::Opcode::BufferAtomicSMax:

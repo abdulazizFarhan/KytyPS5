@@ -1209,6 +1209,42 @@ uint32_t EmitF32BitsOrderedLessThan(EmitterState* state, uint32_t lhs_bits, uint
 
 } // namespace
 
+void EmitAtomicCmpSwapU32(EmitterState* state, const IR::Instruction& inst) {
+	if (IsStorageBufferMemoryKind(inst.memory.kind)) {
+		const auto index =
+		    EmitMemoryDwordIndex(state, inst, inst.memory, 1, AddressSourceCount(inst, 1));
+		const auto in_bounds = EmitStorageBufferElementInBounds(state, inst.memory, index, inst.pc);
+		const auto data      = EmitValueLoad(state, inst.src[0]);
+		const auto comparator = EmitValueLoad(state, inst.src[1]);
+		const auto old       = EmitValueOrZeroIfCondition(state, in_bounds, [&]() {
+			const auto pointer =
+			    EmitStorageBufferElementPointer(state, inst.memory, index, inst.pc);
+			const auto result = state->builder.AllocateId();
+			state->builder.AddFunction({OpAtomicCompareExchange, state->uint_type, result,
+			                            pointer, ConstantU32(state, ScopeDevice),
+			                            ConstantU32(state, MemorySemanticsNone),
+			                            ConstantU32(state, MemorySemanticsNone), data, comparator});
+			EmitDeviceAtomicMemoryBarrier(state);
+			return result;
+		});
+		EmitStoreU32(state, inst.dst, old);
+		return;
+	}
+	const auto pointer = EmitAtomicPointer(state, inst);
+	if (pointer == 0) {
+		EmitStoreU32(state, inst.dst, ConstantU32(state, 0));
+		return;
+	}
+	const auto data       = EmitValueLoad(state, inst.src[0]);
+	const auto comparator = EmitValueLoad(state, inst.src[1]);
+	const auto old        = state->builder.AllocateId();
+	const auto scope      = inst.memory.kind == IR::ResourceKind::Lds ? ScopeWorkgroup : ScopeDevice;
+	state->builder.AddFunction({OpAtomicCompareExchange, state->uint_type, old, pointer,
+	                            ConstantU32(state, scope), ConstantU32(state, MemorySemanticsNone),
+	                            ConstantU32(state, MemorySemanticsNone), data, comparator});
+	EmitStoreU32(state, inst.dst, old);
+}
+
 void EmitAtomicFMinF32(EmitterState* state, const IR::Instruction& inst) {
 	const auto index =
 	    EmitMemoryDwordIndex(state, inst, inst.memory, 1, AddressSourceCount(inst, 1));
@@ -1247,6 +1283,75 @@ void EmitAtomicFMaxF32(EmitterState* state, const IR::Instruction& inst) {
 	EmitStoreU32(state, inst.dst, old);
 }
 
+uint32_t EmitAtomicCSubU32CasLoop(EmitterState* state, uint32_t pointer, uint32_t src);
+
+void EmitAtomicCSubU32(EmitterState* state, const IR::Instruction& inst) {
+	if (IsStorageBufferMemoryKind(inst.memory.kind)) {
+		const auto index =
+		    EmitMemoryDwordIndex(state, inst, inst.memory, 1, AddressSourceCount(inst, 1));
+		const auto in_bounds = EmitStorageBufferElementInBounds(state, inst.memory, index, inst.pc);
+		const auto src       = EmitValueLoad(state, inst.src[0]);
+		const auto old       = EmitValueOrZeroIfCondition(state, in_bounds, [&]() {
+			const auto pointer =
+			    EmitStorageBufferElementPointer(state, inst.memory, index, inst.pc);
+			return EmitAtomicCSubU32CasLoop(state, pointer, src);
+		});
+		EmitStoreU32(state, inst.dst, old);
+		return;
+	}
+	const auto pointer = EmitAtomicPointer(state, inst);
+	if (pointer == 0) {
+		EmitStoreU32(state, inst.dst, ConstantU32(state, 0));
+		return;
+	}
+	const auto src = EmitValueLoad(state, inst.src[0]);
+	const auto old = EmitAtomicCSubU32CasLoop(state, pointer, src);
+	EmitStoreU32(state, inst.dst, old);
+}
+
+uint32_t EmitAtomicCSubU32CasLoop(EmitterState* state, uint32_t pointer, uint32_t src) {
+	const auto scope          = ScopeDevice;
+	const auto preheader      = state->builder.AllocateId();
+	const auto header         = state->builder.AllocateId();
+	const auto main_block     = state->builder.AllocateId();
+	const auto continue_label = state->builder.AllocateId();
+	const auto merge          = state->builder.AllocateId();
+	const auto initial        = state->builder.AllocateId();
+	const auto observed       = state->builder.AllocateId();
+	const auto exchanged      = state->builder.AllocateId();
+	const auto should_sub     = state->builder.AllocateId();
+	const auto desired        = state->builder.AllocateId();
+	const auto equal          = state->builder.AllocateId();
+
+	state->builder.AddFunction({OpBranch, preheader});
+	state->builder.AddFunction({OpLabel, preheader});
+	state->builder.AddFunction({OpAtomicLoad, state->uint_type, initial, pointer,
+	                            ConstantU32(state, scope),
+	                            ConstantU32(state, MemorySemanticsNone)});
+	state->builder.AddFunction({OpBranch, header});
+	state->builder.AddFunction({OpLabel, header});
+	state->builder.AddFunction({OpPhi, state->uint_type, observed, initial, preheader, exchanged,
+	                            continue_label});
+	// If observed < src, no subtraction. observed is the original value.
+	state->builder.AddFunction({OpULessThan, state->bool_type, should_sub, observed, src});
+	// OpLoopMerge must be immediately before OpBranch/OpBranchConditional.
+	state->builder.AddFunction({OpLoopMerge, merge, continue_label, LoopControlNone});
+	state->builder.AddFunction({OpBranchConditional, should_sub, merge, main_block});
+	state->builder.AddFunction({OpLabel, main_block});
+	// Compute desired = observed - src
+	state->builder.AddFunction({OpISub, state->uint_type, desired, observed, src});
+	// Atomic compare-exchange: if memory == observed, replace with desired
+	state->builder.AddFunction({OpAtomicCompareExchange, state->uint_type, exchanged, pointer,
+	                            ConstantU32(state, scope), ConstantU32(state, MemorySemanticsNone),
+	                            ConstantU32(state, MemorySemanticsNone), desired, observed});
+	state->builder.AddFunction({OpIEqual, state->bool_type, equal, exchanged, observed});
+	state->builder.AddFunction({OpBranchConditional, equal, merge, continue_label});
+	state->builder.AddFunction({OpLabel, continue_label});
+	state->builder.AddFunction({OpBranch, header});
+	state->builder.AddFunction({OpLabel, merge});
+	EmitDeviceAtomicMemoryBarrier(state);
+	return observed;
+}
 
 void EmitSLoadDword(EmitterState* state, const IR::Instruction& inst) {
 	if (state->address_memory_variable == 0) {

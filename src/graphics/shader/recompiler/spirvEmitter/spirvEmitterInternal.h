@@ -967,6 +967,8 @@ void EmitAtomicU32(EmitterState* state, const IR::Instruction& inst, uint32_t op
 
 void EmitAtomicFMinF32(EmitterState* state, const IR::Instruction& inst);
 void EmitAtomicFMaxF32(EmitterState* state, const IR::Instruction& inst);
+void EmitAtomicCmpSwapU32(EmitterState* state, const IR::Instruction& inst);
+void EmitAtomicCSubU32(EmitterState* state, const IR::Instruction& inst);
 
 void EmitSLoadDword(EmitterState* state, const IR::Instruction& inst);
 

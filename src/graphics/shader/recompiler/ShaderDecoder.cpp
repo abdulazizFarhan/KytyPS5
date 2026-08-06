@@ -826,8 +826,10 @@ std::string OpcodeToString(Opcode opcode) {
 		case Opcode::TBufferStoreFormatXyz: return "tbuffer_store_format_xyz";
 		case Opcode::TBufferStoreFormatXyzw: return "tbuffer_store_format_xyzw";
 		case Opcode::BufferAtomicSwap: return "buffer_atomic_swap";
+		case Opcode::BufferAtomicCmpSwap: return "buffer_atomic_cmpswap";
 		case Opcode::BufferAtomicAdd: return "buffer_atomic_add";
 		case Opcode::BufferAtomicSub: return "buffer_atomic_sub";
+		case Opcode::BufferAtomicCSub: return "buffer_atomic_csub";
 		case Opcode::BufferAtomicSMin: return "buffer_atomic_smin";
 		case Opcode::BufferAtomicUMin: return "buffer_atomic_umin";
 		case Opcode::BufferAtomicSMax: return "buffer_atomic_smax";
@@ -1124,6 +1126,8 @@ std::string InstructionToString(const Instruction& inst) {
 		case Opcode::BufferAtomicAnd:
 		case Opcode::BufferAtomicOr:
 		case Opcode::BufferAtomicXor:
+		case Opcode::BufferAtomicCmpSwap:
+		case Opcode::BufferAtomicCSub:
 		case Opcode::BufferAtomicFMin:
 		case Opcode::BufferAtomicFMax:
 		case Opcode::BufferLoadSbyte:
