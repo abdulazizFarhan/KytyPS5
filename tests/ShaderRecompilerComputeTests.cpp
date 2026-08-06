@@ -1442,7 +1442,6 @@ public:
     Buffer ret;
     ret.size = static_cast<VkDeviceSize>(std::max<size_t>(dword_count, 1u) *
                                          sizeof(u32));
-
     VkBufferCreateInfo buffer_info{};
     buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     buffer_info.size = ret.size;
@@ -7970,32 +7969,13 @@ SkippedCase ImageStoreMipWritesExplicitMip2D() {
           "OpImageWrite cannot take Lod"};
 }
 
-SkippedCase ScalarBitwiseNotAndOrB32Skipped() {
-  // 2026-07-20: passes a known-good encoding (SOP2 encoding 0x14 +
-  // 0x16) but the readback returns [0x55555555, 0x00000000] where
-  // [0xAAAAAAAA, 0x55555555] is expected. The first word (ANDN2
-  // result) lands at value = src1 instead of src0, suggesting the
-  // decoder or SPIR-V emitter treats the SOP2 source operand field
-  // in the opposite order from EncodeSop2. BitwiseOps test
-  // (existing, with AND/OR/XOR) passes, so the discrepancy
-  // specifically affects the *_NOT family (andn2, orn2, nand, nor,
-  // xnor) which all share the BinaryNotRhsU32 / BinaryThenNotU32
-  // emitter patterns. Re-validate EncodeSop2 against the AMD ISA
-  // spec.
-  return {"ScalarBitwiseNotAndOrB32",
-          "decoder/IR: SOP2 *_NOT family returns src1 instead of "
-          "src0 & ~src1; EncodeSop2 source-order convention may need "
-          "swap. Tracked under 'graphics SOP1/SOP2 source-ordering'."};
-}
-
-SkippedCase ScalarNandNorXnorB32Skipped() {
-  // 2026-07-20: same family as ScalarBitwiseNotAndOrB32 (NAND, NOR,
-  // XNOR all share BinaryThenNotU32 emitter). Will pass once the
-  // Andn2/Orn2 source-order fix lands.
-  return {"ScalarNandNorXnorB32",
-          "decoder/IR: same SOP2 source-ordering issue as Scalar-"
-          "BitwiseNotAndOrB32; will pass once andn2/orn2 fix lands."};
-}
+// 2026-07-23: ScalarBitwiseNotAndOrB32 + ScalarNandNorXnorB32 reactivated
+// in MakeCases after SCC propagation for the *_NOT family (commit 91050e2)
+// and source-ordering verification against RDNA2 PDF Table 63
+// (SSRC0=bits[7:0], SSRC1=bits[15:8]). The skipped-case factories below are
+// kept as historical reference but are no longer in MakeSkippedCases.
+// SkippedCase ScalarBitwiseNotAndOrB32Skipped() { ... } // see history
+// SkippedCase ScalarNandNorXnorB32Skipped() { ... } // see history
 
 SkippedCase ScalarBitset0B32Skipped() {
   // 2026-07-20: SBitset0B32 (SOP1 0x1b) needs a second source for
@@ -8823,10 +8803,17 @@ TestCase ScalarBitwiseNotAndOrB32() {
   AppendSMovLiteral(&code, 1, 0x55555555u);
   code.push_back(EncodeSop2(0x14u, 2, 0, 1));
   code.push_back(EncodeSop2(0x16u, 3, 1, 0));
-  EncodeVop1(0x01u, 0, 2);
+  code.push_back(EncodeVop1(0x01u, 0, 2));
   code.push_back(EncodeVop1(0x01u, 1, 3));
-  AppendBufferStoreDword(&code, 0, 30);
-  AppendBufferStoreDword(&code, 1, 31);
+  // Set vgpr[30] = 0 and vgpr[31] = 4 (in-bounds BYTE addresses for dwords 0 and 1).
+  // Note: MUBUF vaddr is in BYTES, and the Spirv-emit shifts right by 2 to get dword index.
+  // For aligned byte addresses 0 and 4, dword indices are 0 and 1 respectively.
+  code.push_back(EncodeVop1(0x01u, 30, 0xffu));
+  code.push_back(0u);
+  code.push_back(EncodeVop1(0x01u, 31, 0xffu));
+  code.push_back(4u);
+  AppendBufferStoreDword(&code, 0, 30);  // store v0 at dword 0 (v30=0 bytes)
+  AppendBufferStoreDword(&code, 1, 31);  // store v1 at dword 1 (v31=4 bytes)
   AppendEnd(&code);
   return {"ScalarBitwiseNotAndOrB32", code, {}, {0xAAAAAAAAu, 0x55555555u},
           {O::SMovB32, O::SAndn2B32, O::SOrn2B32, O::VMovB32,
@@ -8851,9 +8838,16 @@ TestCase ScalarNandNorXnorB32() {
   code.push_back(EncodeVop1(0x01u, 0, 2));
   code.push_back(EncodeVop1(0x01u, 1, 3));
   code.push_back(EncodeVop1(0x01u, 2, 4));
-  AppendBufferStoreDword(&code, 0, 30);
-  AppendBufferStoreDword(&code, 1, 31);
-  AppendBufferStoreDword(&code, 2, 32);
+  // Set vgpr[30]=0, vgpr[31]=4, vgpr[32]=8 (in-bounds BYTE addresses for dwords 0,1,2).
+  code.push_back(EncodeVop1(0x01u, 30, 0xffu));
+  code.push_back(0u);
+  code.push_back(EncodeVop1(0x01u, 31, 0xffu));
+  code.push_back(4u);
+  code.push_back(EncodeVop1(0x01u, 32, 0xffu));
+  code.push_back(8u);
+  AppendBufferStoreDword(&code, 0, 30);  // dword 0
+  AppendBufferStoreDword(&code, 1, 31);  // dword 1
+  AppendBufferStoreDword(&code, 2, 32);  // dword 2
   AppendEnd(&code);
   return {"ScalarNandNorXnorB32", code, {},
           {0xFFFFFFFFu, 0x00000000u, 0x00000000u},
@@ -8939,6 +8933,14 @@ std::vector<TestCase> MakeCases() {
   AddCase(ScalarNotB32);
   AddCase(ScalarFf1I32B32);
   AddCase(ScalarSubbU32);
+  // ===== 2026-07-23: SOP2 *_NOT family reactivated =====
+  // ScalarBitwiseNotAndOrB32 exercises s_andn2_b32 + s_orn2_b32.
+  // ScalarNandNorXnorB32 exercises s_nand_b32 + s_nor_b32 + s_xnor_b32.
+  // SCC propagation for the *_NOT family landed in 91050e2; the
+  // IR/decode source-ordering is consistent with RDNA2 PDF Table 63
+  // (SSRC0=bits[7:0], SSRC1=bits[15:8], SDST=bits[22:16]).
+  AddCase(ScalarBitwiseNotAndOrB32);
+  AddCase(ScalarNandNorXnorB32);
   AddCase(Rdna2ScalarOpcodes);
   AddCase(ScalarExtendedArithmetic);
   AddCase(ScalarArithmeticSccCarryBorrowOverflow);
@@ -9124,10 +9126,10 @@ std::vector<GraphicsCase> MakeGraphicsCases() {
 }
 
 std::vector<SkippedCase> MakeSkippedCases() {
-  return {ImageStoreMipWritesExplicitMip2D(),
-          ScalarBitwiseNotAndOrB32Skipped(), ScalarNandNorXnorB32Skipped(),
-          ScalarBitset0B32Skipped(), ScalarFf1I32B32Skipped(),
-          ScalarSubbU32Skipped()};
+  // ===== 2026-07-23: SOP2 *_NOT family moved to MakeCases (see notes) =====
+  // ScalarBitwiseNotAndOrB32 + ScalarNandNorXnorB32 now pass; coverage
+  // for s_andn2/s_orn2/s_nand/s_nor/s_xnor is restored.
+  return {ImageStoreMipWritesExplicitMip2D(), ScalarBitset0B32Skipped()};
 }
 
 void CheckPs5GameExampleImageClearRuntimeShape() {
