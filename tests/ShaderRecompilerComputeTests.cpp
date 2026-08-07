@@ -6187,7 +6187,7 @@ TestCase VectorPackAddI16() {
   using O = ShaderOpcode;
   // v_pk_add_i16 (VOP3P 0x02): add both 16-bit lanes independently.
   // v0 = 0x00070005 (lo=5, hi=7), v1 = 0x00030002 (lo=2, hi=3)
-  // result = 0x00050007 (lo=5+2=7, hi=7+3=10)
+  // result = 0x000A0007 (lo=5+2=7, hi=7+3=10)
   std::vector<u32> code;
   AppendVMovLiteral(&code, 0, 0x00070005u);
   AppendVMovLiteral(&code, 1, 0x00030002u);
@@ -6198,7 +6198,7 @@ TestCase VectorPackAddI16() {
   return {"VectorPackAddI16",
           code,
           {},
-          {0x00050007u},
+          {0x000A0007u},
           {O::VMovB32, O::VPkAddI16, O::BufferStoreDword, O::SEndpgm}};
 }
 
