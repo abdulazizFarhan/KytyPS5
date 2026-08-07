@@ -328,10 +328,8 @@ void ResolveRenderColorTarget(uint64_t submit_id, CommandBuffer* buffer, const H
 	const auto view = ResolveTargetViewInfo(
 	    rt.view.base_array_slice_index, rt.view.last_array_slice_index, render_target_slice_offset);
 	switch (view.type) {
-		case TargetViewType::Image2D: break;
-		case TargetViewType::Image2DArray:
-			EXIT("layered render-target views are unsupported: base=%u count=%u\n", view.base_layer,
-			     view.layer_count);
+		case TargetViewType::Image2D:
+		case TargetViewType::Image2DArray: break;
 		case TargetViewType::Unsupported:
 			EXIT("invalid render-target view: base=%u last=%u draw_offset=%u\n",
 			     rt.view.base_array_slice_index, rt.view.last_array_slice_index,

@@ -147,10 +147,8 @@ void ResolveRenderDepthTarget(uint64_t submit_id, CommandBuffer* buffer, const H
 	    has_stencil, has_htile, z.stencil_info.tile_stencil_disable);
 	const auto view = ResolveTargetViewInfo(z.depth_view.slice_start, z.depth_view.slice_max);
 	switch (view.type) {
-		case TargetViewType::Image2D: break;
-		case TargetViewType::Image2DArray:
-			DepthFatal("layered depth views are unsupported: base=%u count=%u", view.base_layer,
-			           view.layer_count);
+		case TargetViewType::Image2D:
+		case TargetViewType::Image2DArray: break;
 		case TargetViewType::Unsupported:
 			DepthFatal("invalid depth view: base=%u last=%u", z.depth_view.slice_start,
 			           z.depth_view.slice_max);

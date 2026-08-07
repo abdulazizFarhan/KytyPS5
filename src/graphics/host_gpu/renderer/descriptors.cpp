@@ -338,15 +338,24 @@ bool IsSupportedDepthTargetDescriptor(const ShaderTextureResource& descriptor,
 	const auto height = static_cast<uint32_t>(descriptor.Height5()) + 1u;
 	const auto pitch  = TileGetTexturePitch(descriptor.Format(), width, 1, descriptor.TileMode());
 	const auto type   = static_cast<Prospero::ImageType>(descriptor.Type());
-	const bool supported_type =
-	    type == Prospero::ImageType::kColor2D || type == Prospero::ImageType::kColor2DArray;
-	return image.type == VulkanImageType::DepthStencil && image.layers == 1 &&
-	       width == image.extent.width && height == image.extent.height &&
-	       descriptor.Depth() == 0 && descriptor.BaseLevel() == 0 && descriptor.LastLevel() == 0 &&
-	       descriptor.MaxMip() == 0 && descriptor.MinLod() == 0 && descriptor.BaseArray5() == 0 &&
+	const bool supported_2d    = type == Prospero::ImageType::kColor2D &&
+	                             image.layers == 1 && descriptor.Depth() == 0 &&
+	                             descriptor.BaseArray5() == 0;
+	const bool supported_array = type == Prospero::ImageType::kColor2DArray &&
+	                             descriptor.BaseArray5() <= descriptor.Depth() &&
+	                             descriptor.Depth() < image.layers;
+	const bool supported_cube =
+	    type == Prospero::ImageType::kCube && width == height && image.layers >= 6 &&
+	    image.layers % 6u == 0 &&
+	    static_cast<uint32_t>(descriptor.Depth()) + 1u == image.layers &&
+	    descriptor.BaseArray5() == 0;
+	return image.type == VulkanImageType::DepthStencil && width == image.extent.width &&
+	       height == image.extent.height &&
+	       (supported_2d || supported_array || supported_cube) && descriptor.BaseLevel() == 0 &&
+	       descriptor.LastLevel() == 0 && descriptor.MaxMip() == 0 && descriptor.MinLod() == 0 &&
 	       descriptor.TileMode() == Prospero::GpuEnumValue(Prospero::TileMode::kDepth) &&
-	       supported_type && descriptor.BCSwizzle() == 0 && !descriptor.MsaaDepth() &&
-	       pitch >= width && pitch == image.guest_pitch;
+	       descriptor.BCSwizzle() == 0 && !descriptor.MsaaDepth() && pitch >= width &&
+	       pitch == image.guest_pitch;
 }
 
 static bool IsSupportedDepthTextureEncoding(const ShaderTextureResource& descriptor) {
