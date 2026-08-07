@@ -897,10 +897,19 @@ void CreatePipelineInternal(PipelineCache::GraphicsPipeline* pipeline, VkRenderP
 	    VK_DYNAMIC_STATE_STENCIL_COMPARE_MASK,
 	    VK_DYNAMIC_STATE_STENCIL_REFERENCE,
 	    VK_DYNAMIC_STATE_STENCIL_WRITE_MASK,
+	    // Must stay last: the count below drops this entry for color-less pipelines.
 	    VK_DYNAMIC_STATE_COLOR_WRITE_ENABLE_EXT,
 	};
-	const auto dynamic_states_count =
+	auto dynamic_states_count =
 	    static_cast<uint32_t>(sizeof(dynamic_states) / sizeof(dynamic_states[0]));
+	// A pipeline that declares COLOR_WRITE_ENABLE requires vkCmdSetColorWriteEnableEXT to
+	// have been called before every draw (VUID-vkCmdDrawIndexed-None-07749). The draw path
+	// only calls it when there is at least one color attachment, so a depth-only pipeline
+	// that declared the state would reach the draw with it unset. Both sides read the same
+	// color_count, so gating the declaration here keeps the two conditions identical.
+	if (static_params.color_count == 0) {
+	    dynamic_states_count--;
+	}
 
 	VkPipelineDynamicStateCreateInfo dynamic_state {};
 	dynamic_state.sType             = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
