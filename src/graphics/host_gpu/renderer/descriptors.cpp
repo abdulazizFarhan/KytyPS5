@@ -526,13 +526,19 @@ NativeTexture(uint64_t submit_id, CommandBuffer* command_buffer,
 	const auto base_level = descriptor.BaseLevel();
 	const auto last_level = descriptor.LastLevel();
 	const auto levels     = static_cast<uint32_t>(descriptor.MaxMip()) + 1u;
+	const auto tile       = descriptor.TileMode();
 	if (base_level > last_level || last_level >= levels) {
-		EXIT("unsupported texture mip view: base=%u last=%u levels=%u\n", base_level, last_level,
-		     levels);
+		EXIT("unsupported texture mip view: base=%u last=%u levels=%u max=%u type=%u tile=%u "
+		     "kind=%u dimension=%u mip_mode=%u read=%d written=%d "
+		     "dwords=%08x,%08x,%08x,%08x,%08x,%08x,%08x,%08x\n",
+		     base_level, last_level, levels, descriptor.MaxMip(), descriptor.Type(), tile,
+		     static_cast<uint32_t>(resource.kind), static_cast<uint32_t>(resource.dimension),
+		     static_cast<uint32_t>(resource.mip_mode), resource.read, resource.written,
+		     descriptor.fields[0], descriptor.fields[1], descriptor.fields[2], descriptor.fields[3],
+		     descriptor.fields[4], descriptor.fields[5], descriptor.fields[6], descriptor.fields[7]);
 	}
 	const auto view_levels = last_level - base_level + 1u;
 	const auto depth       = static_cast<uint32_t>(descriptor.Depth()) + 1u;
-	const auto tile        = descriptor.TileMode();
 	const auto format      = descriptor.Format();
 	const bool sampled_numeric_class =
 	    storage || ((resource.kind == ShaderRecompiler::IR::ResourceKind::ImageUint) ==
