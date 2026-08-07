@@ -656,6 +656,8 @@ namespace LibHttp2 {
 LIB_VERSION("Http2", 1, "Http2", 1, 1);
 
 constexpr int HTTP2_ERROR_INVALID_ID   = -2122641152; /* 0x817B1100 */
+constexpr int HTTP2_ERROR_BEFORE_SEND  = -2122641307; /* 0x817B1065 */
+constexpr int HTTP2_ERROR_TIMEOUT      = -2122641304; /* 0x817B1068 */
 constexpr int HTTP2_ERROR_NULL_POINTER = -2122640859; /* 0x817B1225 */
 
 struct Http2Options {
@@ -696,14 +698,14 @@ struct Http2Request {
 	std::string                                      url;
 	uint64_t                                         content_length = 0;
 	std::vector<std::pair<std::string, std::string>> headers;
-	bool                                             sent        = false;
-	int                                              status_code = 204;
-	std::string  response_headers                                = "HTTP/2 204 No Content\r\n\r\n";
-	std::string  response_body;
-	size_t       read_offset  = 0;
-	int          async_result = 0;
-	int          async_event  = 0;
-	Http2Options options;
+	int                                              send_result = HTTP2_ERROR_BEFORE_SEND;
+	int                                              status_code = 0;
+	std::string                                      response_headers;
+	std::string                                      response_body;
+	size_t                                           read_offset  = 0;
+	int                                              async_result = HTTP2_ERROR_BEFORE_SEND;
+	int                                              async_event  = 0;
+	Http2Options                                     options;
 };
 
 struct Http2AsyncResult {
@@ -1116,9 +1118,9 @@ static int KYTY_SYSV_ABI Http2SendRequest(int req_id, const void* post_data, siz
 		return HTTP2_ERROR_INVALID_ID;
 	}
 
-	request->second.sent = true;
+	request->second.send_result = HTTP2_ERROR_TIMEOUT;
 
-	return 0;
+	return request->second.send_result;
 }
 
 static int KYTY_SYSV_ABI Http2SendRequestAsync(int req_id, const void* post_data, size_t size,
@@ -1138,8 +1140,8 @@ static int KYTY_SYSV_ABI Http2SendRequestAsync(int req_id, const void* post_data
 		return HTTP2_ERROR_INVALID_ID;
 	}
 
-	request->second.sent         = true;
-	request->second.async_result = 0;
+	request->second.send_result  = HTTP2_ERROR_TIMEOUT;
+	request->second.async_result = request->second.send_result;
 	request->second.async_event  = 0;
 
 	return 0;
@@ -1161,11 +1163,10 @@ static int KYTY_SYSV_ABI Http2WaitAsync(int req_id, Http2AsyncResult* result, ui
 		return HTTP2_ERROR_INVALID_ID;
 	}
 
-	request->second.sent = true;
-	*result              = {};
-	result->event_type   = request->second.async_event;
-	result->req_id       = req_id;
-	result->result       = request->second.async_result;
+	*result            = {};
+	result->event_type = request->second.async_event;
+	result->req_id     = req_id;
+	result->result     = request->second.async_result;
 
 	return 0;
 }
@@ -1180,9 +1181,16 @@ static int KYTY_SYSV_ABI Http2GetStatusCode(int req_id, int* status_code) {
 		return HTTP2_ERROR_NULL_POINTER;
 	}
 
+	*status_code = 0;
+
 	auto request = g_http2_requests.find(req_id);
 	if (request == g_http2_requests.end()) {
 		return HTTP2_ERROR_INVALID_ID;
+	}
+
+	const int send_result = request->second.send_result;
+	if (send_result != 0) {
+		return send_result;
 	}
 
 	*status_code = request->second.status_code;
