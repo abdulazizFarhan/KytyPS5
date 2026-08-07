@@ -1233,6 +1233,7 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 		auto* start_ptr = reinterpret_cast<uint8_t*>(address);
 		auto* end_ptr   = start_ptr + size - Jit::Call9::GetSize();
 
+		size_t tls_patch_count = 0;
 		for (auto* ptr = start_ptr; ptr <= end_ptr; ptr++) {
 			auto*  inst_ptr     = ptr;
 			size_t prefix_count = 0;
@@ -1250,8 +1251,6 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 			if (memcmp(inst_ptr, tls_pattern, 3) == 0 && (modrm & 0xc7u) == 0x04u &&
 			    inst_ptr[4] == tls_pattern[4] &&
 			    *reinterpret_cast<const uint32_t*>(inst_ptr + 5) == 0) {
-				LOGF("Patch tls at addr: [%016" PRIx64 "]\n", reinterpret_cast<uint64_t>(ptr));
-
 				const auto reg = (modrm >> 3u) & 7u;
 				EXIT_NOT_IMPLEMENTED(reg == 4u);
 
@@ -1264,7 +1263,11 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 					            inst_size - Jit::Call9::GetSize());
 				}
 				ptr += inst_size - 1;
+				tls_patch_count++;
 			}
+		}
+		if (tls_patch_count > 0) {
+			LOGF("Patch tls: %" PRIu64 " sites in %" PRIu64 " bytes\n", static_cast<uint64_t>(tls_patch_count), size);
 		}
 	}
 }
