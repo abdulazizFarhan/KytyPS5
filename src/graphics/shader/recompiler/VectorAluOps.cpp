@@ -35,7 +35,7 @@ constexpr OpcodeMap VOP2_OPS[] = {
     {0x34u, Opcode::VSubrevF16},     {0x35u, Opcode::VMulF16},
     {0x36u, Opcode::VFmacF16},       {0x37u, Opcode::VFmamkF16},
     {0x38u, Opcode::VFmaakF16},      {0x39u, Opcode::VMaxF16},
-    {0x3au, Opcode::VMinF16},
+    {0x3au, Opcode::VMinF16},        {0x3cu, Opcode::VPkFmacF16},
 };
 
 constexpr OpcodeMap VOP1_OPS[] = {
