@@ -82,7 +82,7 @@ public:
 
 	Resolution             screen_resolution           = Resolution::R1280X720;
 	int                    vblank_frequency            = 60;
-	bool                   vulkan_validation_enabled   = true;
+	bool                   vulkan_validation_enabled   = false;
 	bool                   shader_validation_enabled   = true;
 	ShaderOptimizationType shader_optimization_type    = ShaderOptimizationType::Performance;
 	ShaderLogDirection     shader_log_direction        = ShaderLogDirection::Silent;
