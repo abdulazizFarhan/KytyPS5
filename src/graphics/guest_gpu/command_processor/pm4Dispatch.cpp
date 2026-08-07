@@ -251,6 +251,7 @@ void GraphicsInitJmpTables() {
 	g_cp_op_custom_func[Pm4::R_WAIT_MEM_64]    = CpOpWaitRegMem64;
 	g_cp_op_custom_func[Pm4::R_FLIP]           = CpOpFlip;
 	g_cp_op_custom_func[Pm4::R_RELEASE_MEM]    = CpOpReleaseMem;
+	g_cp_op_custom_func[Pm4::R_CONTEXT_STATE]  = CpOpContextState;
 
 	GraphicsInitJmpTablesCxIndirect();
 	GraphicsInitJmpTablesShIndirect();

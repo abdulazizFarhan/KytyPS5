@@ -32,6 +32,7 @@ static void InitNames() {
 		g_r_names[R_FLIP]           = "R_FLIP";
 		g_r_names[R_RELEASE_MEM]    = "R_RELEASE_MEM";
 		g_r_names[R_DMA_DATA]       = "R_DMA_DATA";
+	g_r_names[R_CONTEXT_STATE]  = "R_CONTEXT_STATE";
 
 		g_names[IT_NOP]                       = "IT_NOP";
 		g_names[IT_SET_BASE]                  = "IT_SET_BASE";

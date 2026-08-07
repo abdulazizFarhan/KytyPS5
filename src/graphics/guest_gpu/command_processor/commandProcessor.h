@@ -14,6 +14,13 @@ namespace Libs::Graphics {
 
 inline constexpr uint32_t AcquireGcrGl2Writeback = 1u << 15u;
 
+enum class ContextStateOperation : uint32_t {
+	Clear     = 0,
+	Push      = 1,
+	Pop       = 2,
+	PushClear = 3,
+};
+
 bool TestWaitRegMemValue(uint64_t value, uint64_t ref, uint64_t mask, uint32_t func);
 
 class CommandScheduler {
@@ -119,6 +126,7 @@ public:
 	KYTY_CLASS_NO_COPY(CommandProcessor);
 
 	void Reset();
+	void ApplyContextStateOperation(ContextStateOperation operation);
 
 	void BufferInit();
 	void BufferFlush();
@@ -252,6 +260,8 @@ private:
 	}
 
 	HW::Context      m_ctx;
+	HW::Context      m_saved_ctx;
+	bool             m_context_state_pushed = false;
 	HW::UserConfig   m_ucfg;
 	HW::Shader       m_sh_ctx;
 	HW::UserSgprType m_user_data_marker                 = HW::UserSgprType::Unknown;

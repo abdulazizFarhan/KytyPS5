@@ -2424,6 +2424,19 @@ KYTY_CP_OP_PARSER(CpOpDrawIndexAuto) {
 	return 2;
 }
 
+KYTY_CP_OP_PARSER(CpOpContextState) {
+	KYTY_PROFILER_FUNCTION();
+
+	const auto packet_size_dw = KYTY_PM4_LEN(cmd_id);
+	EXIT_NOT_IMPLEMENTED(KYTY_PM4_R(cmd_id) != Pm4::R_CONTEXT_STATE);
+	EXIT_NOT_IMPLEMENTED(packet_size_dw != 3u && packet_size_dw != 5u);
+	EXIT_NOT_IMPLEMENTED(buffer[0] > static_cast<uint32_t>(ContextStateOperation::PushClear));
+
+	cp->ApplyContextStateOperation(static_cast<ContextStateOperation>(buffer[0]));
+
+	return packet_size_dw - 1u;
+}
+
 KYTY_CP_OP_PARSER(CpOpClearState) {
 	KYTY_PROFILER_FUNCTION();
 
