@@ -425,7 +425,7 @@ static bool IsSupportedStorageTextureDescriptor(const ShaderRecompiler::IR::Imag
 	                            supported_depth_tile || supported_standard_256b;
 	const bool supported_swizzle =
 	    IsSupportedStorageSwizzle(descriptor.Format(), descriptor.DstSelXYZW()) &&
-	    (descriptor.DstSelXYZW() == DstSel(4, 5, 6, 7) || !resource.read);
+	    (descriptor.DstSelXYZW() == DstSel(4, 5, 6, 7) || !resource.read || resource.atomic);
 	return (is_2d || is_2d_array || is_3d) && supported_tile &&
 	       descriptor.BaseLevel() == descriptor.LastLevel() &&
 	       descriptor.LastLevel() <= descriptor.MaxMip() && descriptor.MinLod() == 0 &&
@@ -458,8 +458,10 @@ void ValidateStorageTexture(const ShaderRecompiler::IR::ImageResource& resource,
 	const bool encoding_ok   = IsSupportedStorageTextureEncoding(descriptor);
 	const bool uint_resource =
 	    resource.kind == ShaderRecompiler::IR::ResourceKind::StorageImageUint;
-	const bool format_ok = Prospero::IsSupportedTextureFormat(format) &&
-	                       uint_resource == Prospero::IsUintTextureFormat(format);
+	const bool format_ok =
+	    Prospero::IsSupportedTextureFormat(format) &&
+	    uint_resource == Prospero::IsUintTextureFormat(format) &&
+	    (!resource.atomic || format == Prospero::GpuEnumValue(Prospero::BufferFormat::k32UInt));
 	if (resource_ok && descriptor_ok && encoding_ok && format_ok && size != 0) {
 		return;
 	}
