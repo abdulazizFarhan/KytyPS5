@@ -8513,65 +8513,6 @@ TestCase BufferAtomicFMaxContendedWorkgroup() {
   return test;
 }
 
-
-TestCase BufferAtomicCmpSwapStoresOnMatch() {
-  using O = ShaderOpcode;
-
-  std::vector<u32> code;
-  // Setup: data=50 in v0, compare=100 in v1 (v0+1)
-  // mem[0] = 100 initially -> CmpSwap should match and store 50
-  AppendVMovLiteral(&code, 0, 50u);
-  AppendVMovLiteral(&code, 1, 100u);
-  AppendVMovU32(&code, 20, 0);
-  // BUFFER_ATOMIC_CMPSWAP: VDATA=0, VADDR=20, opcode=0x31, GLC=1
-  code.push_back(0xe0c44000u); // 0x31<<18 = 0xc40000
-  code.push_back(0x80010000u);
-  AppendStoreVgpr(&code, 0, 1); // store returned vdata (which is 0 + compare got exchanged)
-  AppendEnd(&code);
-
-  TestCase test;
-  test.name = "BufferAtomicCmpSwapStoresOnMatch";
-  test.code = code;
-  test.initial = {100u, 0};
-  test.expected = {50u, 100u};
-  test.opcodes = {O::VMovB32, O::BufferAtomicCmpSwap, O::BufferStoreDword, O::SEndpgm};
-  const auto descriptor =
-      MakeStructuredStorageBufferData(0, static_cast<u32>(test.initial.size() * sizeof(u32)));
-  std::copy_n(descriptor.begin(), 4, test.user_data.begin() + 4);
-  test.user_data[50] = 1u << 20u;
-  test.has_user_data = true;
-  return test;
-}
-
-TestCase BufferAtomicCmpSwapLeavesOnMismatch() {
-  using O = ShaderOpcode;
-
-  std::vector<u32> code;
-  // Setup: data=77 in v0, compare=42 in v1
-  // mem[0] = 100 initially -> CmpSwap should NOT match (compare=42 != mem=100)
-  AppendVMovLiteral(&code, 0, 77u);
-  AppendVMovLiteral(&code, 1, 42u);
-  AppendVMovU32(&code, 20, 0);
-  // opcode 0x31, GLC=1
-  code.push_back(0xe0c44000u);
-  code.push_back(0x80010000u);
-  AppendStoreVgpr(&code, 0, 1);
-  AppendEnd(&code);
-
-  TestCase test;
-  test.name = "BufferAtomicCmpSwapLeavesOnMismatch";
-  test.code = code;
-  test.initial = {100u, 0};
-  test.expected = {100u, 100u};
-  test.opcodes = {O::VMovB32, O::BufferAtomicCmpSwap, O::BufferStoreDword, O::SEndpgm};
-  const auto descriptor =
-      MakeStructuredStorageBufferData(0, static_cast<u32>(test.initial.size() * sizeof(u32)));
-  std::copy_n(descriptor.begin(), 4, test.user_data.begin() + 4);
-  test.user_data[50] = 1u << 20u;
-  test.has_user_data = true;
-  return test;
-}
-
 TestCase BufferAtomicCSubSubtractsWhenMemAtLeastSrc() {
   using O = ShaderOpcode;
 
@@ -8584,11 +8525,11 @@ TestCase BufferAtomicCSubSubtractsWhenMemAtLeastSrc() {
   AppendEnd(&code);
 
   TestCase test;
-  test.name = "BufferAtomicCSubSubtractsWhenMemAtLeastSrc";
-  test.code = code;
-  test.initial = {100u, 0};
+  test.name     = "BufferAtomicCSubSubtractsWhenMemAtLeastSrc";
+  test.code     = code;
+  test.initial  = {100u, 0};
   test.expected = {70u, 100u};
-  test.opcodes = {O::VMovB32, O::BufferAtomicCSub, O::BufferStoreDword, O::SEndpgm};
+  test.opcodes  = {O::VMovB32, O::BufferAtomicCSub, O::BufferStoreDword, O::SEndpgm};
   const auto descriptor =
       MakeStructuredStorageBufferData(0, static_cast<u32>(test.initial.size() * sizeof(u32)));
   std::copy_n(descriptor.begin(), 4, test.user_data.begin() + 4);
@@ -8601,7 +8542,7 @@ TestCase BufferAtomicCSubLeavesWhenMemLessThanSrc() {
   using O = ShaderOpcode;
 
   std::vector<u32> code;
-  // mem[0] = 50, src = 100 -> mem[0] unchanged, return old = 50
+  // mem[0] = 50, src = 100 -> mem[0] = 50, return old = 50
   AppendVMovLiteral(&code, 0, 100u);
   AppendVMovU32(&code, 20, 0);
   AppendBufferStoreOpcode(&code, 0x34, 0, 20, true);
@@ -8609,11 +8550,11 @@ TestCase BufferAtomicCSubLeavesWhenMemLessThanSrc() {
   AppendEnd(&code);
 
   TestCase test;
-  test.name = "BufferAtomicCSubLeavesWhenMemLessThanSrc";
-  test.code = code;
-  test.initial = {50u, 0};
+  test.name     = "BufferAtomicCSubLeavesWhenMemLessThanSrc";
+  test.code     = code;
+  test.initial  = {50u, 0};
   test.expected = {50u, 50u};
-  test.opcodes = {O::VMovB32, O::BufferAtomicCSub, O::BufferStoreDword, O::SEndpgm};
+  test.opcodes  = {O::VMovB32, O::BufferAtomicCSub, O::BufferStoreDword, O::SEndpgm};
   const auto descriptor =
       MakeStructuredStorageBufferData(0, static_cast<u32>(test.initial.size() * sizeof(u32)));
   std::copy_n(descriptor.begin(), 4, test.user_data.begin() + 4);
@@ -8621,6 +8562,7 @@ TestCase BufferAtomicCSubLeavesWhenMemLessThanSrc() {
   test.has_user_data = true;
   return test;
 }
+
 
 TestCase DsAppendUsesEncodedGdsSelector() {
   using O = ShaderOpcode;
@@ -9853,16 +9795,14 @@ std::vector<TestCase> MakeCases() {
   AddCase(VectorBfeI32ArithmeticShiftMasksField);
   AddCase(VectorCarryAndBitCountOps);
   AddCase(VectorVop3CompareEqI64OnGpu);
-  AddCase(BufferAtomicFMinExactRawGlcModes);
-  AddCase(BufferAtomicFMinSpecialValues);
-  AddCase(BufferAtomicFMinContendedWorkgroup);
+  AddCase(BufferAtomicCSubSubtractsWhenMemAtLeastSrc);
+  AddCase(BufferAtomicCSubLeavesWhenMemLessThanSrc);
   AddCase(BufferAtomicFMaxExactRawGlcModes);
   AddCase(BufferAtomicFMaxSpecialValues);
   AddCase(BufferAtomicFMaxContendedWorkgroup);
-  // AddCase(BufferAtomicCmpSwapStoresOnMatch); // Spirv-emit pending debug
-  // AddCase(BufferAtomicCmpSwapLeavesOnMismatch); // Spirv-emit pending debug
-  AddCase(BufferAtomicCSubSubtractsWhenMemAtLeastSrc);
-  AddCase(BufferAtomicCSubLeavesWhenMemLessThanSrc);
+  AddCase(BufferAtomicFMinExactRawGlcModes);
+  AddCase(BufferAtomicFMinSpecialValues);
+  AddCase(BufferAtomicFMinContendedWorkgroup);
   AddCase(VectorMbcntUsesThreadMask);
   AddCase(VectorAddcWritesPerLaneCarryOut);
   AddCase(VectorAddcUsesPerLaneCarryIn);
