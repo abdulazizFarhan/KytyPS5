@@ -440,6 +440,7 @@ void WindowPresentFrame(PreparedFrame* frame) {
 		WindowUpdateIcon();
 
 		SDL_ShowWindow(g_window_ctx->window);
+		SDL_RaiseWindow(g_window_ctx->window);
 
 		g_window_ctx->window_hidden = false;
 		VulkanRecreateSwapchain();
