@@ -66,6 +66,9 @@ LIB_DEFINE(InitSaveData_1);
 LIB_DEFINE(InitShare_1);
 LIB_DEFINE(InitSysmodule_1);
 LIB_DEFINE(InitSystemService_1);
+namespace LibTextToSpeech2 {
+LIB_DEFINE(InitTextToSpeech2_1);
+} // namespace LibTextToSpeech2
 LIB_DEFINE(InitUserService_1);
 LIB_DEFINE(InitVideoOut_1);
 
@@ -100,6 +103,7 @@ void InitAll(Loader::SymbolDatabase* s) {
 	LIB_LOAD(InitShare_1);
 	LIB_LOAD(InitSysmodule_1);
 	LIB_LOAD(InitSystemService_1);
+	LIB_LOAD(LibTextToSpeech2::InitTextToSpeech2_1);
 	LIB_LOAD(LibUlt::InitUlt_1);
 	LIB_LOAD(InitUserService_1);
 	LIB_LOAD(VideoDec2::InitVideoDec2_1);
@@ -233,5 +237,32 @@ LIB_DEFINE(InitContentDelete_1) {
 }
 
 } // namespace LibContentDelete
+
+namespace LibTextToSpeech2 {
+
+LIB_VERSION("TextToSpeech2", 1, "TextToSpeech2", 1, 1);
+
+namespace TextToSpeech2 {
+
+static int KYTY_SYSV_ABI TextToSpeech2GetSpeechStatus() {
+	PRINT_NAME();
+
+	return OK;
+}
+
+static int KYTY_SYSV_ABI TextToSpeech2Cancel() {
+	PRINT_NAME();
+
+	return OK;
+}
+
+} // namespace TextToSpeech2
+
+LIB_DEFINE(InitTextToSpeech2_1) {
+	LIB_FUNC("08JSg9p6bgQ", TextToSpeech2::TextToSpeech2GetSpeechStatus);
+	LIB_FUNC("2jiIxUmcsGo", TextToSpeech2::TextToSpeech2Cancel);
+}
+
+} // namespace LibTextToSpeech2
 
 } // namespace Libs
