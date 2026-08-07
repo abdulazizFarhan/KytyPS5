@@ -343,6 +343,7 @@ struct EmitterState {
 	uint32_t                               ptr_output_sample_mask_array   = 0;
 	uint32_t                               ptr_output_float               = 0;
 	uint32_t                               ptr_output_vec4_float          = 0;
+	uint32_t                               ptr_output_vec4_uint           = 0;
 	uint32_t                               per_vertex_type                = 0;
 	uint32_t                               ptr_output_per_vertex          = 0;
 	uint32_t                               storage_runtime_array_type     = 0;
