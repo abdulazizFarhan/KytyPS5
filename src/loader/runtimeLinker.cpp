@@ -586,11 +586,22 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 		// function-pointer slot that v1.2 just stubbed). Treat Execute and
 		// low-address Write AVs the same way: NOP-out the faulting site
 		// and skip past it.
-		const bool is_low_addr = info->access_violation_vaddr != g_invalid_memory &&
-		                         (info->access_violation_vaddr & 0xFFFFFFFFFF000000ULL) == 0 &&
-		                         info->access_violation_vaddr < 0x100000ULL;
-		const bool is_exe_av   = info->access_violation_type == Common::HostException::AccessViolationType::Execute && is_low_addr;
-		const bool is_lo_write = info->access_violation_type == Common::HostException::AccessViolationType::Write && is_low_addr;
+		// M1W2 v1.4: GTA V's code calls through function-pointer tables that
+		// hold addresses in the dynamic memory region (0x32000000-0x64000000).
+		// The slots are data, not code, so jumping to them faults with an
+		// Execute AV. At the same time, low-address (< 0x100000) sentinels
+		// still trip the v1.3 path. Treat both as "unresolved function
+		// pointer" faults and NOP-out the call site.
+		const uint64_t av_addr = info->access_violation_vaddr;
+		const bool     is_low_addr    = av_addr != g_invalid_memory &&
+		                               (av_addr & 0xFFFFFFFFFF000000ULL) == 0 &&
+		                               av_addr < 0x100000ULL;
+		const bool     is_dyn_mem_addr = av_addr != g_invalid_memory &&
+		                               av_addr < 0x40000000ULL;
+		const bool     is_exe_av      = info->access_violation_type == Common::HostException::AccessViolationType::Execute &&
+		                               (is_low_addr || is_dyn_mem_addr);
+		const bool     is_lo_write    = info->access_violation_type == Common::HostException::AccessViolationType::Write &&
+		                               is_low_addr;
 		if (is_exe_av || is_lo_write) {
 #if KYTY_PLATFORM == KYTY_PLATFORM_WINDOWS
 			// Prefer CONTEXT.Rip from native_context (more reliable than
@@ -610,7 +621,7 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 					fault_ip = reinterpret_cast<uint64_t>(stack[0]) - 2;
 				}
 			}
-			LOGF("[M1W2 v1.3] av_type=%s fault_ip=%016" PRIx64 " ctx_rip=%016" PRIx64
+			LOGF("[M1W2 v1.4] av_type=%s fault_ip=%016" PRIx64 " ctx_rip=%016" PRIx64
 			     " exc_addr=%016" PRIx64 "\n",
 			     is_exe_av ? "Execute" : "Write",
 			     fault_ip,
@@ -626,18 +637,28 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 				const auto patch_addr = fault_ip & ~0x1F;
 				static std::unordered_set<uint64_t> patched_bases;
 				if (patched_bases.insert(patch_addr).second) {
-					LOGF("[M1W2 v1.3] patching AV site at [%016" PRIx64 "] (av=%016" PRIx64
+					LOGF("[M1W2 v1.4] patching AV site at [%016" PRIx64 "] (av=%016" PRIx64
 					     ") with 32 NOPs\n", patch_addr, info->access_violation_vaddr);
-					Common::VirtualMemory::Mode old_mode {};
-					Common::VirtualMemory::Protect(patch_addr, 32, Common::VirtualMemory::Mode::Write, &old_mode);
-					uint8_t nops[32] = {};
-					for (uint32_t i = 0; i < 32; i++) {
-						nops[i] = 0x90;
-					}
-					memcpy(reinterpret_cast<void*>(patch_addr), nops, 32);
-					if (Common::VirtualMemory::IsExecute(old_mode)) {
-						Common::VirtualMemory::Protect(patch_addr, 32, old_mode, nullptr);
-						Common::VirtualMemory::FlushInstructionCache(patch_addr, 32);
+					// Verify the patch site is mapped. GTA V often faults on
+					// addresses in unmapped guard pages; blindly calling Protect
+					// on an unmapped range would itself trigger a nested AV.
+					MEMORY_BASIC_INFORMATION patch_mem_info {};
+					if (VirtualQuery(reinterpret_cast<LPCVOID>(patch_addr), &patch_mem_info, sizeof(patch_mem_info)) != 0 &&
+					    patch_mem_info.State == MEM_COMMIT &&
+					    (patch_mem_info.Protect & (PAGE_GUARD | PAGE_NOACCESS)) == 0) {
+						Common::VirtualMemory::Mode old_mode {};
+						Common::VirtualMemory::Protect(patch_addr, 32, Common::VirtualMemory::Mode::Write, &old_mode);
+						uint8_t nops[32] = {};
+						for (uint32_t i = 0; i < 32; i++) {
+							nops[i] = 0x90;
+						}
+						memcpy(reinterpret_cast<void*>(patch_addr), nops, 32);
+						if (Common::VirtualMemory::IsExecute(old_mode)) {
+							Common::VirtualMemory::Protect(patch_addr, 32, old_mode, nullptr);
+							Common::VirtualMemory::FlushInstructionCache(patch_addr, 32);
+						}
+					} else {
+						LOGF("[M1W2 v1.4] skip patch: patch site not mapped\n");
 					}
 				}
 				if (ctx != nullptr) {
