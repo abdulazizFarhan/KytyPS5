@@ -615,7 +615,7 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 		                               (av_addr & 0xFFFFFFFFFF000000ULL) == 0 &&
 		                               av_addr < 0x100000ULL;
 		const bool     is_dyn_mem_addr = av_addr != g_invalid_memory &&
-		                               av_addr < 0x400000000000ULL;  // M1W2 v1.5b: extended to 16TB for GTA V sentinel table
+		                               av_addr < 0x10000000000000ULL;  // M1W2 v1.5b: extended to 256TB for GTA V sentinel table
 		const bool     is_exe_av      = info->access_violation_type == Common::HostException::AccessViolationType::Execute &&
 		                               (is_low_addr || is_dyn_mem_addr);
 		const bool     is_lo_write    = info->access_violation_type == Common::HostException::AccessViolationType::Write &&
@@ -674,7 +674,7 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 				// RIP by a full 1 MB on every sentinel AV so a single fault
 				// clears the entire 71 KB table. For code-section sentinels
 				// (original v1.3 path), still NOP-out the actual call site.
-				const bool in_dyn_mem = av_addr < 0x400000000000ULL;  // M1W2 v1.5b: 16TB
+				const bool in_dyn_mem = av_addr < 0x10000000000000ULL;  // M1W2 v1.5b: 16TB
 				if ((is_invalid_read || is_heap_read) && ctx != nullptr) {
 					// GTA V tried to deref a sentinel-like address. Skip the
 					// read and return a defined value so the caller can continue.
@@ -685,18 +685,21 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 					return true;
 				}
 				if (is_exe_av && in_dyn_mem && ctx != nullptr) {
+					// M1W2 v1.5c: GTA V iterates a huge function-pointer
+					// table across 64+ TB of virtual address space.
+					// Advance RIP by 1 GB per AV so a single fault
+					// clears 4-64 sentinel entries. The CPU will
+					// immediately re-AV at the new RIP because GTA V's
+					// loop never executes the post-call code, but this
+					// lets GTA V's progress through the address space.
 					static uint64_t fast_skip_count = 0;
 					fast_skip_count++;
 					if ((fast_skip_count & 0x3FF) == 1) {
 						LOGF("[M1W2 v1.5] fast-skip #%" PRIu64 " at [%016" PRIx64 "]\n", fast_skip_count, fault_ip);
 					}
-					// M1W2 v1.5b: GTA V's sentinel table extends across 2+ TB of
-					// virtual address space with 16-256 MB stride. Default 1 GB
-					// skip clears 4-64 entries per AV; near the upper bound use
-					// a smaller skip so we don't overshoot.
 					uint64_t skip_amount = 0x40000000ULL;  // 1 GB
-					if (fault_ip > 0x400000000000ULL - skip_amount) {
-						skip_amount = 0x4000000ULL;  // 64 MB if near 16 TB top
+					if (fault_ip > 0x10000000000000ULL - skip_amount) {
+						skip_amount = 0x4000000ULL;  // 64 MB if near 256 TB top
 					}
 					ctx->Rip = fault_ip + skip_amount;
 					ctx->Rax = 0;
