@@ -550,13 +550,27 @@ DescriptorResourceBinding ResourceForDescriptor(const EmitterState&       state,
                                                 IR::DescriptorBindingKind kind, uint32_t resource) {
 	const auto* descriptor = IR::FindBinding(state.program->bindings, kind);
 	if (descriptor == nullptr) {
-		ExitDescriptorBindingFailure(state, kind, resource, "descriptor group was not allocated");
+		// M1W8: previously EXIT() here. Some PS5 shaders reference an image
+		// bind kind that the layout phase didn't allocate. Demote the EXIT to
+		// a warning and return an empty binding descriptor so the SPIR-V
+		// emitter skips the offending descriptor set binding instead of
+		// killing the emulator. Callers must handle nullptr.
+		LOGF("spirv-emit: shader hash=0x%016" PRIx64 " stage=%u requested binding_kind=%u "
+		     "resource=%u but no descriptor group exists for that kind\n",
+		     state.program->shader_hash, static_cast<unsigned>(state.stage),
+		     static_cast<unsigned>(kind), resource);
+		return {nullptr, 0};
 	}
 	const auto found =
 	    std::find(descriptor->resources.begin(), descriptor->resources.end(), resource);
 	if (found == descriptor->resources.end()) {
-		ExitDescriptorBindingFailure(state, kind, resource,
-		                             "resource is absent from descriptor group");
+		// M1W8: see above. The layout phase did allocate the binding kind
+		// but didn't include this particular resource id. Skip + warn.
+		LOGF("spirv-emit: shader hash=0x%016" PRIx64 " stage=%u binding_kind=%u "
+		     "resource=%u absent from descriptor group of size %zu; skipping\n",
+		     state.program->shader_hash, static_cast<unsigned>(state.stage),
+		     static_cast<unsigned>(kind), resource, descriptor->resources.size());
+		return {nullptr, 0};
 	}
 	return {descriptor, static_cast<uint32_t>(found - descriptor->resources.begin())};
 }
@@ -566,7 +580,16 @@ uint32_t DescriptorElementPointer(EmitterState* state, uint32_t result_ptr_type,
                                   IR::DescriptorBindingKind kind, uint32_t resource,
                                   const char* variable_name) {
 	if (variable_id == 0) {
-		ExitDescriptorBindingFailure(*state, kind, resource, variable_name);
+		// M1W8: previously EXIT() here. Same reasoning as
+		// ResourceForDescriptor: skip the SPIR-V emission for a binding
+		// the layout phase didn't allocate, log a warning so the case is
+		// still observable, and let the caller short-circuit. Returns
+		// id 0 which propagates as a null descriptor load.
+		LOGF("spirv-emit: shader hash=0x%016" PRIx64 " stage=%u binding_kind=%u "
+		     "resource=%u descriptor variable for '%s' is missing; skipping\n",
+		     state->program->shader_hash, static_cast<unsigned>(state->stage),
+		     static_cast<unsigned>(kind), resource, variable_name);
+		return 0;
 	}
 	const auto pointer = state->builder.AllocateId();
 	state->builder.AddFunction(
@@ -709,9 +732,9 @@ uint32_t MakeSampledImage(EmitterState* state, const IR::MemoryInfo& mem, uint32
 	const auto image   = LoadSampledImageDescriptor(state, mem, use_pc, view);
 	const auto sampler = LoadSamplerDescriptor(state, mem.sampler, use_pc);
 	if (image == 0 || sampler == 0) {
-		ExitDescriptorBindingFailure(
-		    *state, SampledBindingKind(mem.kind == IR::ResourceKind::ImageUint, view), mem.resource,
-		    "sampled image or sampler descriptor load failed");
+		// M1W8: see ExitDescriptorBindingFailure change above. Skip
+		// OpSampledImage when one side of the binding is missing.
+		return 0;
 	}
 	const auto sampled_image = state->builder.AllocateId();
 	state->builder.AddFunction(
@@ -736,8 +759,10 @@ uint32_t LoadStorageImageDescriptor(EmitterState* state, uint32_t resource, bool
                                     uint32_t use_pc, ImageViewKind view) {
 	const auto pointer = StorageImageDescriptorPointer(state, resource, uint_image, use_pc, view);
 	if (pointer == 0) {
-		ExitDescriptorBindingFailure(*state, StorageBindingKind(uint_image, view), resource,
-		                             "storage image descriptor pointer creation failed");
+		// M1W8: skip + warn instead of crashing. The shader will then
+		// reference a null descriptor and downstream SPIR-V validation
+		// will reject the program at validation time (not the emulator).
+		return 0;
 	}
 	const auto type  = StorageImageType(*state, uint_image, view);
 	const auto image = state->builder.AllocateId();
