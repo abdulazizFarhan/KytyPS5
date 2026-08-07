@@ -99,9 +99,11 @@ void ResolveRenderDepthTarget(uint64_t submit_id, CommandBuffer* buffer, const H
 	const auto& dc = hw.GetDepthControl();
 	const auto& sc = hw.GetStencilControl();
 	const auto& sm = hw.GetStencilMask();
+	const bool  has_stencil =
+	    z.stencil_info.format != Prospero::GpuEnumValue(Prospero::StencilFormat::kInvalid);
 	const bool  depth_active =
 	    dc.z_enable || dc.z_write_enable || dc.depth_bounds_enable || rc.depth_clear_enable;
-	const bool stencil_active = dc.stencil_enable || rc.stencil_clear_enable;
+	const bool stencil_active = has_stencil && (dc.stencil_enable || rc.stencil_clear_enable);
 	if (!depth_active && !stencil_active) {
 		return;
 	}
@@ -139,8 +141,6 @@ void ResolveRenderDepthTarget(uint64_t submit_id, CommandBuffer* buffer, const H
 		}
 		return;
 	}
-	const bool has_stencil =
-	    z.stencil_info.format != Prospero::GpuEnumValue(Prospero::StencilFormat::kInvalid);
 	const bool has_htile            = z.z_info.tile_surface_enable;
 	const bool msaa_compat          = depth_msaa_single_sample_compatible(z.z_info.num_samples);
 	const bool htile_stencil_compat = depth_htile_stencil_acceleration_compatible(
@@ -157,7 +157,7 @@ void ResolveRenderDepthTarget(uint64_t submit_id, CommandBuffer* buffer, const H
 	}
 	// Prospero defines the compression-disable bits as tile writeback policy. Vulkan attachments
 	// expose the same logical depth/stencil values regardless of the driver's backing compression.
-	if ((stencil_active && !has_stencil) || rc.resummarize_enable || rc.copy_centroid ||
+	if (rc.resummarize_enable || rc.copy_centroid ||
 	    rc.copy_sample != 0 || z.z_info.expclear_enabled || z.stencil_info.expclear_enabled ||
 	    z.z_info.embedded_sample_locations || z.z_info.partially_resident ||
 	    z.stencil_info.partially_resident || z.z_info.plane_compression != 0 ||
@@ -330,10 +330,10 @@ void ResolveRenderDepthTarget(uint64_t submit_id, CommandBuffer* buffer, const H
 	r->depth_min_bounds         = hw.GetDepthBoundsMin();
 	r->depth_max_bounds         = hw.GetDepthBoundsMax();
 
-	r->stencil_clear_enable = rc.stencil_clear_enable;
+	r->stencil_clear_enable = has_stencil && rc.stencil_clear_enable;
 	r->stencil_clear_value  = hw.GetStencilClearValue();
-	r->stencil_test_enable  = dc.stencil_enable;
-	if (dc.stencil_enable) {
+	r->stencil_test_enable  = has_stencil && dc.stencil_enable;
+	if (r->stencil_test_enable) {
 		if (dc.stencilfunc > static_cast<uint8_t>(VK_COMPARE_OP_ALWAYS) ||
 		    (dc.backface_enable &&
 		     dc.stencilfunc_bf > static_cast<uint8_t>(VK_COMPARE_OP_ALWAYS)) ||
