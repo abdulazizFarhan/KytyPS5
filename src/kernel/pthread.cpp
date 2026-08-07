@@ -54,6 +54,10 @@
 
 namespace Libs {
 
+namespace LibcInternalExt {
+void RunThreadAtexitDestructors();
+} // namespace LibcInternalExt
+
 namespace LibKernel {
 
 LIB_NAME("libkernel", "libkernel");
@@ -3158,6 +3162,8 @@ int PthreadGetCurrentPriorityForKernel() {
 
 static void CleanupThread(void* arg) {
 	auto* thread = static_cast<Pthread>(arg);
+
+	LibcInternalExt::RunThreadAtexitDestructors();
 
 	auto thread_dtors = g_pthread_context->GetThreadDtors();
 
