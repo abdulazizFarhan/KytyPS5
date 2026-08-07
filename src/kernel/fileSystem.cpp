@@ -238,6 +238,12 @@ std::filesystem::path MountPoints::GetRealFilename(const std::string& mounted_fi
 		while (Common::StartsWith(rel_path, '/')) {
 			rel_path = Common::RemoveFirst(rel_path, 1);
 		}
+#if KYTY_PLATFORM == KYTY_PLATFORM_WINDOWS
+		if (rel_path.find_first_of("<>:\"|?*") != std::string::npos) {
+			::printf("FileSystem: Windows-incompatible guest filename: %s\\n",
+			         mounted_file_name.c_str());
+		}
+#endif
 		return p.dir / rel_path;
 	}
 
