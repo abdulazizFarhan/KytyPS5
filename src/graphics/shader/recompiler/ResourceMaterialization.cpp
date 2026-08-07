@@ -149,8 +149,12 @@ bool ValidateResourceSpecialization(const Program& program, const ResourceSnapsh
 		const auto dimension = DescriptorDimension(descriptor);
 		if (dimension == Decoder::ImageDimension::Unknown || dimension != image.dimension) {
 			if (error != nullptr) {
-				*error =
-				    fmt::format("image descriptor {} no longer matches specialized dimension", i);
+				*error = fmt::format(
+				    "image descriptor {} no longer matches specialized dimension: "
+				    "{:08x},{:08x},{:08x},{:08x},{:08x},{:08x},{:08x},{:08x}",
+				    i, descriptor.dwords[0], descriptor.dwords[1], descriptor.dwords[2],
+				    descriptor.dwords[3], descriptor.dwords[4], descriptor.dwords[5],
+				    descriptor.dwords[6], descriptor.dwords[7]);
 			}
 			return false;
 		}
@@ -171,8 +175,12 @@ bool ValidateResourceSpecialization(const Program& program, const ResourceSnapsh
 			                          image.kind == ResourceKind::StorageImageUint;
 			if (uint_descriptor != uint_program && !(image.atomic && uint_program)) {
 				if (error != nullptr) {
-					*error =
-					    fmt::format("image descriptor {} no longer matches specialized format", i);
+					*error = fmt::format(
+					    "image descriptor {} no longer matches specialized format: "
+					    "{:08x},{:08x},{:08x},{:08x},{:08x},{:08x},{:08x},{:08x}",
+					    i, descriptor.dwords[0], descriptor.dwords[1], descriptor.dwords[2],
+					    descriptor.dwords[3], descriptor.dwords[4], descriptor.dwords[5],
+					    descriptor.dwords[6], descriptor.dwords[7]);
 				}
 				return false;
 			}
