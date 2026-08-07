@@ -615,7 +615,7 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 		                               (av_addr & 0xFFFFFFFFFF000000ULL) == 0 &&
 		                               av_addr < 0x100000ULL;
 		const bool     is_dyn_mem_addr = av_addr != g_invalid_memory &&
-		                               av_addr < 0x100000000000ULL;
+		                               av_addr < 0x400000000000ULL;  // M1W2 v1.5b: extended to 16TB for GTA V sentinel table
 		const bool     is_exe_av      = info->access_violation_type == Common::HostException::AccessViolationType::Execute &&
 		                               (is_low_addr || is_dyn_mem_addr);
 		const bool     is_lo_write    = info->access_violation_type == Common::HostException::AccessViolationType::Write &&
@@ -674,7 +674,7 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 				// RIP by a full 1 MB on every sentinel AV so a single fault
 				// clears the entire 71 KB table. For code-section sentinels
 				// (original v1.3 path), still NOP-out the actual call site.
-				const bool in_dyn_mem = av_addr < 0x100000000000ULL;
+				const bool in_dyn_mem = av_addr < 0x400000000000ULL;  // M1W2 v1.5b: 16TB
 				if ((is_invalid_read || is_heap_read) && ctx != nullptr) {
 					// GTA V tried to deref a sentinel-like address. Skip the
 					// read and return a defined value so the caller can continue.
@@ -690,10 +690,13 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 					if ((fast_skip_count & 0x3FF) == 1) {
 						LOGF("[M1W2 v1.5] fast-skip #%" PRIu64 " at [%016" PRIx64 "]\n", fast_skip_count, fault_ip);
 					}
-					// Skip by 256 MB to avoid overshooting the upper bound
-					uint64_t skip_amount = 0x10000000ULL;
-					if (fault_ip > 0x100000000ULL - skip_amount) {
-						skip_amount = 0x1000000ULL;  // 16MB if near top
+					// M1W2 v1.5b: GTA V's sentinel table extends across 2+ TB of
+					// virtual address space with 16-256 MB stride. Default 1 GB
+					// skip clears 4-64 entries per AV; near the upper bound use
+					// a smaller skip so we don't overshoot.
+					uint64_t skip_amount = 0x40000000ULL;  // 1 GB
+					if (fault_ip > 0x400000000000ULL - skip_amount) {
+						skip_amount = 0x4000000ULL;  // 64 MB if near 16 TB top
 					}
 					ctx->Rip = fault_ip + skip_amount;
 					ctx->Rax = 0;
