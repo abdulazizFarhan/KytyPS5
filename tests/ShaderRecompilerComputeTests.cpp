@@ -2786,6 +2786,7 @@ void RunCase(VulkanHarness *vulkan, const TestCase &test) {
             "storage image descriptor swizzle did not reach the specialized program");
   }
   if (test.compile_only) {
+    test.passed = true;
     std::printf("[compute] %-32s ok\n", test.name);
     return;
   }
