@@ -1341,7 +1341,7 @@ int KYTY_SYSV_ABI GraphicsWriteDataPatchSetAddressOrOffset(uint32_t* cmd,
 		return OK;
 	}
 
-	return static_cast<int>(0x8a6c000cu);
+	return GRAPHICS5_ERROR_INVALID_PACKET;
 }
 
 int KYTY_SYSV_ABI GraphicsUnknownJumpPatchSetTarget(uint32_t* cmd, const volatile uint32_t* target,
@@ -2836,6 +2836,10 @@ uint32_t KYTY_SYSV_ABI GraphicsAcbCondExecGetSize() {
 	return GraphicsDcbCondExecGetSize();
 }
 
+uint32_t KYTY_SYSV_ABI GraphicsAcbJumpGetSize() {
+	return 0x10u;
+}
+
 uint32_t* KYTY_SYSV_ABI GraphicsAcbWaitRegMem(CommandBuffer* buf, uint8_t size,
                                               uint8_t compare_function, uint8_t cache_policy,
                                               const volatile void* address, uint64_t reference,
@@ -3155,7 +3159,7 @@ int KYTY_SYSV_ABI GraphicsDmaDataPatchSetDstAddressOrOffset(uint32_t* cmd,
 		return OK;
 	}
 
-	return static_cast<int>(0x8a6c000cu);
+	return GRAPHICS5_ERROR_INVALID_PACKET;
 }
 
 int KYTY_SYSV_ABI GraphicsDmaDataPatchSetSrcAddressOrOffsetOrImmediate(
@@ -3169,7 +3173,7 @@ int KYTY_SYSV_ABI GraphicsDmaDataPatchSetSrcAddressOrOffsetOrImmediate(
 		return OK;
 	}
 
-	return static_cast<int>(0x8a6c000cu);
+	return GRAPHICS5_ERROR_INVALID_PACKET;
 }
 
 uint32_t KYTY_SYSV_ABI GraphicsGetPacketSize(uint32_t* packet) {
@@ -3233,6 +3237,15 @@ int KYTY_SYSV_ABI GraphicsSetRangePredication(uint32_t* start, const volatile ui
 	return OK;
 }
 
+int KYTY_SYSV_ABI GraphicsRewindPatchSetRewindState(uint32_t* cmd, uint8_t state) {
+	if (((cmd[0] >> 8u) & 0xffu) != Pm4::IT_REWIND) {
+		return GRAPHICS5_ERROR_INVALID_PACKET;
+	}
+
+	cmd[1] = (cmd[1] & 0x7fffffffu) | (static_cast<uint32_t>(state) << 31u);
+	return OK;
+}
+
 int KYTY_SYSV_ABI GraphicsCondExecPatchSetEnd(uint32_t* cmd, const volatile uint32_t* buffer) {
 	PRINT_NAME();
 
@@ -3241,23 +3254,23 @@ int KYTY_SYSV_ABI GraphicsCondExecPatchSetEnd(uint32_t* cmd, const volatile uint
 	     reinterpret_cast<uint64_t>(cmd), reinterpret_cast<uint64_t>(buffer));
 
 	if (cmd == nullptr || buffer == nullptr) {
-		return static_cast<int>(0x8a6c000cu);
+		return GRAPHICS5_ERROR_INVALID_PACKET;
 	}
 
 	auto op = (cmd[0] >> 8u) & 0xffu;
 	if (op != Pm4::IT_COND_EXEC) {
-		return static_cast<int>(0x8a6c000cu);
+		return GRAPHICS5_ERROR_INVALID_PACKET;
 	}
 
 	auto* packet_end = cmd + 5;
 	auto* range_end  = const_cast<uint32_t*>(reinterpret_cast<const volatile uint32_t*>(buffer));
 	if (range_end < packet_end) {
-		return static_cast<int>(0x8a6c000cu);
+		return GRAPHICS5_ERROR_INVALID_PACKET;
 	}
 
 	auto num_dwords = static_cast<uint64_t>(range_end - packet_end);
 	if (num_dwords > 0x3fffu) {
-		return static_cast<int>(0x8a6c000cu);
+		return GRAPHICS5_ERROR_INVALID_PACKET;
 	}
 
 	cmd[4] = (cmd[4] & ~0x3fffu) | static_cast<uint32_t>(num_dwords);
@@ -3273,12 +3286,12 @@ int KYTY_SYSV_ABI GraphicsCondExecPatchSetCommandAddress(uint32_t*              
 	     reinterpret_cast<uint64_t>(cmd), reinterpret_cast<uint64_t>(command));
 
 	if (cmd == nullptr || command == nullptr) {
-		return static_cast<int>(0x8a6c000cu);
+		return GRAPHICS5_ERROR_INVALID_PACKET;
 	}
 
 	auto op = (cmd[0] >> 8u) & 0xffu;
 	if (op != Pm4::IT_COND_EXEC || (reinterpret_cast<uintptr_t>(command) & 0x3u) != 0) {
-		return static_cast<int>(0x8a6c000cu);
+		return GRAPHICS5_ERROR_INVALID_PACKET;
 	}
 
 	auto addr = reinterpret_cast<uint64_t>(command);
