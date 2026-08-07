@@ -535,9 +535,10 @@ bool LowerMemoryInstruction(const Decoder::Instruction& decoded, BasicBlock* blo
 		case Decoder::Opcode::BufferAtomicCmpSwap: {
 			// CmpSwap uses VDATA as 64-bit register pair: VDATA[31:0] = data,
 			// VDATA[63:32] = compare. Add the compare as a +1 register offset.
-			// Hardware reads VDATA (data) before the atomic, then writes the
-			// original memory value back to VDATA. So inst.dst = decoded.dst
-			// for the result, AND src[0] = decoded.dst for the input data.
+			// Layout in IR:
+			//   inst.src[0] = data (decoded.dst)
+			//   inst.src[1] = comparator (decoded.dst + 1)
+			//   inst.src[2..3] = address sources (filled by LowerBufferAddressSources)
 			Instruction inst;
 			inst.pc       = decoded.pc;
 			inst.op       = Opcode::AtomicCmpSwapU32;
@@ -545,8 +546,10 @@ bool LowerMemoryInstruction(const Decoder::Instruction& decoded, BasicBlock* blo
 			inst.dst.kind = OperandKind::Null;
 			if ((decoded.glc && !LowerRegisterOperand(decoded.dst, &inst.dst, error)) ||
 			    !LowerSourceOperand(decoded.dst, &inst.src[0], error) ||
-			    !LowerSourceOperand(OffsetDecodedRegister(decoded.dst, 1), &inst.src[1], error) ||
-			    !LowerBufferAddressSources(decoded, &inst, 2, error)) {
+			    !LowerSourceOperand(OffsetDecodedRegister(decoded.dst, 1), &inst.src[1], error)) {
+				return false;
+			}
+			if (!LowerBufferAddressSources(decoded, &inst, 2, error)) {
 				return false;
 			}
 			block->instructions.push_back(inst);

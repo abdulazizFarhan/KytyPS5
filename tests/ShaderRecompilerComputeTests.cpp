@@ -8564,8 +8564,36 @@ TestCase BufferAtomicCmpSwapStoresOnMatch() {
   std::copy_n(descriptor.begin(), 4, test.user_data.begin() + 4);
   test.user_data[50] = 1u << 20u;
   test.has_user_data = true;
+    return test;
+}
+TestCase BufferAtomicCmpSwapLeavesOnMismatch() {
+  using O = ShaderOpcode;
+
+  std::vector<u32> code;
+  // Setup: data=77 in v0, compare=42 in v1
+  // mem[0] = 100 initially -> CmpSwap should NOT match (compare=42 != mem=100)
+  AppendVMovLiteral(&code, 0, 77u);
+  AppendVMovLiteral(&code, 1, 42u);
+  AppendVMovU32(&code, 20, 0);
+  // BUFFER_ATOMIC_CMPSWAP: VDATA=0, VADDR=20, opcode=0x31, GLC=1
+  code.push_back(EncodeMubuf0(0x31, 0, false, true, true));
+  code.push_back(EncodeMubuf1(0, 12, 20));
+  AppendStoreVgpr(&code, 0, 1);
+  AppendEnd(&code);
+
+  TestCase test;
+  test.name = "BufferAtomicCmpSwapLeavesOnMismatch";
+  test.code = code;
+  test.initial = {100u, 0};
+  test.expected = {100u, 100u};
+  test.opcodes = {O::VMovB32, O::BufferAtomicCmpSwap, O::BufferStoreDword, O::SEndpgm};
+  const auto descriptor = MakeStructuredStorageBufferData(0, static_cast<u32>(test.initial.size() * sizeof(u32)));
+  std::copy_n(descriptor.begin(), 4, test.user_data.begin() + 4);
+  test.user_data[50] = 1u << 20u;
+  test.has_user_data = true;
   return test;
 }
+
 TestCase BufferAtomicCSubLeavesWhenMemLessThanSrc() {
   using O = ShaderOpcode;
 
@@ -9823,10 +9851,11 @@ std::vector<TestCase> MakeCases() {
   AddCase(VectorBfeI32ArithmeticShiftMasksField);
   AddCase(VectorCarryAndBitCountOps);
   AddCase(VectorVop3CompareEqI64OnGpu);
+  AddCase(BufferAtomicFMaxExactRawGlcModes);
+  AddCase(BufferAtomicCmpSwapStoresOnMatch);
+  AddCase(BufferAtomicCmpSwapLeavesOnMismatch);
   AddCase(BufferAtomicCSubSubtractsWhenMemAtLeastSrc);
   AddCase(BufferAtomicCSubLeavesWhenMemLessThanSrc);
-  // AddCase(BufferAtomicCmpSwapStoresOnMatch); // Spirv-emit pending debug
-  AddCase(BufferAtomicFMaxExactRawGlcModes);
   AddCase(BufferAtomicFMaxSpecialValues);
   AddCase(BufferAtomicFMaxContendedWorkgroup);
   AddCase(BufferAtomicFMinExactRawGlcModes);

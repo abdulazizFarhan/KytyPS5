@@ -1211,8 +1211,12 @@ uint32_t EmitF32BitsOrderedLessThan(EmitterState* state, uint32_t lhs_bits, uint
 
 void EmitAtomicCmpSwapU32(EmitterState* state, const IR::Instruction& inst) {
 	if (IsStorageBufferMemoryKind(inst.memory.kind)) {
+		// CmpSwap uses inst.src[0] = data, inst.src[1] = comparator.
+		// Address sources start at src[2] (not src[1] as in single-source 
+		// atomics).
+		const auto extra = (inst.src_count > 2u) ? (inst.src_count - 2u) : 0u;
 		const auto index =
-		    EmitMemoryDwordIndex(state, inst, inst.memory, 1, AddressSourceCount(inst, 1));
+		    EmitMemoryDwordIndex(state, inst, inst.memory, 2, extra);
 		const auto in_bounds = EmitStorageBufferElementInBounds(state, inst.memory, index, inst.pc);
 		const auto data      = EmitValueLoad(state, inst.src[0]);
 		const auto comparator = EmitValueLoad(state, inst.src[1]);
