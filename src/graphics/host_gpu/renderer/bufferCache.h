@@ -68,7 +68,7 @@ public:
 	                uint32_t value);
 	void CopyBuffer(CommandBuffer* command, GraphicContext* ctx, uint64_t dst_vaddr,
 	                uint64_t src_vaddr, uint64_t size);
-	[[nodiscard]] bool HasPageOverlap(uint64_t vaddr, uint64_t size);
+	[[nodiscard]] bool IsRegionRegistered(uint64_t vaddr, uint64_t size);
 	[[nodiscard]] bool IsRegionCpuModified(uint64_t vaddr, uint64_t size);
 	[[nodiscard]] bool IsRegionGpuModified(uint64_t vaddr, uint64_t size);
 	void               PublishImageBacking(uint64_t vaddr, uint64_t size);

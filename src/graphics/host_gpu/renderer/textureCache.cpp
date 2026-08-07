@@ -450,7 +450,7 @@ struct TextureCache::ReadbackWorker {
 		const auto linear_size    = linear_elements * info.bytes_per_element;
 		const auto slice_size     = info.size / info.layers;
 		const bool meta_overlap   = cache.HasMetaOverlapLocked(info.address, info.size);
-		const bool buffer_overlap = cache.m_buffer_cache.HasPageOverlap(info.address, info.size);
+		const bool buffer_overlap = cache.m_buffer_cache.IsRegionRegistered(info.address, info.size);
 		if (linear_size > slice_size || cached.image->format != info.format ||
 		    cached.image->extent.width != info.width ||
 		    cached.image->extent.height != info.height || meta_overlap || buffer_overlap) {
@@ -511,7 +511,7 @@ struct TextureCache::ReadbackWorker {
 		}
 		const auto slice_size     = info.size / layers;
 		const bool meta_overlap   = cache.HasMetaOverlapLocked(info.address, info.size);
-		const bool buffer_overlap = cache.m_buffer_cache.HasPageOverlap(info.address, info.size);
+		const bool buffer_overlap = cache.m_buffer_cache.IsRegionRegistered(info.address, info.size);
 		if (meta_overlap || buffer_overlap) {
 			EXIT("TextureCache: color-image readback storage is unsupported, addr=0x%016" PRIx64
 			     " size=0x%016" PRIx64 " meta=%d buffer=%d kind=%u\n",
@@ -1117,7 +1117,7 @@ VulkanImage* TextureCache::FindTexture(CommandBuffer* command, GraphicContext* c
 		RetireSampledTargetAliases(ctx, info);
 	}
 	BufferImageCopySource source {nullptr, 0, info.address, info.size, true};
-	if (m_buffer_cache.HasPageOverlap(info.address, info.size)) {
+	if (m_buffer_cache.IsRegionRegistered(info.address, info.size)) {
 		// ObtainBufferForImage publishes dirty native-buffer bytes when necessary and otherwise
 		// uses a CPU-current staging fallback through guest backing.
 		source = m_buffer_cache.ObtainBufferForImage(info.address, info.size);
@@ -1313,7 +1313,7 @@ StorageTextureVulkanImage* TextureCache::FindStorageTexture(CommandBuffer*   com
 	}
 
 	std::lock_guard       transaction(m_resource_mutex);
-	const bool            buffer_overlap = m_buffer_cache.HasPageOverlap(info.address, info.size);
+	const bool            buffer_overlap = m_buffer_cache.IsRegionRegistered(info.address, info.size);
 	BufferImageCopySource source {nullptr, 0, info.address, info.size, true};
 	if (buffer_overlap) {
 		source = m_buffer_cache.ObtainBufferForImage(info.address, info.size);
@@ -1474,7 +1474,7 @@ RenderTextureVulkanImage* TextureCache::FindRenderTarget(CommandBuffer*         
 	}
 	std::lock_guard       transaction(m_resource_mutex);
 	BufferImageCopySource target_source {nullptr, 0, info.address, info.size, true};
-	const bool target_buffer_overlap = m_buffer_cache.HasPageOverlap(info.address, info.size);
+	const bool target_buffer_overlap = m_buffer_cache.IsRegionRegistered(info.address, info.size);
 	if (target_buffer_overlap) {
 		// A render target may use a containing native buffer after dirty bytes are published or
 		// coherent guest backing for a clean partial view. ObtainBufferForImage keeps GPU-dirty
@@ -1715,7 +1715,7 @@ DepthStencilVulkanImage* TextureCache::FindDepthTarget(CommandBuffer* command, G
 	// BufferCache treats an untracked guest range as CPU-current. That is useful when
 	// uploading from guest memory, but it is not evidence that a clean native image is
 	// stale. Only a genuinely overlapping buffer participates in transition selection.
-	const bool depth_buffer_overlap = m_buffer_cache.HasPageOverlap(info.address, info.size);
+	const bool depth_buffer_overlap = m_buffer_cache.IsRegionRegistered(info.address, info.size);
 	const auto depth_source         = m_buffer_cache.ObtainBufferForImage(info.address, info.size);
 	const auto stencil_source =
 	    has_stencil ? m_buffer_cache.ObtainBufferForImage(info.stencil_address, info.stencil_size)
@@ -2010,7 +2010,7 @@ TextureCache::RegisterVideoOutSurfaces(GraphicContext*                  ctx,
 	}
 	std::lock_guard transaction(m_resource_mutex);
 	for (const auto& info: infos) {
-		if (m_buffer_cache.HasPageOverlap(info.address, info.size)) {
+		if (m_buffer_cache.IsRegionRegistered(info.address, info.size)) {
 			EXIT("TextureCache: video-out surface aliases buffer pages, addr=0x%016" PRIx64
 			     " size=0x%016" PRIx64 "\n",
 			     info.address, info.size);
@@ -2234,7 +2234,7 @@ bool TextureCache::ClearImageFromBuffer(CommandBuffer* command, uint64_t vaddr, 
 	}
 
 	RequireNoMetaOverlapLocked(vaddr, size);
-	const bool buffer_overlap = m_buffer_cache.HasPageOverlap(vaddr, size);
+	const bool buffer_overlap = m_buffer_cache.IsRegionRegistered(vaddr, size);
 	const bool buffer_cpu_modified =
 	    buffer_overlap && m_buffer_cache.IsRegionCpuModified(vaddr, size);
 	const bool buffer_gpu_modified =
@@ -2332,7 +2332,7 @@ void TextureCache::MarkGpuWritten(VulkanImage* image) {
 			     static_cast<const void*>(image), static_cast<uint32_t>(cached->kind));
 		}
 		for (uint32_t i = 0; i < cached->RangeCount(); i++) {
-			if (m_buffer_cache.HasPageOverlap(cached->Address(i), cached->Size(i))) {
+			if (m_buffer_cache.IsRegionRegistered(cached->Address(i), cached->Size(i))) {
 				const bool cpu_modified =
 				    m_buffer_cache.IsRegionCpuModified(cached->Address(i), cached->Size(i));
 				const bool gpu_modified =
@@ -2818,7 +2818,7 @@ void TextureCache::RegisterMeta(uint64_t vaddr, uint64_t size, uint32_t layers) 
 		     vaddr, size, layers);
 	}
 	std::lock_guard transaction(m_resource_mutex);
-	if (m_buffer_cache.HasPageOverlap(vaddr, size)) {
+	if (m_buffer_cache.IsRegionRegistered(vaddr, size)) {
 		// Register virtual surface metadata independently of an earlier buffer view. Kyty's split
 		// caches first publish any dirty buffer bytes; clean partial views use guest backing.
 		const auto source = m_buffer_cache.ObtainBufferForImage(vaddr, size);

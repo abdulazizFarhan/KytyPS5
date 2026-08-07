@@ -139,6 +139,8 @@ uint64_t AlignUp(uint64_t value) {
 	return (value + BufferCache::CACHING_PAGE_SIZE - 1) & ~(BufferCache::CACHING_PAGE_SIZE - 1);
 }
 
+} // namespace
+
 bool PageOverlaps(uint64_t left, uint64_t left_size, uint64_t right, uint64_t right_size) {
 	const auto left_begin  = left & ~(TRACKER_PAGE_SIZE - 1);
 	const auto left_end    = (left + left_size + TRACKER_PAGE_SIZE - 1) & ~(TRACKER_PAGE_SIZE - 1);
@@ -146,7 +148,6 @@ bool PageOverlaps(uint64_t left, uint64_t left_size, uint64_t right, uint64_t ri
 	const auto right_end = (right + right_size + TRACKER_PAGE_SIZE - 1) & ~(TRACKER_PAGE_SIZE - 1);
 	return left_begin < right_end && right_begin < left_end;
 }
-} // namespace
 
 bool MergeOverlappingBufferCacheRange(BufferCacheRange* merged,
                                       BufferCacheRange  candidate) noexcept {
@@ -1088,7 +1089,7 @@ void BufferCache::FillBuffer(CommandBuffer* command, GraphicContext* ctx, uint64
 		std::lock_guard transaction(m_resource_mutex);
 		const auto      texture_region      = m_texture_cache->QueryRegion(vaddr, size);
 		const bool      image_overlap       = texture_region.image_bytes;
-		const bool      buffer_overlap      = HasPageOverlap(vaddr, size);
+		const bool      buffer_overlap      = IsRegionRegistered(vaddr, size);
 		const bool      buffer_gpu_modified = IsRegionGpuModified(vaddr, size);
 		if (!buffer_overlap && !buffer_gpu_modified) {
 			if (image_overlap) {
@@ -1152,7 +1153,7 @@ void BufferCache::CopyBuffer(CommandBuffer* command, GraphicContext* ctx, uint64
 			     " dst=0x%016" PRIx64 " size=0x%016" PRIx64 "\n",
 			     src_vaddr, dst_vaddr, size);
 		}
-		if (!HasPageOverlap(dst_vaddr, size) && !IsRegionGpuModified(src_vaddr, size) &&
+		if (!IsRegionRegistered(dst_vaddr, size) && !IsRegionGpuModified(src_vaddr, size) &&
 		    !IsRegionGpuModified(dst_vaddr, size) && !src_image_gpu) {
 			if (src_region.gpu_metadata_bytes) {
 				LOGF("BufferCache: host copy reads virtual metadata, src=0x%016" PRIx64
@@ -1224,20 +1225,23 @@ void BufferCache::CopyBuffer(CommandBuffer* command, GraphicContext* ctx, uint64
 	                     nullptr, 2, after, 0, nullptr);
 }
 
-bool BufferCache::HasPageOverlap(uint64_t vaddr, uint64_t size) {
+bool BufferCache::IsRegionRegistered(uint64_t vaddr, uint64_t size) {
 	if (vaddr == 0 || size == 0 || vaddr >= TRACKER_ADDRESS_SIZE ||
 	    size > TRACKER_ADDRESS_SIZE - vaddr) {
-		EXIT("BufferCache: invalid page-overlap query, addr=0x%016" PRIx64 " size=0x%016" PRIx64
+		EXIT("BufferCache: invalid registered-region query, addr=0x%016" PRIx64 " size=0x%016" PRIx64
 		     "\n",
 		     vaddr, size);
 	}
 	FaultSafeCacheLock lock(this, m_mutex);
-	for (const auto& [address, cached]: m_buffers) {
-		if (PageOverlaps(vaddr, size, address, cached->size)) {
-			return true;
-		}
+	// Cached buffers are ordered by start address and non-overlapping.
+	// The last buffer beginning before (vaddr + size) is therefore the
+	// only possible intersection.
+	const auto candidate = m_buffers.lower_bound(vaddr + size);
+	if (candidate == m_buffers.begin()) {
+		return false;
 	}
-	return false;
+	const auto& [address, cached] = *std::prev(candidate);
+	return address + cached->size > vaddr;
 }
 
 bool BufferCache::IsRegionGpuModified(uint64_t vaddr, uint64_t size) {
