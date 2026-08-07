@@ -118,6 +118,11 @@ static bool ParseArgs(int argc, char* argv[], RunOptions& options, bool& show_he
 			continue;
 		}
 
+		if (arg == "--fullscreen") {
+			options.config.fullscreen_enabled = true;
+			continue;
+		}
+
 		if (!Common::StartsWith(arg, "--")) {
 			::printf("game input must be provided with --game\n");
 			return false;

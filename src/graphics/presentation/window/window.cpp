@@ -971,9 +971,13 @@ static void WindowCreate(WindowContext* ctx) {
 
 	LOGF("WindowCreate(): width = %d, height = %d\n", width, height);
 
+	uint32_t window_flags = KYTY_SDL_WINDOW_FLAGS;
+	if (Config::FullscreenEnabled()) {
+		window_flags |= static_cast<uint32_t>(SDL_WINDOW_FULLSCREEN_DESKTOP);
+	}
 	ctx->window =
 	    SDL_CreateWindow(KYTY_SDL_WINDOW_CAPTION, KYTY_SDL_WINDOWPOS_CENTERED,
-	                     KYTY_SDL_WINDOWPOS_CENTERED, width, height, KYTY_SDL_WINDOW_FLAGS);
+	                     KYTY_SDL_WINDOWPOS_CENTERED, width, height, window_flags);
 
 	ctx->window_hidden = true;
 

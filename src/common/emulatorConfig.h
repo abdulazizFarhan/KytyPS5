@@ -21,6 +21,7 @@ enum class OutputDirection { Silent, Console, File };
 struct ConfigOptions {
 	uint32_t               screen_width                = 1280;
 	uint32_t               screen_height               = 720;
+	bool                   fullscreen_enabled          = false;
 	uint32_t               vblank_frequency            = 60;
 	bool                   vulkan_validation_enabled   = false;
 	bool                   shader_validation_enabled   = false;
@@ -44,6 +45,7 @@ void Load(const ConfigOptions& cfg);
 
 uint32_t GetScreenWidth();
 uint32_t GetScreenHeight();
+bool     FullscreenEnabled();
 uint32_t GetVblankFrequency();
 bool     VulkanValidationEnabled();
 
