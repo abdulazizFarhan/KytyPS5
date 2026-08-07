@@ -161,7 +161,7 @@ static KYTY_SYSV_ABI uint64_t ResolveImportStubWithId(uint64_t record_id);
 
 static uint64_t AllocateUnresolvedImportThunk(uint64_t record_id, Program* program) {
 	constexpr uint64_t page_size  = 4096;
-	constexpr uint64_t thunk_size = 162;
+	constexpr uint64_t thunk_size = 165;
 
 	// Prefer the per-program guest-mode thunk region (RWX, same allocation as
 	// base_vaddr). The guest's PLT `jmp [GOT]` then jumps into guest-executable
@@ -277,6 +277,10 @@ static uint64_t AllocateUnresolvedImportThunk(uint64_t record_id, Program* progr
 	emit(0x41);
 	emit(0xff);
 	emit(0xe3); // jmp r11
+	// Match the integer fallback for floating-point return values.
+	emit(0x0f);
+	emit(0x57);
+	emit(0xc0); // xorps xmm0, xmm0
 	emit(0x31);
 	emit(0xc0); // xor eax, eax
 	emit(0xc3); // ret
