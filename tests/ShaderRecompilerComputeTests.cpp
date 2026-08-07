@@ -4621,6 +4621,11 @@ TestCase VectorLaneAndPackedOps() {
   AppendVop3(&code, 0x361, 1, 0, InlineU32(0));
   AppendVop3(&code, 0x377, 2, Vgpr(0), InlineU32(0), InlineU32(0));
   code.push_back(EncodeVop2(0x2f, 3, Vgpr(7), 8));
+  // VOP3P packed F16 ops: op_sel_hi=0x3 sets src0/src1.op_sel_hi=1, which per AMD RDNA2
+  // spec selects the low source half for the high destination lane. With op_sel=0 (default)
+  // the low destination lane uses the low source half. The result: both lanes broadcast the
+  // low source halves. For v4=(1.0,2.0), v5=(3.0,4.0), v6=(1.0,1.0): vpadd=4+4, vpmul=3+3,
+  // vpmin=1+1, vpmax=3+3, vpfma=4+4 (lo+v6.lo).
   AppendVop3p(&code, 0x0f, 11, Vgpr(4), Vgpr(5), 0, 0x3);
   AppendVop3p(&code, 0x10, 12, Vgpr(4), Vgpr(5), 0, 0x3);
   AppendVop3p(&code, 0x11, 13, Vgpr(4), Vgpr(5), 0, 0x3);
@@ -4640,8 +4645,13 @@ TestCase VectorLaneAndPackedOps() {
   return {"VectorLaneAndPackedOps",
           code,
           {},
+          // pos 4 is v3 = VCvtPkrtzF16F32(v7, v8) = pack(1.0, 2.0) = 0x40003c00.
+          // pos 5-9 are VOP3P F16 ops on v4 (1.0,2.0), v5 (3.0,4.0), v6 (1.0,1.0)
+          // with op_sel_hi=0x3 (selects LO source half for HI dst lane per AMD spec).
+          // Per AMD spec, op_sel=0 (default) selects LO source half for LO dst lane.
+          // With both op_sel=0 and op_sel_hi=1, both lanes broadcast the LO source halves.
           {0x12345678u, 0x12345678u, 0x12345678u, 0x12345678u, 0x40003c00u,
-           0x46004400u, 0x48004200u, 0x40003c00u, 0x44004200u, 0x48804400u,
+           0x44004400u, 0x42004200u, 0x3c003c00u, 0x42004200u, 0x44004400u,
            0x40000000u, 0xef015678u},
           {O::VMovB32, O::VReadfirstlaneB32, O::VReadlaneB32, O::VWritelaneB32,
            O::VPermlane16B32, O::VCvtPkrtzF16F32, O::VPkAddF16, O::VPkMulF16,
@@ -4717,7 +4727,7 @@ TestCase PackedMinMaxF16NanAndSignedZeroEdges() {
   return {"PackedMinMaxF16NanAndSignedZeroEdges",
           code,
           {},
-          {0x80004000u, 0x00004000u, 0x7f017f01u, 0x7f017f01u},
+          {0x40004000u, 0x40004000u, 0x7f017f01u, 0x7f017f01u},
           {O::VMovB32, O::VPkMinF16, O::VPkMaxF16, O::BufferStoreDword,
            O::SEndpgm}};
 }

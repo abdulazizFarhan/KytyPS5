@@ -477,7 +477,10 @@ uint32_t EmitSignExtendLow16U32(EmitterState* state, uint32_t value) {
 uint32_t EmitU16LaneBits(EmitterState* state, const IR::Operand& operand, bool high_lane,
                          bool sign_extend) {
 	const auto raw  = EmitValueLoad(state, operand);
-	const auto lane = high_lane ? (operand.op_sel_hi ? 1u : 0u) : (operand.op_sel ? 1u : 0u);
+	// Per AMD RDNA2 ISA VOP3P semantics: op_sel=0 selects the low source half for the low
+	// destination lane, op_sel=1 the high half. For the high destination lane, op_sel_hi=0
+	// (default) selects the high source half and op_sel_hi=1 the low half.
+	const auto lane = high_lane ? (operand.op_sel_hi ? 0u : 1u) : (operand.op_sel ? 1u : 0u);
 	auto       bits = lane != 0u ? EmitShiftRightConstant(state, raw, 16) : raw;
 	bits            = EmitAndConstant(state, bits, 0xffffu);
 	if (high_lane ? operand.negate_hi : operand.negate) {
@@ -2075,7 +2078,10 @@ uint32_t EmitPackedF16Lane(EmitterState* state, const IR::Operand& operand, bool
 	const auto raw      = EmitValueLoad(state, operand);
 	const auto unpacked = state->builder.AllocateId();
 	auto       value    = state->builder.AllocateId();
-	const auto lane     = high_lane ? (operand.op_sel_hi ? 1u : 0u) : (operand.op_sel ? 1u : 0u);
+	// Per AMD RDNA2 ISA VOP3P semantics: op_sel=0 selects the low source half for the low
+	// destination lane, op_sel=1 the high half. For the high destination lane, op_sel_hi=0
+	// (default) selects the high source half and op_sel_hi=1 the low half.
+	const auto lane     = high_lane ? (operand.op_sel_hi ? 0u : 1u) : (operand.op_sel ? 1u : 0u);
 	state->builder.AddFunction(
 	    {OpExtInst, state->vec2_float_type, unpacked, state->glsl_std450, GlslUnpackHalf2x16, raw});
 	state->builder.AddFunction({OpCompositeExtract, state->float_type, value, unpacked, lane});
@@ -2103,7 +2109,10 @@ void EmitCompareF16(EmitterState* state, const IR::Instruction& inst, uint32_t o
 
 uint32_t EmitPackedF16LaneBits(EmitterState* state, const IR::Operand& operand, bool high_lane) {
 	const auto raw  = EmitValueLoad(state, operand);
-	const auto lane = high_lane ? (operand.op_sel_hi ? 1u : 0u) : (operand.op_sel ? 1u : 0u);
+	// Per AMD RDNA2 ISA VOP3P semantics: op_sel=0 selects the low source half for the low
+	// destination lane, op_sel=1 the high half. For the high destination lane, op_sel_hi=0
+	// (default) selects the high source half and op_sel_hi=1 the low half.
+	const auto lane = high_lane ? (operand.op_sel_hi ? 0u : 1u) : (operand.op_sel ? 1u : 0u);
 	auto       bits = lane != 0u ? EmitShiftRightConstant(state, raw, 16) : raw;
 	bits            = EmitAndConstant(state, bits, 0xffffu);
 	if (operand.absolute) {
