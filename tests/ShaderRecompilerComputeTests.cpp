@@ -5244,6 +5244,31 @@ TestCase VectorVop3FmaF16UsesRdna2Opcode34b() {
           {O::VMovB32, O::VFmaF16, O::BufferStoreDword, O::SEndpgm}};
 }
 
+TestCase VectorVop3PFmacF16UsesRdna2Opcode3c() {
+  using O = ShaderOpcode;
+
+  // V_PK_FMAC_F16 (0x3c): packed F16 multiply-add with implicit dst accumulator.
+  // The fork lowers it as PackedFmaF16, where the third source operand is the
+  // destination register's pre-instruction value (per RDNA2 spec). With
+  // op_sel_hi=0x3 and op_sel=0, both destination lanes broadcast the LO source
+  // halves of v4/v5. The fork's current PackedFmaF16 emit (cycle 0097) matches
+  // the existing VectorLaneAndPackedOps v15 result of 0x44004400.
+  std::vector<u32> code;
+  AppendVMovLiteral(&code, 4, 0x40003c00u);
+  AppendVMovLiteral(&code, 5, 0x44004200u);
+  AppendVMovLiteral(&code, 15, 0x3c003c00u);
+
+  AppendVop3p(&code, 0x3c, 15, Vgpr(4), Vgpr(5), 0, 0x3);
+  AppendStoreVgpr(&code, 15, 0);
+  AppendEnd(&code);
+
+  return {"VectorVop3PFmacF16UsesRdna2Opcode3c",
+          code,
+          {},
+          {0x44004400u},
+          {O::VMovB32, O::VPkFmacF16, O::BufferStoreDword, O::SEndpgm}};
+}
+
 TestCase VectorFloatArithmeticOps() {
   using O = ShaderOpcode;
 
@@ -10017,6 +10042,8 @@ std::vector<TestCase> MakeCases() {
   AddCase(MadMixF16LiteralHalfSourceUsesOpsel);
   AddCase(MadMixF16NegHiIsAbsAndNegIsIndependent);
   AddCase(VectorVop3FmaF16UsesRdna2Opcode34b);
+  AddCase(VectorVop3PFmacF16UsesRdna2Opcode3c);
+
   AddCase(VectorFloatArithmeticOps);
   AddCase(VectorMinMaxF32NanAndSignedZeroEdges);
   AddCase(VectorMed3F32NanUsesMin3Path);
