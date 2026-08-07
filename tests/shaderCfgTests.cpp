@@ -2230,9 +2230,9 @@ void TestNewShaderRecompilerStagedShaderOps() {
 	Check(Common::ContainsStr(result.ir_dump,
 	                          "FmaF16 v70.sdwa(sel=4,sext=0), v5, v6, v70.sdwa(sel=4,sext=0)"),
 	      "V_FMAC_F16 did not lower using the destination as the FMA accumulator");
-	Check(Common::ContainsStr(result.ir_dump, "FmaF16 v71.sdwa(sel=4,sext=0), v7, 0x3c003c00, v8"),
+	Check(Common::ContainsStr(result.ir_dump, "FmaF16 v71.sdwa(sel=4,sext=0), v7, 0x3c003c00, v71.sdwa(sel=4,sext=0)"),
 	      "V_FMAMK_F16 did not lower with the literal in source 1");
-	Check(Common::ContainsStr(result.ir_dump, "FmaF16 v72.sdwa(sel=4,sext=0), v9, v10, 0x40004000"),
+	Check(Common::ContainsStr(result.ir_dump, "FmaF16 v72.sdwa(sel=4,sext=0), v9, v10, v72.sdwa(sel=4,sext=0)"),
 	      "V_FMAAK_F16 did not lower with the literal in source 2");
 	Check(SpirvContainsOpcode(result.spirv, 130),
 	      "SPIR-V binary does not contain OpISub for S_SUBB_U32");
