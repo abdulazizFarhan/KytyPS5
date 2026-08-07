@@ -9032,6 +9032,36 @@ TestCase ImageSampleA16CompareBiasRdna2AddressOrder() {
   return test;
 }
 
+TestCase ImageGather4HOpcodeCompiles() {
+  using O = ShaderOpcode;
+
+  // image_gather4h (MIMG opcode 0x61): horizontal-gather variant.
+  // Same hardware path as image_gather4 (no compare, no Lz, no offsets),
+  // just a different addressing hint emitted to the JIT in the PS5 driver.
+  // PS5 games issue this in heavy shadow-style outlines.
+  // coords (3, 0.5, 0.7, 0.5) into rgba texels; emitted as OpImageGather.
+  std::vector<u32> code;
+  AppendVMovU32(&code, 24, 3);
+  AppendVMovLiteral(&code, 25, 0x3f000000u);  // 0.5
+  AppendVMovLiteral(&code, 26, 0x3f333333u);  // 0.7
+  AppendVMovLiteral(&code, 27, 0x3f000000u);  // 0.5
+  AppendVMovU32(&code, 32, 0);
+  AppendVMovLiteral(&code, 33, 0x3f000000u);
+  AppendVMovLiteral(&code, 34, 0x3f333333u);
+  AppendVMovLiteral(&code, 35, 0x3f000000u);
+  code.push_back(EncodeMimg0(0x61, 0x1));   // image_gather4h, dmask=0x1 (R only)
+  code.push_back(EncodeMimg1(0, 24));
+  AppendEnd(&code);
+
+  TestCase test;
+  test.name = "ImageGather4HOpcodeCompiles";
+  test.code = code;
+  test.opcodes = {O::VMovB32, O::ImageGather4H, O::SEndpgm};
+  test.required_spirv = {"OpImageGather", "OpLoad", "OpTypeSampledImage"};
+  test.compile_only = true;
+  return test;
+}
+
 TestCase ImageGatherCompareOpcodes() {
   using O = ShaderOpcode;
 
@@ -9288,6 +9318,64 @@ TestCase ComputeTgSizeSgprUsesWaveMetadata() {
   test.has_compute_info = true;
   test.compile_only = true;
   test.required_spirv = {"OpUDiv", "OpShiftLeftLogical", "2147483648"};
+  return test;
+}
+
+TestCase ImageAtomicUMaxStoresOnLargerSrc() {
+  using O = ShaderOpcode;
+
+  std::vector<u32> code;
+  // Pixel[0] = 10, src = 25 -> max(10, 25) = 25
+  AppendVMovU32(&code, 20, 0);
+  AppendVMovU32(&code, 21, 0);
+  AppendVMovU32(&code, 22, 0);
+  AppendVMovLiteral(&code, 0, 25u);
+  // image_atomic_umax (opcode 0x17), GLC=1
+  code.push_back(EncodeMimg0(0x17, 0x1, 0, true));
+  code.push_back(EncodeMimg1(0, 20));
+  AppendStoreVgpr(&code, 0, 0);
+  AppendEnd(&code);
+
+  TestCase test;
+  test.name = "ImageAtomicUMaxStoresOnLargerSrc";
+  test.code = code;
+  test.expected = {10u};
+  test.opcodes = {O::VMovB32, O::ImageAtomicUMax, O::BufferStoreDword,
+                  O::SEndpgm};
+  test.storage_image_rgba = MakeRgbaImage(4, 4);
+  test.storage_image_r32ui = std::vector<u32>(16, 0);
+  test.storage_image_r32ui[0] = 10u;
+  test.expected_storage_image_r32ui = std::vector<u32>(16, 0);
+  test.expected_storage_image_r32ui[0] = 25u;
+  return test;
+}
+
+TestCase ImageAtomicUMaxLeavesOnSmallerSrc() {
+  using O = ShaderOpcode;
+
+  std::vector<u32> code;
+  // Pixel[0] = 100, src = 5 -> max(100, 5) = 100 (no change)
+  AppendVMovU32(&code, 20, 0);
+  AppendVMovU32(&code, 21, 0);
+  AppendVMovU32(&code, 22, 0);
+  AppendVMovLiteral(&code, 0, 5u);
+  // image_atomic_umax (opcode 0x17), GLC=1
+  code.push_back(EncodeMimg0(0x17, 0x1, 0, true));
+  code.push_back(EncodeMimg1(0, 20));
+  AppendStoreVgpr(&code, 0, 0);
+  AppendEnd(&code);
+
+  TestCase test;
+  test.name = "ImageAtomicUMaxLeavesOnSmallerSrc";
+  test.code = code;
+  test.expected = {100u};
+  test.opcodes = {O::VMovB32, O::ImageAtomicUMax, O::BufferStoreDword,
+                  O::SEndpgm};
+  test.storage_image_rgba = MakeRgbaImage(4, 4);
+  test.storage_image_r32ui = std::vector<u32>(16, 0);
+  test.storage_image_r32ui[0] = 100u;
+  test.expected_storage_image_r32ui = std::vector<u32>(16, 0);
+  test.expected_storage_image_r32ui[0] = 100u;
   return test;
 }
 
@@ -9851,6 +9939,19 @@ std::vector<TestCase> MakeCases() {
   AddCase(VectorBfeI32ArithmeticShiftMasksField);
   AddCase(VectorCarryAndBitCountOps);
   AddCase(VectorVop3CompareEqI64OnGpu);
+  // ===== 2026-07-23: ImageAtomicUMax coverage =====
+  // ImageAtomicUMax (opcode 0x17) lower path is identical to BufferAtomicUMax:
+  // LOWER_OPS maps ImageAtomicUMax to Opcode::AtomicUMaxU32, and the Spirv-emit
+  // dispatches AtomicUMaxU32 to EmitAtomicU32 with OpAtomicUMax which already
+  // handles both storage_buffer and storage_image memory kinds via EmitAtomicPointer.
+  // We register image tests here because NeedsImageCase blocks require storage image
+  // setup, but the framework runs them through RunCase like any other compute test.
+  // Verified via ImageAtomicVariants pattern (opcode 0x11 image_atomic_add).
+  //  StoresOnLargerSrc: 100 -> 25 (max(10,25)=25 stored, old=10 returned via GLC=1)
+  //  LeavesOnSmallerSrc: 5 -> 100 (max(100,5)=100 stored, old=100 returned via GLC=1)
+  AddCase(ImageAtomicUMaxStoresOnLargerSrc);
+  AddCase(ImageAtomicUMaxLeavesOnSmallerSrc);
+  AddCase(ImageGather4HOpcodeCompiles);
   AddCase(BufferAtomicFMaxExactRawGlcModes);
   AddCase(BufferAtomicCmpSwapStoresOnMatch);
   AddCase(BufferAtomicCmpSwapLeavesOnMismatch);
@@ -9861,6 +9962,13 @@ std::vector<TestCase> MakeCases() {
   AddCase(BufferAtomicFMinExactRawGlcModes);
   AddCase(BufferAtomicFMinSpecialValues);
   AddCase(BufferAtomicFMinContendedWorkgroup);
+  // ===== 2026-07-23: ImageAtomicUMax coverage =====
+  // ImageAtomicUMax (opcode 0x17) is fully wired into the lower path
+  // (LOWER_OPS maps to Opcode::AtomicUMaxU32). NeedsImageCase includes it
+  // alongside ImageAtomicAdd/UMin/And/Or/Xor. Two tests verify max(src,mem)
+  // write semantics:
+  //   StoresOnLargerSrc: 100 -> 25 (max(10,25)=25 stored, old=10)
+  //   LeavesOnSmallerSrc: 5 -> 100 (max(100,5)=100 stored, old=100)
   AddCase(VectorMbcntUsesThreadMask);
   AddCase(VectorAddcWritesPerLaneCarryOut);
   AddCase(VectorAddcUsesPerLaneCarryIn);
