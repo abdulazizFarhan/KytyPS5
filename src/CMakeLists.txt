@@ -20,6 +20,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(utils.cmake)
 
+option(KYTY_ENABLE_CLANG_TIDY "Run clang-tidy checks during builds" OFF)
+
 set(KYTY_THIRD_PARTY_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty")
 
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
@@ -123,7 +125,7 @@ if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 12.0.0)
 		common
 		#launcher
 	)
-	list(APPEND KYTY_CLANG_TYDY 
+	list(APPEND KYTY_CLANG_TIDY 
 		kyty_emulator
 		#common
 		launcher
