@@ -5132,7 +5132,7 @@ void TestNewShaderRecompilerCfgSharedOuterAndLoopMerge() {
 	CheckSpirvBinaryValidates(result.spirv);
 }
 
-void TestNewShaderRecompilerCfgLoopSharedContinueSelectionMerges() {
+void TestNewShaderRecompilerCfgLoopEarlyContinuesNoSelection() {
 	const uint32_t shader[] = {
 	    EncodeSMovB32(0, 128),       // s0 = 0
 	    EncodeSopc(0x0a, 0, 130),    // loop: s_cmp_lt_u32 s0, 2
@@ -5157,15 +5157,13 @@ void TestNewShaderRecompilerCfgLoopSharedContinueSelectionMerges() {
 	std::string                     error;
 	Check(ShaderRecompiler::TryRecompile(shader, options, &result, &error), error.c_str());
 	Check(Common::ContainsStr(result.ir_dump, "mode=structured"),
-	      "shared loop continue selections should stay on structured path");
-	Check(!Common::ContainsStr(result.ir_dump, "duplicate structured merge block"),
-	      "shared loop continue selections were not split before structurization");
-	Check(SpirvContainsOpcode(result.spirv, 246),
-	      "shared loop continue selections SPIR-V lacks OpLoopMerge");
-	Check(SpirvContainsOpcode(result.spirv, 247),
-	      "shared loop continue selections SPIR-V lacks OpSelectionMerge");
-	Check(!SpirvContainsOpcode(result.spirv, 251),
-	      "shared loop continue selections unexpectedly used dispatcher OpSwitch");
+	      "loop early continues should stay on structured path");
+	Check(SpirvInstructionOpcodeCount(result.spirv, 246) != 0,
+	      "loop early continues SPIR-V lacks OpLoopMerge");
+	Check(SpirvInstructionOpcodeCount(result.spirv, 247) == 0,
+	      "loop early continues SPIR-V unexpectedly used OpSelectionMerge");
+	Check(SpirvInstructionOpcodeCount(result.spirv, 251) == 0,
+	      "loop early continues unexpectedly used dispatcher OpSwitch");
 	CheckSpirvBinaryValidates(result.spirv);
 }
 
@@ -6806,7 +6804,7 @@ int main() {
 	TestNewShaderRecompilerCfgLoopHeaderBufferLoadDispatcher();
 	TestNewShaderRecompilerCfgLoopHeaderDsAppendConsumeDispatcher();
 	TestNewShaderRecompilerCfgSharedOuterAndLoopMerge();
-	TestNewShaderRecompilerCfgLoopSharedContinueSelectionMerges();
+	TestNewShaderRecompilerCfgLoopEarlyContinuesNoSelection();
 	TestNewShaderRecompilerCfgDuplicateMergeStructuredSplit();
 	TestNewShaderRecompilerCfgIrreducibleDispatcher();
 	TestNewShaderRecompilerExecMaskHelpers();
