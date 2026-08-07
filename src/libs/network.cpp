@@ -3762,6 +3762,20 @@ int KYTY_SYSV_ABI NpGetNpReachabilityState(int user_id, uint32_t* state) {
 	return OK;
 }
 
+int KYTY_SYSV_ABI NpHasSignedUp(int user_id, bool* has_signed_up) {
+	PRINT_NAME();
+
+	if (has_signed_up == nullptr) {
+		return np_error_invalid_argument;
+	}
+
+	LOGF("\t user_id = %d\n", user_id);
+
+	*has_signed_up = false;
+
+	return OK;
+}
+
 } // namespace NpManager
 
 } // namespace Libs::Network

@@ -1408,6 +1408,7 @@ LIB_DEFINE(InitNet_1_NpManager) {
 	LIB_FUNC("O80NrhUOPGY", NpManager::NpCheckPremium);
 	LIB_FUNC("eQH7nWPcAgc", NpManager::NpGetState);
 	LIB_FUNC("e-ZuhGEoeC4", NpManager::NpGetNpReachabilityState);
+	LIB_FUNC("Oad3rvY-NJQ", NpManager::NpHasSignedUp);
 }
 
 } // namespace LibNpManager
