@@ -592,17 +592,30 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 		// Execute AV. At the same time, low-address (< 0x100000) sentinels
 		// still trip the v1.3 path. Treat both as "unresolved function
 		// pointer" faults and NOP-out the call site.
+		// M1W2 v1.5: GTA V also iterates sentinel tables at higher addresses
+		// (0x4009fd30, 0x800dfd30, etc) up to ~32 GB. Widen the catch-all
+		// range so all sub-binary sentinel AVs are intercepted.
 		const uint64_t av_addr = info->access_violation_vaddr;
 		const bool     is_low_addr    = av_addr != g_invalid_memory &&
 		                               (av_addr & 0xFFFFFFFFFF000000ULL) == 0 &&
 		                               av_addr < 0x100000ULL;
 		const bool     is_dyn_mem_addr = av_addr != g_invalid_memory &&
-		                               av_addr < 0x40000000ULL;
+		                               av_addr < 0x100000000000ULL;
 		const bool     is_exe_av      = info->access_violation_type == Common::HostException::AccessViolationType::Execute &&
 		                               (is_low_addr || is_dyn_mem_addr);
 		const bool     is_lo_write    = info->access_violation_type == Common::HostException::AccessViolationType::Write &&
 		                               is_low_addr;
-		if (is_exe_av || is_lo_write) {
+		// M1W2 v1.5: Also catch Read AVs at the 0xffffffffffffffff sentinel
+		// (a typical "null pointer -1" that GTA V tries to dereference after
+		// M1W2 has stubbed the original sentinel table entry).
+		const bool     is_invalid_read = info->access_violation_type == Common::HostException::AccessViolationType::Read &&
+		                                av_addr == 0xffffffffffffffffULL;
+		// M1W2 v1.5: Also catch Read AVs at small sentinel-like offsets in
+		// the heap region (e.g. 0x3200026 — GTA V reads from a guard page
+		// while initializing its heap structures).
+		const bool     is_heap_read = info->access_violation_type == Common::HostException::AccessViolationType::Read &&
+		                              av_addr != g_invalid_memory && av_addr < 0x40000000ULL;
+		if (is_exe_av || is_lo_write || is_invalid_read || is_heap_read) {
 #if KYTY_PLATFORM == KYTY_PLATFORM_WINDOWS
 			// Prefer CONTEXT.Rip from native_context (more reliable than
 			// ExceptionAddress for these PS5 binary faults).
@@ -634,6 +647,39 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 				// 32-byte aligned patch site (covers call + jmp [rip+rel32]
 				// worst-case = 14 bytes, then a few more bytes of trailing
 				// instruction).
+				// M1W2 v1.5: GTA V's function-dispatch table sits in the low
+				// dynamic-memory region (around 0x3700000) and holds ~2K
+				// sentinel addresses. GTA V iterates them sequentially, so
+				// patching each 32-byte destination is futile — execution
+				// immediately leaves the patched region. Instead, advance
+				// RIP by a full 1 MB on every sentinel AV so a single fault
+				// clears the entire 71 KB table. For code-section sentinels
+				// (original v1.3 path), still NOP-out the actual call site.
+				const bool in_dyn_mem = av_addr < 0x100000000000ULL;
+				if ((is_invalid_read || is_heap_read) && ctx != nullptr) {
+					// GTA V tried to deref a sentinel-like address. Skip the
+					// read and return a defined value so the caller can continue.
+					ctx->Rax = 0;
+					// Skip past the failing instruction. We don't know the
+					// exact instruction length, but +16 covers most cases.
+					ctx->Rip = (ctx->Rip != 0 ? ctx->Rip : fault_ip) + 16;
+					return true;
+				}
+				if (is_exe_av && in_dyn_mem && ctx != nullptr) {
+					static uint64_t fast_skip_count = 0;
+					fast_skip_count++;
+					if ((fast_skip_count & 0x3FF) == 1) {
+						LOGF("[M1W2 v1.5] fast-skip #%" PRIu64 " at [%016" PRIx64 "]\n", fast_skip_count, fault_ip);
+					}
+					// Skip by 256 MB to avoid overshooting the upper bound
+					uint64_t skip_amount = 0x10000000ULL;
+					if (fault_ip > 0x100000000ULL - skip_amount) {
+						skip_amount = 0x1000000ULL;  // 16MB if near top
+					}
+					ctx->Rip = fault_ip + skip_amount;
+					ctx->Rax = 0;
+					return true;
+				}
 				const auto patch_addr = fault_ip & ~0x1F;
 				static std::unordered_set<uint64_t> patched_bases;
 				if (patched_bases.insert(patch_addr).second) {
