@@ -1026,12 +1026,18 @@ void TextureCache::ResolveStorageImageOverlaps(GraphicContext* ctx, const ImageI
 			case StorageImageOverlap::RetireSampled: retire.push_back(cached); continue;
 			case StorageImageOverlap::PageNeighbor: continue;
 			case StorageImageOverlap::Unsupported:
-				EXIT("TextureCache: unsupported storage-image byte alias, requested=0x%016" PRIx64
-				     "+0x%016" PRIx64 " existing=0x%016" PRIx64 "+0x%016" PRIx64
-				     " kind=%u same_context=%d gpu=%d/%d buffer=%d\n",
-				     requested.address, requested.size, cached->Address(), cached->Size(),
-				     static_cast<uint32_t>(cached->kind), cached->ctx == ctx, cached->gpu_modified,
-				     tracker_gpu, cached->buffer_modified);
+				// M1W2 v1.5d: Previously EXITs here when GTA V (and
+				// other PS5 games) want to create a new storage image
+				// at an address that has a modified cached image of a
+				// different size. The cached image gets a readback and
+				// is retired, freeing the address range for the new
+				// allocation. This loses the in-flight GPU data but
+				// lets GTA V's pipeline creation continue.
+				LOGF("TextureCache: retiring storage-image byte alias, requested=0x%016" PRIx64
+				     "+0x%016" PRIx64 " existing=0x%016" PRIx64 "+0x%016" PRIx64 "\n",
+				     requested.address, requested.size, cached->Address(), cached->Size());
+				retire.push_back(cached);
+				continue;
 		}
 	}
 	RequireRetirementIsolation(retire, "storage neighbor", requested.address, requested.size);
