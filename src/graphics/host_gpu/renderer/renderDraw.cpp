@@ -1053,7 +1053,7 @@ void RenderDrawIndex(uint64_t submit_id, CommandBuffer* buffer, HW::Context* ctx
 
 	Common::LockGuard lock(g_render_ctx->GetMutex());
 
-	if (index_count == 0) {
+	if (index_count == 0 || instance_count == 0) {
 		return;
 	}
 
@@ -1123,9 +1123,6 @@ void RenderDrawIndex(uint64_t submit_id, CommandBuffer* buffer, HW::Context* ctx
 
 	EXIT_NOT_IMPLEMENTED(flags != 0);
 	EXIT_NOT_IMPLEMENTED(type != 1);
-	if (instance_count == 0) {
-		instance_count = 1;
-	}
 
 	const DrawCallInfo    draw {"DrawIndex",    CommandBufferDebugOp::DrawIndex,
 	                            index_count,    flags,
@@ -1186,7 +1183,7 @@ void RenderDrawIndexAuto(uint64_t submit_id, CommandBuffer* buffer, HW::Context*
 
 	Common::LockGuard lock(g_render_ctx->GetMutex());
 
-	if (index_count == 0) {
+	if (index_count == 0 || instance_count == 0) {
 		return;
 	}
 
@@ -1224,9 +1221,6 @@ void RenderDrawIndexAuto(uint64_t submit_id, CommandBuffer* buffer, HW::Context*
 	hw_check(*ctx);
 
 	EXIT_NOT_IMPLEMENTED(flags != 0);
-	if (instance_count == 0) {
-		instance_count = 1;
-	}
 
 	const DrawCallInfo draw {"DrawIndexAuto", CommandBufferDebugOp::DrawIndexAuto,
 	                         index_count,     flags,

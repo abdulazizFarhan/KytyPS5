@@ -172,6 +172,9 @@ public:
 	                   uint32_t render_target_slice_offset = 0, uint32_t instance_count = 1,
 	                   uint32_t first_vertex = 0, uint32_t first_instance = 0);
 	void DrawIndirect(uint32_t data_offset, uint32_t draw_initiator, bool indexed);
+	void SubmitNonIndexedDraw(uint32_t vertex_count, uint32_t flags,
+	                              uint32_t render_target_slice_offset, uint32_t first_vertex,
+	                              uint32_t first_instance);
 	void DrawIndirectMulti(uint32_t data_offset, uint32_t max_count_or_count,
 	                       const volatile uint32_t* count_addr, uint32_t stride_in_bytes,
 	                       uint32_t draw_initiator, bool indexed);
