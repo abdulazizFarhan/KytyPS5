@@ -61,6 +61,8 @@ int KYTY_SYSV_ABI Select(int nfds, void* readfds, void* writefds, void* exceptfd
                          const void* timeout);
 int64_t KYTY_SYSV_ABI Send(int s, const void* buf, uint64_t len, int flags);
 int64_t KYTY_SYSV_ABI Recv(int s, void* buf, uint64_t len, int flags);
+int64_t KYTY_SYSV_ABI Recvfrom(int s, void* buf, uint64_t len, int flags, void* addr,
+                               uint32_t* addrlen);
 
 } // namespace Net
 
