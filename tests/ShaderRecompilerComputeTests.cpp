@@ -11132,11 +11132,6 @@ ShaderTextureResource BasicUintVolumeStorageTextureDescriptor() {
     resource = BasicArrayStorageTextureResource();
     descriptor = BasicArrayStorageTextureDescriptor();
     descriptor.fields[4] |= 1u << 16u;
-  } else if (std::strcmp(kind, "array-mip-view") == 0) {
-    resource = BasicArrayStorageTextureResource();
-    descriptor = BasicArrayStorageTextureDescriptor();
-    descriptor.fields[3] |= (1u << 12u) | (1u << 16u);
-    descriptor.fields[5] |= 1u << 4u;
   } else if (std::strcmp(kind, "reserved") == 0) {
     descriptor.fields[1] |= 1u << 29u;
   } else if (std::strcmp(kind, "metadata") == 0) {
@@ -11324,7 +11319,7 @@ void CheckBasicStorageTextureDescriptor() {
   for (const char *kind : {"resource", "type", "tile", "mip", "swizzle",
                            "linear-rgb1-read", "bgra-read", "r16-float-read", "r8-unorm-read",
                            "yzwx-read", "yzwx-format",
-                           "array-base-view", "array-mip-view", "reserved", "metadata", "uint-format",
+                           "array-base-view", "reserved", "metadata", "uint-format",
                            "uint-resource-float-format", "depth-tile-read",
                            "depth-tile-extent"}) {
     std::string command = std::string("\"") + path +
