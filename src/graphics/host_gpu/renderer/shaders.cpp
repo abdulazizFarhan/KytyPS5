@@ -217,6 +217,10 @@ static void GetInputFormat(const ShaderBufferResource& res, VkFormat* format, ui
 			*format = VK_FORMAT_A2B10G10R10_SNORM_PACK32;
 			*size   = 4;
 			break;
+		case Prospero::BufferFormat::k10_10_10_2UInt:
+			*format = VK_FORMAT_A2B10G10R10_UINT_PACK32;
+			*size   = 4;
+			break;
 		case Prospero::BufferFormat::k16_16Float:
 			*format = VK_FORMAT_R16G16_SFLOAT;
 			*size   = 2;
