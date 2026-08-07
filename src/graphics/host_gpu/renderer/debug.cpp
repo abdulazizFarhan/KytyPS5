@@ -500,7 +500,15 @@ static void ZPrint(const char* func, const HW::DepthRenderTarget& z) {
 }
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
-static void ZCheck(const HW::DepthRenderTarget& z) {
+static void ZCheck(const HW::DepthRenderTarget& z, const HW::DepthControl& dc,
+                   const HW::RenderControl& rc) {
+	const bool depth_active =
+	    dc.z_enable || dc.z_write_enable || dc.depth_bounds_enable || rc.depth_clear_enable;
+	const bool stencil_active = dc.stencil_enable || rc.stencil_clear_enable;
+	if (!depth_active && !stencil_active) {
+		return;
+	}
+
 	if (z.z_info.format == 0) {
 		EXIT_NOT_IMPLEMENTED(z.z_info.format != 0);
 		EXIT_NOT_IMPLEMENTED(z.z_info.tile_mode_index != 0);
@@ -1267,7 +1275,7 @@ void hw_check(const HW::Context& hw) {
 	log_phase("vp");
 	VpCheck(vp, smc);
 	log_phase("z");
-	ZCheck(z);
+	ZCheck(z, d, rc);
 	log_phase("clip");
 	ClipCheck(c);
 	log_phase("rc");
