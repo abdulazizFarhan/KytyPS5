@@ -36,6 +36,22 @@ VkMemoryBarrier MakeShaderWriteDependency() {
 	return barrier;
 }
 
+VkMemoryBarrier MakeShaderAccessDependency() {
+	VkMemoryBarrier barrier {};
+	barrier.sType         = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+	barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+	barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+	return barrier;
+}
+
+VkMemoryBarrier MakeShaderWriteHazardDependency() {
+	VkMemoryBarrier barrier {};
+	barrier.sType         = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+	barrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+	barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+	return barrier;
+}
+
 VkImageMemoryBarrier MakeStorageImageDependency(const VulkanImage& image, bool read, bool written) {
 	EXIT_IF(image.image == nullptr || image.type == VulkanImageType::DepthStencil);
 
@@ -111,6 +127,21 @@ bool MarkShaderAddressWrites(const std::vector<ShaderAddressWriteRange>& writes)
 bool HasShaderBufferWrites(const ShaderStageRuntime& runtime) {
 	EXIT_IF(!runtime);
 	return !CollectShaderBufferWrites(*runtime.program, *runtime.resources).empty();
+}
+
+void ShaderAccessBarrier(VkCommandBuffer vk_buffer, VkPipelineStageFlags source_stages) {
+	EXIT_IF(vk_buffer == nullptr || source_stages == 0);
+	const auto barrier = MakeShaderAccessDependency();
+	vkCmdPipelineBarrier(vk_buffer, source_stages, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 1,
+	                    &barrier, 0, nullptr, 0, nullptr);
+}
+
+void ShaderWriteHazardBarrier(VkCommandBuffer      vk_buffer,
+                              VkPipelineStageFlags destination_stages) {
+	EXIT_IF(vk_buffer == nullptr || destination_stages == 0);
+	const auto barrier = MakeShaderWriteHazardDependency();
+	vkCmdPipelineBarrier(vk_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, destination_stages, 0, 1,
+	                    &barrier, 0, nullptr, 0, nullptr);
 }
 
 void ShaderWriteBarrier(VkCommandBuffer vk_buffer, VkPipelineStageFlags source_stages) {

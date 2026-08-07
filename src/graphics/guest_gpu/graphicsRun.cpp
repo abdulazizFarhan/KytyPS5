@@ -1404,9 +1404,9 @@ void CommandProcessor::DrawIndirectMulti(uint32_t data_offset, uint32_t max_coun
 void CommandProcessor::DispatchDirect(uint32_t thread_group_x, uint32_t thread_group_y,
                                       uint32_t thread_group_z, uint32_t mode) {
 	uint32_t frame_num = 0;
-	uint32_t local_x   = 1;
-	uint32_t local_y   = 1;
-	uint32_t local_z   = 1;
+	[[maybe_unused]] uint32_t local_x   = 1;
+	[[maybe_unused]] uint32_t local_y   = 1;
+	[[maybe_unused]] uint32_t local_z   = 1;
 
 	{
 		Common::LockGuard lock(m_mutex);
@@ -1450,27 +1450,27 @@ void CommandProcessor::DispatchDirect(uint32_t thread_group_x, uint32_t thread_g
 		                     thread_group_y, thread_group_z, mode);
 	}
 
-	constexpr uint32_t DispatchInitiatorUseThreadDimensions = 1u << 5u;
-	auto               group_count = [](uint32_t threads, uint32_t group_size) {
-		return (threads == 0
-		            ? 0u
-		            : (threads + std::max(group_size, 1u) - 1u) / std::max(group_size, 1u));
-	};
+	// constexpr uint32_t DispatchInitiatorUseThreadDimensions = 1u << 5u;
+	// auto               group_count = [](uint32_t threads, uint32_t group_size) {
+	// 	return (threads == 0
+	// 	            ? 0u
+	// 	            : (threads + std::max(group_size, 1u) - 1u) / std::max(group_size, 1u));
+	// };
 
-	auto groups_x = thread_group_x;
-	auto groups_y = thread_group_y;
-	auto groups_z = thread_group_z;
-	if ((mode & DispatchInitiatorUseThreadDimensions) != 0) {
-		groups_x = group_count(thread_group_x, local_x);
-		groups_y = group_count(thread_group_y, local_y);
-		groups_z = group_count(thread_group_z, local_z);
-	}
+	// auto groups_x = thread_group_x;
+	// auto groups_y = thread_group_y;
+	// auto groups_z = thread_group_z;
+	// if ((mode & DispatchInitiatorUseThreadDimensions) != 0) {
+	// 	groups_x = group_count(thread_group_x, local_x);
+	// 	groups_y = group_count(thread_group_y, local_y);
+	// 	groups_z = group_count(thread_group_z, local_z);
+	// }
 
-	const uint64_t invocations =
-	    static_cast<uint64_t>(groups_x) * groups_y * groups_z * local_x * local_y * local_z;
-	if (invocations != 0) {
-		BufferFlushAndWait();
-	}
+	// const uint64_t invocations =
+	//     static_cast<uint64_t>(groups_x) * groups_y * groups_z * local_x * local_y * local_z;
+	// if (invocations != 0) {
+	// 	BufferFlushAndWait();
+	// }
 }
 
 void CommandProcessor::DispatchIndirect(uint32_t data_offset, uint32_t mode) {

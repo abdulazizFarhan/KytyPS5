@@ -534,16 +534,12 @@ void RenderDispatchDirect(uint64_t submit_id, CommandBuffer* buffer, HW::Context
 		auto*      pipeline             = g_render_ctx->GetPipelineCache()->CreateComputePipeline(
 		    &input_info, &sh_ctx->GetCs(), cs_shader);
 
-		vkCmdBindPipeline(vk_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->pipeline);
-
-		const auto address_writes = BindDescriptors(
+				const auto address_writes = BindDescriptors(
 		    submit_id, buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->pipeline_layout,
 		    input_info.stage, VK_SHADER_STAGE_COMPUTE_BIT, DescriptorCache::Stage::Compute);
 		if (buffer->GetRecordingGeneration() != recording_generation) {
 			continue;
 		}
-
-		vkCmdDispatch(vk_buffer, thread_group_x, thread_group_y, thread_group_z);
 
 		bool has_storage_writes = HasShaderBufferWrites(input_info.stage);
 		has_storage_writes      = MarkShaderAddressWrites(address_writes) || has_storage_writes;
@@ -557,8 +553,15 @@ void RenderDispatchDirect(uint64_t submit_id, CommandBuffer* buffer, HW::Context
 		        }) ||
 		    has_storage_writes;
 		if (has_storage_writes) {
-			ShaderWriteBarrier(vk_buffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+			// A host fence used to serialize every dispatch. Preserve its read-before-write ordering
+			// while allowing the queue to execute asynchronously.
+			ShaderWriteHazardBarrier(vk_buffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 		}
+		vkCmdBindPipeline(vk_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->pipeline);
+		vkCmdDispatch(vk_buffer, thread_group_x, thread_group_y, thread_group_z);
+
+		// The removed host fence also ordered read-only dispatches before later writers.
+		ShaderAccessBarrier(vk_buffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 		break;
 	}
 }
