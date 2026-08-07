@@ -28,6 +28,7 @@
 #include <cstring>
 #include <fmt/format.h>
 #include <memory>
+#include <unordered_set>
 #include <vector>
 
 #if KYTY_PLATFORM == KYTY_PLATFORM_WINDOWS
@@ -575,6 +576,84 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 
 		if (Libs::LibKernel::Memory::KernelHandleReservedRangeAccessViolation(
 		        info->access_violation_vaddr)) {
+			return true;
+		}
+
+		// M1W2 v1.3: PS5 binaries use a 0x0/0x1 sentinel for unresolved
+		// data/executable imports. After v1.2 unblocked further code paths
+		// (see the legacy PLT0 patch), the next AV class surfaces: a Write
+		// AV at a low address (the binary tried to write to a NULL
+		// function-pointer slot that v1.2 just stubbed). Treat Execute and
+		// low-address Write AVs the same way: NOP-out the faulting site
+		// and skip past it.
+		const bool is_low_addr = info->access_violation_vaddr != g_invalid_memory &&
+		                         (info->access_violation_vaddr & 0xFFFFFFFFFF000000ULL) == 0 &&
+		                         info->access_violation_vaddr < 0x100000ULL;
+		const bool is_exe_av   = info->access_violation_type == Common::HostException::AccessViolationType::Execute && is_low_addr;
+		const bool is_lo_write = info->access_violation_type == Common::HostException::AccessViolationType::Write && is_low_addr;
+		if (is_exe_av || is_lo_write) {
+#if KYTY_PLATFORM == KYTY_PLATFORM_WINDOWS
+			// Prefer CONTEXT.Rip from native_context (more reliable than
+			// ExceptionAddress for these PS5 binary faults).
+			auto* ctx = reinterpret_cast<PCONTEXT>(const_cast<void*>(info->native_context));
+			auto  fault_ip = (ctx != nullptr) ? ctx->Rip : 0ULL;
+			if (fault_ip == 0) {
+				fault_ip = info->exception_address;
+			}
+			if (fault_ip != 0) {
+				// On Windows the binary's call/jmp can be misaligned by 1
+				// byte (RIP points to the byte after a multi-byte opcode
+				// or after a 1-byte AVX prefix). Fall back to a pushed RIP
+				// on the stack (return address) when ctx->Rip is suspicious.
+				if (auto* stack = reinterpret_cast<const uint64_t*>(info->rsp);
+				    (ctx == nullptr || (ctx->Rip & 0xF) == 0x1) && stack[0] != 0) {
+					fault_ip = reinterpret_cast<uint64_t>(stack[0]) - 2;
+				}
+			}
+			LOGF("[M1W2 v1.3] av_type=%s fault_ip=%016" PRIx64 " ctx_rip=%016" PRIx64
+			     " exc_addr=%016" PRIx64 "\n",
+			     is_exe_av ? "Execute" : "Write",
+			     fault_ip,
+			     ctx == nullptr
+			         ? 0ULL
+			         : reinterpret_cast<uint64_t>(ctx->Rip),
+			     info->exception_address);
+
+			if (fault_ip != 0) {
+				// 32-byte aligned patch site (covers call + jmp [rip+rel32]
+				// worst-case = 14 bytes, then a few more bytes of trailing
+				// instruction).
+				const auto patch_addr = fault_ip & ~0x1F;
+				static std::unordered_set<uint64_t> patched_bases;
+				if (patched_bases.insert(patch_addr).second) {
+					LOGF("[M1W2 v1.3] patching AV site at [%016" PRIx64 "] (av=%016" PRIx64
+					     ") with 32 NOPs\n", patch_addr, info->access_violation_vaddr);
+					Common::VirtualMemory::Mode old_mode {};
+					Common::VirtualMemory::Protect(patch_addr, 32, Common::VirtualMemory::Mode::Write, &old_mode);
+					uint8_t nops[32] = {};
+					for (uint32_t i = 0; i < 32; i++) {
+						nops[i] = 0x90;
+					}
+					memcpy(reinterpret_cast<void*>(patch_addr), nops, 32);
+					if (Common::VirtualMemory::IsExecute(old_mode)) {
+						Common::VirtualMemory::Protect(patch_addr, 32, old_mode, nullptr);
+						Common::VirtualMemory::FlushInstructionCache(patch_addr, 32);
+					}
+				}
+				if (ctx != nullptr) {
+					// Skip past the bad call/jmp. On x64 a call/jmp is at
+					// most 7 bytes, so +16 is safe.
+					ctx->Rip = fault_ip + 16;
+					// M1W2 v1.3: define RAX=0 so callers that consumed
+					// the (now-stubbed) function's return value get a
+					// well-defined "not found" instead of stale regs.
+					ctx->Rax = 0;
+				}
+			}
+#else
+			// Linux-side: hostException.cpp sets the new RIP via
+			// info->patched_address. Fall back to a no-op for now.
+#endif
 			return true;
 		}
 	}
