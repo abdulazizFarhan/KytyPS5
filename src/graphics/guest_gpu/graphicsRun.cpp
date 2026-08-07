@@ -666,8 +666,13 @@ void CommandProcessor::WriteData(uint32_t* dst, const uint32_t* src, uint32_t dw
 	const uint32_t increment    = (write_control >> 16u) & 0x1u;
 	const uint32_t write_confirm = (write_control >> 20u) & 0x1u;
 
-	if (dst_sel != 0 && dst_sel != 2 && dst_sel != 4 && dst_sel != 5) {
-		EXIT("unsupported writeData destination selector 0x%02" PRIx32 "\n", dst_sel);
+	switch (dst_sel) {
+		case 0:
+		case 2:
+		case 4:
+		case 5:
+		case 6: break;
+		default: EXIT("unsupported writeData destination selector 0x%02" PRIx32 "\n", dst_sel);
 	}
 	EXIT_NOT_IMPLEMENTED(increment != 0);
 
