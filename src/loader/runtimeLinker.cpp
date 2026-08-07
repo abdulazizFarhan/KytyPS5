@@ -379,9 +379,10 @@ static KYTY_SYSV_ABI void RunEntry(uint64_t addr, EntryParams* params, atexit_fu
 	auto* func = reinterpret_cast<entry_func_t>(addr);
 
 	if (stack_top != nullptr) {
-		const auto guest_rsp =
+		const auto aligned_stack_top =
 		    reinterpret_cast<uintptr_t>(stack_top) & ~static_cast<uintptr_t>(0x0f);
-		const auto guest_rbp = guest_rsp - 4u * sizeof(uint64_t);
+		const auto guest_rsp = aligned_stack_top - 2u * sizeof(uintptr_t);
+		const auto guest_rbp = guest_rsp;
 
 		auto* guest_root_frame = reinterpret_cast<uintptr_t*>(guest_rbp);
 		guest_root_frame[0]    = 0;
