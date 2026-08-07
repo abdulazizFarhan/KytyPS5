@@ -2192,7 +2192,18 @@ void RuntimeLinker::LoadProgramToMemory(Program* program) {
 			}
 
 			if (!skip_protect) {
-				if (!Common::VirtualMemory::Protect(segment_addr, segment_memory_size, mode)) {
+				// The guest-visible protection lives in the range tracker; the host mapping must stay
+				// writable so loader/runtime patching of guest pages (relocations, PLT stubs) never
+				// faults against a guest-only protection. Restoring a tracker mode verbatim used to
+				// leave program pages host-read-only and livelock the first relocation write.
+				// NoAccess is kept intact: guard pages must trap.
+				auto host_mode = mode;
+				if (mode != Common::VirtualMemory::Mode::NoAccess) {
+					host_mode = Common::VirtualMemory::IsExecute(mode)
+					                  ? Common::VirtualMemory::Mode::ExecuteReadWrite
+					                  : Common::VirtualMemory::Mode::ReadWrite;
+				}
+				if (!Common::VirtualMemory::Protect(segment_addr, segment_memory_size, host_mode)) {
 					EXIT("failed to protect ELF segment %u\n", static_cast<unsigned>(i));
 				}
 				Libs::LibKernel::Memory::UpdateProgramMemoryProtection(segment_addr,
