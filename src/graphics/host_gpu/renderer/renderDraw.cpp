@@ -479,6 +479,12 @@ static void SetDynamicParams(VkCommandBuffer                  vk_buffer,
 	}
 	vkCmdSetLineWidth(vk_buffer, line_width);
 
+	vkCmdSetDepthBiasEnable(vk_buffer, dynamic_params.depth_bias_enable ? VK_TRUE : VK_FALSE);
+	if (dynamic_params.depth_bias_enable) {
+		vkCmdSetDepthBias(vk_buffer, dynamic_params.depth_bias_constant_factor,
+		                  dynamic_params.depth_bias_clamp, dynamic_params.depth_bias_slope_factor);
+	}
+
 	if (dynamic_params.stencil_test_enable) {
 		vkCmdSetStencilCompareMask(vk_buffer, VK_STENCIL_FACE_FRONT_BIT,
 		                           dynamic_params.stencil_front.compareMask);

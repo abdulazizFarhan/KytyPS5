@@ -388,6 +388,10 @@ static void VulkanFindPhysicalDevice(VkInstance instance, VkSurfaceKHR surface,
 			LOGF("tessellationShader is not supported\n");
 			skip_device = true;
 		}
+		if (device_features2.features.depthBiasClamp != VK_TRUE) {
+			LOGF("depthBiasClamp is not supported\n");
+			skip_device = true;
+		}
 
 		if (!skip_device) {
 			uint32_t extensions_count = 0;
@@ -644,6 +648,7 @@ static VkDevice VulkanCreateDevice(VkPhysicalDevice physical_device, VkSurfaceKH
 	device_features.shaderImageGatherExtended            = VK_TRUE;
 	device_features.independentBlend                     = VK_TRUE;
 	device_features.tessellationShader                   = VK_TRUE;
+	device_features.depthBiasClamp                       = VK_TRUE;
 	device_features.vertexPipelineStoresAndAtomics =
 	    supported_features2.features.vertexPipelineStoresAndAtomics;
 
