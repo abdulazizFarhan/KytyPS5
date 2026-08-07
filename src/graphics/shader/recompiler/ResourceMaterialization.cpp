@@ -29,7 +29,8 @@ bool NullImageDescriptor(const DescriptorValue& descriptor) {
 }
 
 bool ValidImageDescriptor(const DescriptorValue& descriptor) {
-	return ((descriptor.dwords[3] >> 28u) & 0x8u) != 0;
+	const auto format = static_cast<Prospero::BufferFormat>((descriptor.dwords[1] >> 20u) & 0x1ffu);
+	return ((descriptor.dwords[3] >> 28u) & 0x8u) != 0 && format != Prospero::BufferFormat::kInvalid;
 }
 
 uint32_t DescriptorImageSwizzle(const DescriptorValue& descriptor) {
