@@ -467,10 +467,14 @@ void ValidateStorageTexture(const ShaderRecompiler::IR::ImageResource& resource,
 	const bool encoding_ok   = IsSupportedStorageTextureEncoding(descriptor);
 	const bool uint_resource =
 	    resource.kind == ShaderRecompiler::IR::ResourceKind::StorageImageUint;
+	const bool raw_sint_storage =
+	    format == Prospero::GpuEnumValue(Prospero::BufferFormat::k32SInt) && uint_resource &&
+	    resource.written && !resource.read && !resource.atomic;
 	const bool format_ok =
-	    Prospero::IsSupportedTextureFormat(format) &&
-	    uint_resource == Prospero::IsUintTextureFormat(format) &&
-	    (!resource.atomic || format == Prospero::GpuEnumValue(Prospero::BufferFormat::k32UInt));
+	    raw_sint_storage ||
+	    (Prospero::IsSupportedTextureFormat(format) &&
+	     uint_resource == Prospero::IsUintTextureFormat(format) &&
+	     (!resource.atomic || format == Prospero::GpuEnumValue(Prospero::BufferFormat::k32UInt)));
 	if (resource_ok && descriptor_ok && encoding_ok && format_ok && size != 0) {
 		return;
 	}
