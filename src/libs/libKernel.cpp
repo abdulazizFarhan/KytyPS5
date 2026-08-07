@@ -1974,6 +1974,7 @@ LIB_DEFINE(InitLibKernel_1_Posix) {
 	LIB_FUNC("fZOeZIOEmLw", Posix::send);
 	LIB_FUNC("oBr313PppNE", Posix::sendto);
 	LIB_FUNC("Ez8xjo9UF4E", Posix::recv);
+	LIB_FUNC("lUk6wrGXyMw", Posix::recvfrom);
 	LIB_FUNC("4n51s0zEf0c", Posix::inet_pton);
 	LIB_FUNC("5jRCs2axtr4", Posix::inet_ntop);
 	LIB_FUNC("cfwBSQyr5Ys", cfwBSQyr5Ys);
