@@ -218,7 +218,7 @@ private:
 		typename CoarseTable::PageRange   coarse_range {};
 		typename TrackingTable::PageRange tracking_range {};
 		if (!CoarseTable::TryGetPageRange(address, size, coarse_range) ||
-		    !TrackingTable::TryGetPageRange(address, size, tracking_range)) {
+		    (!strict_bytes && !TrackingTable::TryGetPageRange(address, size, tracking_range))) {
 			return {};
 		}
 		MembershipList candidates;
@@ -229,8 +229,8 @@ private:
 		}
 		std::vector<OwnerT> result;
 		for (const Registration* registration: candidates) {
-			if ((!strict_bytes || Overlaps(registration->ranges, address, size)) &&
-			    HasTrackingMembership(registration, tracking_range) &&
+			if ((strict_bytes ? Overlaps(registration->ranges, address, size)
+			                  : HasTrackingMembership(registration, tracking_range)) &&
 			    predicate(registration->owner)) {
 				result.push_back(registration->owner);
 			}
