@@ -1102,7 +1102,9 @@ bool LowerDecodedInstruction(const Decoder::Instruction& inst, BasicBlock* block
 		case Decoder::Opcode::VMadU64U32: return LowerVectorMadU64U32(inst, block, error);
 		case Decoder::Opcode::VMacF32: return LowerVectorMacF32(inst, block, error);
 		case Decoder::Opcode::VPkFmacF16: return LowerVectorPkFmacF16(inst, block, error);
-		case Decoder::Opcode::VFmacF16: return LowerVectorFmacF16(inst, block, error);
+		case Decoder::Opcode::VFmacF16:
+		case Decoder::Opcode::VFmamkF16:
+		case Decoder::Opcode::VFmaakF16: return LowerVectorFmacF16(inst, block, error);
 		case Decoder::Opcode::VDot2cF32F16: return LowerVectorDot2cF32F16(inst, block, error);
 		case Decoder::Opcode::VInterpP1F32: return LowerVInterpP1F32(inst, block);
 		case Decoder::Opcode::VInterpP2F32:

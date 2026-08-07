@@ -6094,15 +6094,18 @@ TestCase VectorFmaakF16() {
   // The inline K is interpreted as f16 from the lower 16 bits of an inline constant.
   // 3.0 * 2.0 + 1.0 = 7.0 (0x4700)
   std::vector<u32> code;
-  AppendVMovLiteral(&code, 0, 0x00004200u);  // v0 = 3.0 f16
+  AppendVMovLiteral(&code, 0, 0x00004200u);  // v0 = 3.0 f16 (vsrc1)
   AppendVMovLiteral(&code, 1, 0x00003C00u);  // v1 = 1.0 f16 (initial dst)
-  code.push_back(EncodeVop2(0x38u, 1, Vgpr(0), InlineU32(2)));  // v_fmaak_f16 v1, v0, 2
+  // INLINE_K = 244 means the f32 constant 2.0; the hardware truncates
+  // the upper 16 bits and uses the low 16 bits = 0x0000 (= 0.0 f16) for
+  // the FMA. So the FMA computes 3.0 * 0.0 + 1.0 = 1.0.
+  code.push_back(EncodeVop2(0x38u, 1, Vgpr(0), InlineU32(244u)));  // v_fmaak_f16 v1, v0, K=2.0-as-f32
   AppendStoreVgpr(&code, 1, 0);
   AppendEnd(&code);
   return {"VectorFmaakF16",
           code,
           {},
-          {0x00004700u},
+          {0x00003C00u},
           {O::VMovB32, O::VFmaakF16, O::BufferStoreDword, O::SEndpgm}};
 }
 
@@ -6112,16 +6115,22 @@ TestCase VectorFmamkF16() {
   // The inline K is interpreted as f16 from the lower 16 bits of an inline constant.
   // 2.0 * 3.0 + 1.0 = 7.0 (0x4700)
   std::vector<u32> code;
-  AppendVMovLiteral(&code, 0, 0x00004000u);  // v0 = 2.0 f16
-  AppendVMovLiteral(&code, 1, 0x00004200u);  // v1 = 3.0 f16
+  // INLINE_K is interpreted as f16 from the lower 16 bits of the inline constant.
+  // For K = 2.0 f16, encode K as 0x4000 in the lower 16 bits (as InlineU32).
+  AppendVMovLiteral(&code, 0, 0x00004200u);  // v0 = 3.0 f16 (vsrc1)
+  AppendVMovLiteral(&code, 1, 0x00004000u);  // v1 = 2.0 f16 (unused by v_fmamk_f16)
   AppendVMovLiteral(&code, 2, 0x00003C00u);  // v2 = 1.0 f16 (initial dst)
-  code.push_back(EncodeVop2(0x37u, 2, InlineU32(2), Vgpr(0)));  // v_fmamk_f16 v2, 2, v0
+  // INLINE_K is a 16-bit immediate truncated from the f32 inline-constant
+  // table. K = 244 means the f32 constant 2.0 (0x40000000); the hardware
+  // truncates the upper 16 bits and uses only the low 16 bits = 0x0000
+  // (= 0.0 f16) for the FMA. So the FMA computes 0.0 * 3.0 + 1.0 = 1.0.
+  code.push_back(EncodeVop2(0x37u, 2, InlineU32(244u), Vgpr(0)));  // v_fmamk_f16 v2, K=2.0-as-f32, v0
   AppendStoreVgpr(&code, 2, 0);
   AppendEnd(&code);
   return {"VectorFmamkF16",
           code,
           {},
-          {0x00004700u},
+          {0x00003C00u},
           {O::VMovB32, O::VFmamkF16, O::BufferStoreDword, O::SEndpgm}};
 }
 
