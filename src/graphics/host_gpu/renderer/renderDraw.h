@@ -26,6 +26,11 @@ struct PipelineDynamicParameters {
 
 	PipelineStencilDynamicState stencil_front;
 	PipelineStencilDynamicState stencil_back;
+
+	bool  depth_bias_enable          = false;
+	float depth_bias_constant_factor = 0.0f;
+	float depth_bias_clamp           = 0.0f;
+	float depth_bias_slope_factor    = 0.0f;
 };
 
 #pragma pack(pop)
@@ -36,7 +41,7 @@ static_assert(alignof(PipelineDynamicParameters) == 1);
 static_assert(sizeof(PipelineDynamicParameters) ==
               sizeof(bool) + sizeof(float[3]) + sizeof(float[3]) + sizeof(int[4]) + sizeof(float) +
                   sizeof(uint32_t) + sizeof(bool[RENDER_COLOR_ATTACHMENTS_MAX]) +
-                  sizeof(PipelineStencilDynamicState) * 2);
+                  sizeof(PipelineStencilDynamicState) * 2 + sizeof(bool) + sizeof(float[3]));
 
 [[nodiscard]] bool           IsSameColorResolveSubresource(const RenderColorInfo& src,
                                                            const RenderColorInfo& dst);
