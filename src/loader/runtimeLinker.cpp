@@ -548,9 +548,24 @@ void KYTY_SYSV_ABI SysStackWalkX86(uint64_t rbp, void** stack, int* depth) {
 static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exception_info) {
 	const auto* info = &exception_info;
 
-	if (info->type == Common::HostException::ExceptionType::IllegalInstruction &&
-	    Loader::X64InstructionEmulator::TryEmulate(info->native_context)) {
-		return true;
+	if (info->type == Common::HostException::ExceptionType::IllegalInstruction) {
+		if (Loader::X64InstructionEmulator::TryEmulate(info->native_context)) {
+			return true;
+		}
+		// M1W2 v1.5: GTA V's fast-skip landed RIP on unmapped sentinel data;
+		// the CPU tried to decode it as code and raised an illegal-instruction
+		// fault instead of an Execute AV. Skip past the bad instruction
+		// when the fault_ip is inside the dynamic-memory sentinel region.
+		auto* ctx = reinterpret_cast<PCONTEXT>(const_cast<void*>(info->native_context));
+		const uint64_t rip = (ctx != nullptr) ? ctx->Rip : 0ULL;
+		if (rip != 0 && rip < 0x100000000000ULL) {
+			LOGF("[M1W2 v1.5] illegal-instruction skip at [%016" PRIx64 "]\n", rip);
+			if (ctx != nullptr) {
+				ctx->Rip = rip + 16;
+				ctx->Rax = 0;
+			}
+			return true;
+		}
 	}
 
 	if (info->type == Common::HostException::ExceptionType::AccessViolation) {
@@ -604,7 +619,11 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 		const bool     is_exe_av      = info->access_violation_type == Common::HostException::AccessViolationType::Execute &&
 		                               (is_low_addr || is_dyn_mem_addr);
 		const bool     is_lo_write    = info->access_violation_type == Common::HostException::AccessViolationType::Write &&
-		                               is_low_addr;
+		                               (is_low_addr || is_dyn_mem_addr);
+		// M1W2 v1.5: Sentinel-like high addresses (negative-looking values like
+		// 0xffffffffffffff8d) are also stubs in GTA V's virtual dispatch tables.
+		const bool     is_high_sentinel = info->access_violation_type == Common::HostException::AccessViolationType::Write &&
+		                                 av_addr != g_invalid_memory && av_addr > 0xFFFFFFFF00000000ULL;
 		// M1W2 v1.5: Also catch Read AVs at the 0xffffffffffffffff sentinel
 		// (a typical "null pointer -1" that GTA V tries to dereference after
 		// M1W2 has stubbed the original sentinel table entry).
@@ -615,7 +634,7 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 		// while initializing its heap structures).
 		const bool     is_heap_read = info->access_violation_type == Common::HostException::AccessViolationType::Read &&
 		                              av_addr != g_invalid_memory && av_addr < 0x40000000ULL;
-		if (is_exe_av || is_lo_write || is_invalid_read || is_heap_read) {
+		if (is_exe_av || is_lo_write || is_high_sentinel || is_invalid_read || is_heap_read) {
 #if KYTY_PLATFORM == KYTY_PLATFORM_WINDOWS
 			// Prefer CONTEXT.Rip from native_context (more reliable than
 			// ExceptionAddress for these PS5 binary faults).
