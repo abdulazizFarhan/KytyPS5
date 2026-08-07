@@ -87,12 +87,14 @@ struct DynamicInfo {
 	uint64_t preinit_array_size  = 0;
 	uint64_t pltgot_vaddr        = 0;
 
-	Elf64_Rela* jmprela_table      = nullptr;
-	uint64_t    jmprela_table_size = 0;
+	std::unique_ptr<Elf64_Rela[]> jmprela_owned = nullptr;
+	Elf64_Rela*                    jmprela_table      = nullptr;
+	uint64_t                       jmprela_table_size = 0;
 
-	Elf64_Rela* rela_table            = nullptr;
-	uint64_t    rela_table_total_size = 0;
-	uint64_t    rela_table_entry_size = 0;
+	std::unique_ptr<Elf64_Rela[]> rela_owned = nullptr;
+	Elf64_Rela*                    rela_table            = nullptr;
+	uint64_t                       rela_table_total_size = 0;
+	uint64_t                       rela_table_entry_size = 0;
 
 	uint64_t relative_count = 0;
 
