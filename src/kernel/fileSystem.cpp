@@ -714,7 +714,7 @@ int64_t KYTY_SYSV_ABI KernelLseek(int d, int64_t offset, int whence) {
 		return KERNEL_ERROR_ESPIPE;
 	}
 
-	file->mutex.Lock();
+	Common::LockGuard lock(file->mutex);
 
 	bool is_invalid = file->f.IsInvalid();
 
@@ -738,8 +738,6 @@ int64_t KYTY_SYSV_ABI KernelLseek(int d, int64_t offset, int whence) {
 	auto pos = static_cast<int64_t>(file->f.Tell());
 
 	EXIT_IF(pos != offset);
-
-	file->mutex.Unlock();
 
 	if (is_invalid) {
 		LOGF("\tfile is invalid\n");
