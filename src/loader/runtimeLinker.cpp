@@ -752,12 +752,28 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 					    fast_skip_count > 1000000ULL) {
 						static uint64_t loop_skip_count = 0;
 						loop_skip_count++;
-						if ((loop_skip_count & 0xFF) == 1) {
+						if (loop_skip_count == 1) {
 							LOGF("[M1W2 v1.7 cycle0138] loop-skip #%" PRIu64 " RIP=%016" PRIx64 " -> 0x90293a15 with RAX=0x8002000d (count=%" PRIu64 ")\n",
 							     loop_skip_count, fault_ip, fast_skip_count);
 						}
 						ctx->Rip = 0x90293a15ULL;  // After the je at 0x90293a0f, in GTA V's post-loop code
 						ctx->Rax = 0x8002000dULL;
+						return true;
+					}
+					// Cycle 0139: When GTA V's RIP is in GTA V's post-loop main function
+					// (0x90293a15-0x9029e346), jump to GTA V's main return at 0x9029e346
+					// with RAX=0. This simulates GTA V's main completing all its setup
+					// and returning. GTA V's launcher might continue when GTA V's main returns.
+					if (fault_ip >= 0x90293a15ULL && fault_ip < 0x9029e346ULL &&
+					    fast_skip_count > 1000000ULL) {
+						static uint64_t main_skip_count = 0;
+						main_skip_count++;
+						if (main_skip_count == 1) {
+							LOGF("[M1W2 v1.7 cycle0139] main-skip #%" PRIu64 " RIP=%016" PRIx64 " -> 0x9029e346 with RAX=0 (count=%" PRIu64 ")\n",
+							     main_skip_count, fault_ip, fast_skip_count);
+						}
+						ctx->Rip = 0x9029e346ULL;
+						ctx->Rax = 0;
 						return true;
 					}
 					// Cycle 0136: Big skip in GTA V's code/data region
@@ -767,6 +783,7 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 					// (Cycle 0138 loop-skip fires before this for the loop range)
 					if (fault_ip >= 0x90000000ULL && fault_ip < 0xB0000000ULL &&
 					    fault_ip != 0x90293a15ULL &&  // Don't skip the loop-skip target
+					    fault_ip != 0x9029e346ULL &&  // Don't skip the main-skip target
 					    fast_skip_count > 1000000ULL) {
 						static uint64_t big_skip_count = 0;
 						big_skip_count++;
