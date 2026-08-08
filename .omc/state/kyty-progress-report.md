@@ -1037,6 +1037,45 @@ reach PLT entries (it gets redirected to launcher continuation before).
 - `src/loader/runtimeLinker.cpp` (cycle 0141k): cleanup, reverted to launcher
 - `src/loader/runtimeLinker.cpp` (cycle 0141l): stable, no changes needed
 
+## Cycle 0141m (2026-08-09) — PLT stub range corrected to mapped C
+
+### Critical discovery
+While analyzing GTA V's binary, discovered that GTA V's loaded memory has
+two different vaddr mappings:
+
+- **Mapping A**: `vaddr = file_offset + 0x90000000` (for code section 0x90293xxx-0x90308xxx)
+- **Mapping C**: `vaddr = file_offset + 0x90000000 - 0x18e50` = `file_offset + 0x8FFFE71B0`
+
+PLT entries in GTA V's loaded memory use **mapped C** addresses:
+- PLT 0x00 (file offset 0x308e150) -> vaddr 0x903075300
+- PLT 0x24 (file offset 0x308e390) -> vaddr 0x903075540
+- PLT 0xff (file offset 0x308ff50) -> vaddr 0x903077100
+
+### Changes
+- Updated PLT stub range from `0x90308e000-0x903090000` (mapped A - WRONG) to
+  `0x903075300-0x903077100` (mapped C - CORRECT)
+- Added comment explaining the mapping
+
+### Test results (2-min, 2026-08-09)
+- PLT stub events: 0 (PLT stub still doesn't fire - GTA V's RIP doesn't reach PLT entries)
+- Cycle 0134/0138/0139 redirect events: 3
+- Patched AV sites: 6 (consistent with cycle 0141l)
+- No ucrtbase crash
+- Test exits cleanly
+
+### Status
+GTA V's launcher runs, M1W2 v1.4 patches PLT-related AVs, emulator cleanup runs.
+The PLT stub infrastructure is now correctly placed but doesn't fire because
+GTA V's RIP doesn't reach PLT entries (it gets redirected to launcher
+continuation 0x900000089 first).
+
+### Key insight for next iteration
+GTA V's launcher calls PLT functions which are essentially NOPs (M1W2 v1.4
+patches the AV sites). For GTA V to progress to actual game code, the PLT
+functions need to be IMPLEMENTED, not just patched.
+
+AI-assisted disclosure: Yes, AI-assisted.
+
 ## Cycle 0129-0130 (2026-08-08) — M1W2 v1.7 late-sentinel threshold discovery
 
 ### Investigation (cycle 0129)
