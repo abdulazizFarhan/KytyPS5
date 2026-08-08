@@ -737,18 +737,21 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 						ctx->Rax = 0;
 						return true;
 					}
-					// Cycle 0134: When we're deep in GTA V's code region after redirect,
-					// and many AVs have been processed, try to redirect to GTA V's
-					// code AFTER the outer loops (0x90293844) to skip the iteration.
-					// Only fire ONCE - otherwise GTA V's RIP gets stuck at 0x90293844
-					// because that address also AVs.
-					static bool s_deep_redirect_done = false;
+					// Cycle 0135: When GTA V's RIP is in GTA V's code region (0x90000000-0xA0000000)
+					// and many AVs have been processed, advance RIP by 1MB instead of 16 bytes.
+					// This lets GTA V's RIP quickly move past GTA V's current code region
+					// which is iterating through sentinel addresses. After advance, GTA V's
+					// RIP might land in unmapped memory (which fast-skip continues to handle)
+					// or in GTA V's mapped code (which GTA V might execute).
 					if (fault_ip >= 0x90000000ULL && fault_ip < 0xA0000000ULL &&
-					    fast_skip_count > 1000000ULL && !s_deep_redirect_done) {
-						s_deep_redirect_done = true;
-						LOGF("[M1W2 v1.7 cycle0134] deep redirect RIP=%016" PRIx64 " to 0x90293844 (count=%" PRIu64 ")\n",
-						     fault_ip, fast_skip_count);
-						ctx->Rip = 0x90293844ULL;
+					    fast_skip_count > 1000000ULL) {
+						static uint64_t big_skip_count = 0;
+						big_skip_count++;
+						if ((big_skip_count & 0xFF) == 1) {
+							LOGF("[M1W2 v1.7 cycle0135] big-skip #%" PRIu64 " RIP=%016" PRIx64 " -> +1MB (count=%" PRIu64 ")\n",
+							     big_skip_count, fault_ip, fast_skip_count);
+						}
+						ctx->Rip = fault_ip + 0x100000ULL;  // +1MB
 						ctx->Rax = 0;
 						return true;
 					}
