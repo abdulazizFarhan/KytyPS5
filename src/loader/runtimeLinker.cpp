@@ -725,7 +725,7 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 					// vaddr 0x902937ef (file offset 0x2937ef). This lets GTA V's
 					// outer loop epilogue execute on real code instead of in the
 					// unmapped range, potentially avoiding the early main() return.
-					if (fault_ip > 0x49a0000ULL && fault_ip < 0x50000000ULL) {
+					if (fault_ip > 0x4800000ULL && fault_ip < 0x50000000ULL) {
 						static uint64_t redirect_count = 0;
 						redirect_count++;
 						if (redirect_count <= 5) {
