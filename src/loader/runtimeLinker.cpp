@@ -787,10 +787,10 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 						static uint64_t main_skip_count = 0;
 						main_skip_count++;
 						if (main_skip_count == 1) {
-							LOGF("[M1W2 v1.7 cycle0139] main-skip #%" PRIu64 " RIP=%016" PRIx64 " -> 0x9002854e1 with RAX=0 (count=%" PRIu64 ")\n",
+							LOGF("[M1W2 v1.7 cycle0139] main-skip #%" PRIu64 " RIP=%016" PRIx64 " -> 0x900000089 with RAX=0 (count=%" PRIu64 ")\n",
 							     main_skip_count, fault_ip, fast_skip_count);
 						}
-						ctx->Rip = 0x9002854e1ULL;
+						ctx->Rip = 0x900000089ULL;
 						ctx->Rax = 0;
 						return true;
 					}
