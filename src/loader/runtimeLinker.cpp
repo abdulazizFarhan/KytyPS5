@@ -1477,9 +1477,43 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 			LOGF("Patch tls: %" PRIu64 " sites in %" PRIu64 " bytes\n", static_cast<uint64_t>(tls_patch_count), size);
 		}
 	}
+	// 	// M1W2 v1.7 cycle 0141: GTA V's PLT 0xf8 patches
+	// GTA V's outer loops (4 of them) all call PLT 0xf8 then check the return
+	// value against 0x8002000d. Without this patch, PLT 0xf8 reads from a
+	// vtable that contains unmapped sentinel values, causing millions of AVs.
+	// By replacing the call with "mov eax, 0x8002000d", the cmp/je after
+	// the call matches and the loop exits on the first iteration.
+	{
+		const std::string program_name = Common::PathToString(program->file_name);
+		if (program_name.find("gtav") != std::string::npos) {
+			constexpr uint64_t PLT_0XF8_FILE_OFFSET = 0x308f0d0;
+			constexpr uint8_t  MOV_EAX[5] = {0xb8, 0x0d, 0x00, 0x02, 0x80};
+			auto* plt_start = reinterpret_cast<uint8_t*>(address);
+			auto* plt_end   = plt_start + size - 5;
+			size_t plt_patch_count = 0;
+			for (auto* ptr = plt_start; ptr <= plt_end; ptr++) {
+				if (ptr[0] == 0xe8) {
+					int32_t disp = static_cast<int32_t>(
+					    static_cast<uint32_t>(ptr[1]) |
+					    (static_cast<uint32_t>(ptr[2]) << 8) |
+					    (static_cast<uint32_t>(ptr[3]) << 16) |
+					    (static_cast<uint32_t>(ptr[4]) << 24));
+					uint64_t target_off = (reinterpret_cast<uint64_t>(ptr + 5) - program->base_vaddr) + static_cast<uint64_t>(disp);
+					if (target_off == PLT_0XF8_FILE_OFFSET) {
+						memcpy(ptr, MOV_EAX, 5);
+						plt_patch_count++;
+					}
+				}
+			}
+			if (plt_patch_count > 0) {
+				LOGF("Patch PLT 0xf8: %" PRIu64 " sites\n", static_cast<uint64_t>(plt_patch_count));
+			}
+		}
+	}
 }
 
 uint64_t RuntimeLinker::GetEntry() {
+
 	// EXIT_NOT_IMPLEMENTED(!Common::Thread::IsMainThread());
 
 	Common::LockGuard lock(m_mutex);

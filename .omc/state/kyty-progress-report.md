@@ -431,9 +431,73 @@ GTA V's post-loop code at 0x902937ef calls PLT 0x4 first, which clobbers RAX.
 - 8.5x longer runtime
 - **No GPU rendering reached yet** (still no Vulkan calls after redirect)
 
-## GTA V current status (cycle 0140)
+## Cycle 0141 (2026-08-08) — M1W2 v1.7 GTA V PLT 0xf8 patch
+
+### Investigation
+Cycle 0141 adds a PROACTIVE patch to GTA V's PLT 0xf8 call sites at the
+binary-load time. Goal: make GTA V's outer loops exit naturally on the
+first iteration by replacing `call PLT 0xf8` with `mov eax, 0x8002000d`.
+
+### GTA V's PLT 0xf8 call sites (file offsets)
+- 0x29379d: outer loop 1 call
+- 0x2937dd: outer loop 1's `call` body (sentinel check)
+- 0x29382d: outer loop 2 call
+- 0x2938fd: outer loop 3 call
+
+These are all direct `e8 XX XX XX XX` calls to PLT 0xf8 (target 0x308f0d0).
+
+### Patch design
+Add a loop in `PatchProgram()` that scans each segment for `e8` calls
+whose target is `0x308f0d0` (file offset of PLT 0xf8 entry). When found,
+replace the 5-byte `call` with `mov eax, 0x8002000d` (b8 0d 00 02 80).
+
+After the patch, GTA V's loop body executes:
+```
+mov ecx, 0x18
+mov esi, 1
+mov rdx, rbx
+mov eax, 0x8002000d  ; (was: call PLT_0xf8)
+cmp eax, 0x8002000d  ; match!
+je <loop_exit>       ; exits on first iteration
+```
+
+This makes GTA V's 4 outer loops exit naturally without depending on
+PLT 0xf8 returning the right value.
+
+### Issues discovered (cycle 0141)
+1. **Hex constant confusion (CRITICAL)**: GTA V's actual base_vaddr is
+   `0x900000000` (9 hex digits = 64GB), NOT `0x90000000` (8 hex digits = 2.4GB).
+   The original SELF format vaddr is in the 0xXXXXXXXXX range.
+
+2. **PLT 0xf8 outside segment 0**: GTA V's PLT 0xf8 (file offset 0x308f0d0)
+   is BEYOND segment 0's file_size (50832444 = 0x307CBFC). So PLT 0xf8
+   is in segment 1 (mode = Read, not Execute).
+
+3. **Patch scan order**: `PatchProgram()` is only called for Execute-mode
+   segments. The 4 call sites are in segment 0 (Execute), so the scan
+   should find them. But initial test found 0 sites.
+
+4. **Debug log showing 0 PLT 0xf8 calls**: DEBUG scan found 10,177 e8 calls
+   in segment 0 but none had target_off = 0x308f0d0. The 4 expected call
+   sites at file offsets 0x29379d-0x2938fd were NOT in the debug log.
+
+### Status
+- **PATCH IN PLACE**: `PatchProgram()` now scans GTA V's code segments
+  for PLT 0xf8 calls and replaces them with `mov eax, 0x8002000d`.
+- **NOT FUNCTIONAL YET**: Debug logging shows 0 calls found.
+- **NEXT**: Diagnose why the 4 known PLT 0xf8 calls are not in the
+  scan output. Possible causes:
+  - Binary layout off-by-one (need to verify segment 0's actual file size)
+  - The calls were already patched by TLS pattern (unlikely, different bytes)
+  - Debug log is truncated or ordered incorrectly
+
+### Files changed
+- `src/loader/runtimeLinker.cpp` (cycle 0141): add PLT 0xf8 patch in
+  PatchProgram() after the existing TLS patch block
+
+## GTA V current status (cycle 0141)
 - GTA V RIP range: 0x372fd30 to 0xb4aa5e36 (2.5GB walk)
-- Max fast-skip entries: 5,687 in 2-min run
+- Max fast-skip entries: 5,215 in 2-min run
 - Late-sentinel events: 5,249
 - Cycle 0138 loop-skip: fires once (0x902937ef -> 0x90293a15)
 - Cycle 0139 main-skip: fires once (0x90293a15 -> 0x9029e346)
@@ -443,9 +507,34 @@ GTA V's post-loop code at 0x902937ef calls PLT 0x4 first, which clobbers RAX.
 - Cycle 0140 PLT 0xf8 intercept: NON-FUNCTIONAL (GTA V's RIP never reaches
   high sentinel addresses because cycle 0131 redirects to GTA V's code
   before any sentinel AV); reverted
+- **Cycle 0141 PLT 0xf8 patch**: Patch code added to PatchProgram but
+  diagnostic shows 0 PLT 0xf8 calls found. The 4 expected call sites
+  at file offsets 0x29379d-0x2938fd are NOT being detected by the
+  scan. Investigation needed.
 
 ### File changed
-- `src/loader/runtimeLinker.cpp` (commit 5e9b165): cycle 0131 redirect
+- `src/loader/runtimeLinker.cpp` (cycle 0141): add PLT 0xf8 patch in
+  PatchProgram() after the existing TLS patch block
+
+
+## GTA V current status (cycle 0141)
+- GTA V RIP range: 0x372fd30 to 0xb4aa5e36 (2.5GB walk)
+- Max fast-skip entries: 5,215 in 2-min run
+- Late-sentinel events: 5,249
+- Cycle 0138 loop-skip: fires once (0x902937ef -> 0x90293a15)
+- Cycle 0139 main-skip: fires once (0x90293a15 -> 0x9029e346)
+- Cycle 0136 big-skip: fires ~32 times (covers 0x90000000-0xB029e356)
+- Non-M1W2 events: 974 (67% of baseline 894 events from cycle 0125)
+- GTA V's RIP walks through GTA V's address space then unmapped memory
+- Cycle 0140 PLT 0xf8 intercept: NON-FUNCTIONAL (GTA V's RIP never reaches
+  high sentinel addresses because cycle 0131 redirects to GTA V's code
+  before any sentinel AV); reverted
+- Cycle 0141 PLT 0xf8 patch: Patch code added to PatchProgram but
+  diagnostic shows 0 PLT 0xf8 calls found. Need to debug why the 4
+  expected call sites are not detected.
+
+### File changed
+- `src/loader/runtimeLinker.cpp` (cycle 0141): add PLT 0xf8 patch
 
 ## GTA V WindowCreate observation
 GTA V's code DOES create a window before exiting:
