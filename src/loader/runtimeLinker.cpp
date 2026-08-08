@@ -722,6 +722,13 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 					// count or finds a real (non-sentinel) entry.
 					ctx->Rip = fault_ip + 16;
 					ctx->Rax = 0;
+					// Cycle 0129 debug: log every 1024th AV with addr > 0x55400000
+					// (just past the last observed sentinel) to find where GTA V's
+					// RIP actually exits the sentinel range.
+					if (fault_ip > 0x55400000ULL) {
+						LOGF("[M1W2 v1.7 late-sentinel] RIP=%016" PRIx64 " count=%" PRIu64 "\n",
+						     fault_ip, fast_skip_count);
+					}
 					return true;
 				}
 				const auto patch_addr = fault_ip & ~0x1F;
