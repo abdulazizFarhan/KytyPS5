@@ -5850,7 +5850,30 @@ TestCase Vop2SdwaCndmaskSourceModifier() {
           {0xbf800000u},
           {O::VMovB32, O::VCmpTU32, O::VCndmaskB32, O::BufferStoreDword,
            O::SEndpgm}};
+}TestCase Vop2SdwaMinU32PreservesWordDestination() {
+  using O = ShaderOpcode;
+
+  std::vector<u32> code;
+  AppendVMovLiteral(&code, 10, 0xa1b2c3d4u);
+  AppendVMovU32(&code, 12, 7);
+  code.push_back(0x261418f9u);
+  code.push_back(0x0686149fu);
+  AppendStoreVgpr(&code, 10, 0);
+  AppendVMovLiteral(&code, 10, 0xa1b2c3d4u);
+  AppendVMovU32(&code, 12, 64);
+  code.push_back(0x261418f9u);
+  code.push_back(0x0686149fu);
+  AppendStoreVgpr(&code, 10, 1);
+  AppendEnd(&code);
+
+  return {"Vop2SdwaMinU32PreservesWordDestination",
+          code,
+          {},
+          {0xa1b20007u, 0xa1b2001fu},
+          {O::VMovB32, O::VMinU32, O::BufferStoreDword, O::SEndpgm}};
 }
+
+
 
 TestCase Vop3CndmaskUsesSgprMaskLaneBits() {
   using O = ShaderOpcode;
@@ -10057,6 +10080,7 @@ std::vector<TestCase> MakeCases() {
   AddCase(VectorCompareClassF32);
   AddCase(VectorCompareF16Ops);
   AddCase(Vop2SdwaCndmaskSourceModifier);
+  AddCase(Vop2SdwaMinU32PreservesWordDestination);
   AddCase(Vop3CndmaskUsesSgprMaskLaneBits);
   AddCase(Vop3CndmaskAllowsDataSourceModifier);
   AddCase(VectorCompareExecOps);
