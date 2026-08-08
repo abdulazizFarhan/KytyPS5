@@ -552,14 +552,16 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 		if (Loader::X64InstructionEmulator::TryEmulate(info->native_context)) {
 			return true;
 		}
-		// M1W2 v1.5: GTA V's fast-skip landed RIP on unmapped sentinel data;
+		// M1W2 v1.7: GTA V's fast-skip landed RIP on unmapped sentinel data;
 		// the CPU tried to decode it as code and raised an illegal-instruction
 		// fault instead of an Execute AV. Skip past the bad instruction
 		// when the fault_ip is inside the dynamic-memory sentinel region.
+		// M1W2 v1.5 advanced by 1GB but bypassed GTA V's post-call code;
+		// v1.7 advances by 16 bytes (same as Execute AV fast-skip below).
 		auto* ctx = reinterpret_cast<PCONTEXT>(const_cast<void*>(info->native_context));
 		const uint64_t rip = (ctx != nullptr) ? ctx->Rip : 0ULL;
 		if (rip != 0 && rip < 0x100000000000ULL) {
-			LOGF("[M1W2 v1.5] illegal-instruction skip at [%016" PRIx64 "]\n", rip);
+			LOGF("[M1W2 v1.7] illegal-instruction skip at [%016" PRIx64 "]\n", rip);
 			if (ctx != nullptr) {
 				ctx->Rip = rip + 16;
 				ctx->Rax = 0;
@@ -712,7 +714,7 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 					static uint64_t fast_skip_count = 0;
 					fast_skip_count++;
 					if ((fast_skip_count & 0x3FF) == 1) {
-						LOGF("[M1W2 v1.5] fast-skip #%" PRIu64 " at [%016" PRIx64 "]\n", fast_skip_count, fault_ip);
+						LOGF("[M1W2 v1.7] fast-skip #%" PRIu64 " at [%016" PRIx64 "]\n", fast_skip_count, fault_ip);
 					}
 					// M1W2 v1.7: advance RIP by 16 bytes (past the failing call)
 					// instead of 1GB. Let GTA V's post-call code execute so its
