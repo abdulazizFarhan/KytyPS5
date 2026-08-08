@@ -729,15 +729,27 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 						static uint64_t redirect_count = 0;
 						redirect_count++;
 						if (redirect_count <= 5) {
-							LOGF("[M1W2 v1.7 cycle0133] redirect RIP=%016" PRIx64 " to 0x902937ef with RAX=0x8002000d (count=%" PRIu64 ")\n",
+							LOGF("[M1W2 v1.7 cycle0134] redirect RIP=%016" PRIx64 " to 0x902937ef (count=%" PRIu64 ")\n",
 							     fault_ip, fast_skip_count);
 						}
-						// Cycle 0133: Set RAX=0x8002000d (HRESULT_FROM_WIN32(ERROR_INVALID_DATA))
-						// so GTA V's outer loop check at 0x902937e2 ('cmp eax, 0x8002000d')
-						// passes and the loop exits. Then GTA V's main continues past
-						// the sentinel iteration.
+						// Cycle 0131: redirect to GTA V's post-loop code
 						ctx->Rip = 0x902937efULL;
-						ctx->Rax = 0x8002000dULL;
+						ctx->Rax = 0;
+						return true;
+					}
+					// Cycle 0134: When we're deep in GTA V's code region after redirect,
+					// and many AVs have been processed, try to redirect to GTA V's
+					// code AFTER the outer loops (0x90293844) to skip the iteration.
+					// Only fire ONCE - otherwise GTA V's RIP gets stuck at 0x90293844
+					// because that address also AVs.
+					static bool s_deep_redirect_done = false;
+					if (fault_ip >= 0x90000000ULL && fault_ip < 0xA0000000ULL &&
+					    fast_skip_count > 1000000ULL && !s_deep_redirect_done) {
+						s_deep_redirect_done = true;
+						LOGF("[M1W2 v1.7 cycle0134] deep redirect RIP=%016" PRIx64 " to 0x90293844 (count=%" PRIu64 ")\n",
+						     fault_ip, fast_skip_count);
+						ctx->Rip = 0x90293844ULL;
+						ctx->Rax = 0;
 						return true;
 					}
 					ctx->Rip = fault_ip + 16;
