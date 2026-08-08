@@ -1056,8 +1056,22 @@ PLT entries in GTA V's loaded memory use **mapped C** addresses:
   `0x903075300-0x903077100` (mapped C - CORRECT)
 - Added comment explaining the mapping
 
+### Important finding: PLT entries are NEVER actually executed
+After further investigation, discovered that kyty's loader patches GTA V's
+GOT entries with "stub" function vaddrs (RegisterStubbedImport). This means:
+
+1. GTA V's launcher calls PLT entry (e.g., PLT 0x01 at 0x903075310)
+2. PLT entry does `jmp [GOT[0x01]]`
+3. GOT[0x01] is patched by kyty's loader to point to a stub function
+4. GTA V's RIP jumps to kyty's stub, NOT to PLT entry's import thunk
+5. The stub function either resolves the import or returns 0
+
+So GTA V's RIP never actually lands on PLT entry code. The PLT stub
+infrastructure is technically incorrect for the actual flow, but doesn't
+hurt anything.
+
 ### Test results (2-min, 2026-08-09)
-- PLT stub events: 0 (PLT stub still doesn't fire - GTA V's RIP doesn't reach PLT entries)
+- PLT stub events: 0 (GTA V's RIP never reaches PLT entries)
 - Cycle 0134/0138/0139 redirect events: 3
 - Patched AV sites: 6 (consistent with cycle 0141l)
 - No ucrtbase crash
@@ -1065,14 +1079,13 @@ PLT entries in GTA V's loaded memory use **mapped C** addresses:
 
 ### Status
 GTA V's launcher runs, M1W2 v1.4 patches PLT-related AVs, emulator cleanup runs.
-The PLT stub infrastructure is now correctly placed but doesn't fire because
-GTA V's RIP doesn't reach PLT entries (it gets redirected to launcher
-continuation 0x900000089 first).
+GTA V's launcher calls PLT entries which redirect to kyty's stub functions.
 
-### Key insight for next iteration
-GTA V's launcher calls PLT functions which are essentially NOPs (M1W2 v1.4
-patches the AV sites). For GTA V to progress to actual game code, the PLT
-functions need to be IMPLEMENTED, not just patched.
+### Key insight
+For GTA V to progress to actual game code, the kyty stubs need to implement
+the actual PS5 system functions that GTA V's launcher calls. The current
+stubs just return 0, which means GTA V's launcher initialization doesn't
+actually do anything meaningful.
 
 AI-assisted disclosure: Yes, AI-assisted.
 
