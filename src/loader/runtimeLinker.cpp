@@ -722,12 +722,15 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 					// count or finds a real (non-sentinel) entry.
 					ctx->Rip = fault_ip + 16;
 					ctx->Rax = 0;
-					// Cycle 0129 debug: log every 1024th AV with addr > 0x55400000
-					// (just past the last observed sentinel) to find where GTA V's
-					// RIP actually exits the sentinel range.
-					if (fault_ip > 0x55400000ULL) {
-						LOGF("[M1W2 v1.7 late-sentinel] RIP=%016" PRIx64 " count=%" PRIu64 "\n",
-						     fault_ip, fast_skip_count);
+					// Cycle 0130 debug: log AVs above 0x4000000 with throttle
+					// to find where GTA V's RIP actually exits the sentinel range.
+					if (fault_ip > 0x4000000ULL) {
+						static uint64_t late_log_count = 0;
+						late_log_count++;
+						if (late_log_count <= 5 || (late_log_count % 1000) == 0) {
+							LOGF("[M1W2 v1.7 late-sentinel] RIP=%016" PRIx64 " count=%" PRIu64 " total=%" PRIu64 "\n",
+							     fault_ip, fast_skip_count, late_log_count);
+						}
 					}
 					// Cycle 0129: log when GTA V's RIP returns to GTA V's mapped code region
 					// (0x900000000+ = code base, 0x800000000+ = data base)
