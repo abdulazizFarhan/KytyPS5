@@ -430,6 +430,8 @@ GTA V's post-loop code at 0x902937ef calls PLT 0x4 first, which clobbers RAX.
 - 13x more AVs processed
 - 8.5x longer runtime
 - **No GPU rendering reached yet** (still no Vulkan calls after redirect)
+- **Cycle 0141e**: GTA V's main epilogue patched (ret -> jmp-2) - eliminates ucrtbase crash
+- **Cycle 0141h**: PLT stub + PLT 0x24 patch added as infrastructure (not yet effective)
 
 ## Cycle 0141 (2026-08-08) — M1W2 v1.7 GTA V PLT 0xf8 patch
 
@@ -932,6 +934,65 @@ path needs many functions to work).
 - `src/loader/runtimeLinker.cpp` (commit 5e9b165): cycle 0131 RIP redirect
 - `src/loader/runtimeLinker.cpp` (commit 4364bf7): cycle 0132 lower threshold
 - `src/loader/runtimeLinker.cpp` (commit d54c39e): cycle 0133 RAX=0x8002000d
+
+## Cycle 0141h (2026-08-09) — M1W2 v1.7 GTA V PLT stub + PLT 0x24 patch (infrastructure)
+
+### Investigation
+Cycle 0141h adds two NEW infrastructure pieces for handling GTA V's
+unimplemented PLT calls:
+
+1. **PLT stub in M1W2 handler**: When GTA V's RIP lands in the PLT range
+   (0x90308e000-0x903090000, mapped A region), simulate a function return
+   by popping [ctx->Rsp] into ctx->Rip and advancing ctx->Rsp by 8. RAX = 0.
+   This lets GTA V's main body continue executing past unimplemented PLT
+   calls as if the called function returned immediately.
+
+2. **PLT 0x24 patch in PatchProgram**: Pattern-based search for
+   `e8 XX XX XX XX 85 c0 0f 84` (call-then-test-then-jz), verifies the call
+   target is PLT 0x24 (vaddr 0x903075540), replaces with `mov eax, 1`
+   (`b8 01 00 00 00`). Patches 129 sites in GTA V's main body (file offsets
+   0x297e59-0x2983be).
+
+### Why both are infrastructure only
+Both the PLT stub and PLT 0x24 patch are IN PLACE but DON'T FIRE in the
+current test because GTA V's RIP gets redirected to the patched epilogue
+(cycle 0141e) before reaching PLT entries or PLT 0x24 call sites.
+
+- PLT entries are at mapped A vaddrs (0x90308e150-0x90308ff50)
+- PLT 0x24 call sites are at mapped C vaddrs (0x90027E009-0x90027F56E)
+- Cycle 0139 redirects GTA V's RIP from 0x90293a15-0x9029e346 (mapped A)
+  to 0x9002854e1 (mapped C, patched epilogue) - GTA V never reaches PLT
+
+### Experiment: disabled cycles 0138/0139/0136
+Tried disabling cycles 0138, 0139, 0136 to let GTA V's RIP walk through
+main body. Result:
+- 4004 fast-skips in 2-min test (vs 1101 with cycles enabled)
+- RIPs visited 0x90-0x93 range (GTA V's mapped code region)
+- BUT no PLT stub fires (GTA V's RIP doesn't reach 0x90308e000 range)
+- Cycle 0136 big-skip still fired (advanced RIP past GTA V's mapped code)
+- No crash, no actual game progress (RIP just AVs and fast-skips)
+
+The fundamental issue: GTA V's RIP needs to LAND on actual executable code
+(not data) for the PLT stub to fire. The PLT range check works, but GTA V's
+RIP doesn't naturally reach it without a waypoint.
+
+### Test result (2-min, 2026-08-09, all cycles re-enabled)
+- Cycle 0134 redirect: 0x4800010 -> 0x902937ef (GTA V loop body)
+- Cycle 0138 loop-skip: 0x902937ef -> 0x90293a15 (RAX=0x8002000d)
+- Cycle 0139 main-skip: 0x90293a15 -> 0x9002854e1 (patched epilogue)
+- **No ucrtbase crash!**
+- GTA V stuck in infinite loop at patched epilogue (cycle 0141e state)
+- 1101 fast-skips (sentinel iteration phase)
+- 3 cycle events fired
+- PLT stub and PLT 0x24 patch in source, awaiting GTA V's RIP to reach PLT
+
+### Status: STABLE, infrastructure in place
+- Cycle 0141e state preserved (GTA V in infinite loop, no crash)
+- PLT stub: ready to fire when GTA V's RIP enters PLT range
+- PLT 0x24 patch: 129 sites patched, ready when GTA V's RIP reaches PLT 0x24
+
+### Files changed
+- `src/loader/runtimeLinker.cpp` (commit 64801ea): cycle 0141h PLT stub + PLT 0x24 patch range fix
 
 
 ## Cycle 0129-0130 (2026-08-08) — M1W2 v1.7 late-sentinel threshold discovery
