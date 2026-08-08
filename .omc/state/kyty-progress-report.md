@@ -251,10 +251,31 @@ but GTA V's RIP then keeps walking through GTA V's data region via the big skip.
 
 The big skip is the simpler mechanism that remains in place.
 
+### Cycle 0138: Loop range skip
+Added a new loop-skip condition that fires when GTA V's RIP is in GTA V's
+outer loop range (0x90293760-0x90293a00) and many AVs have been processed.
+Sets RIP to 0x90293a15 (past the loop range, after the je at 0x90293a0f)
+with RAX=0x8002000d. This simulates GTA V's outer loops all exiting at once.
+
+Effect: non-M1W2 events dropped from 894 to 561 (37% reduction). GTA V's
+loop iterations are bypassed, so GTA V's code does fewer PLT calls before
+the big skip fires.
+
+Tested in 2-min GTA V run (build at 22:55):
+- Max RIP: 0xb465df85 (similar to cycle 0136)
+- Max fast-skip: 5,516,289
+- Non-M1W2 events: 561 (vs 894 before)
+- Loop-skip fires once at RIP=0x902937ef (count=1,114,160)
+
+GTA V still doesn't reach GPU rendering - GTA V's code after the loop
+range also calls PLT functions that AV, but the loop-skip reduces the
+number of redundant PLT calls.
+
 ### Assessment
-The big skip doesn't help GTA V reach GPU rendering - GTA V's code still doesn't
-have the necessary functions implemented. But it does let GTA V's RIP move past
-GTA V's currently-stuck region quickly.
+The big skip and loop skip don't help GTA V reach GPU rendering - GTA V's
+code still doesn't have the necessary functions implemented. But they do
+let GTA V's RIP move past GTA V's currently-stuck region quickly and with
+fewer redundant PLT calls.
 
 ### 5-minute test (cycle 0136)
 - GTA V ran for 300s (5 minutes), killed by timeout
