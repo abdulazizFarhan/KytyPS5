@@ -219,6 +219,28 @@ redirect RIP to vaddr 0x902937ef (GTA V's post-loop code).
 
 #
 
+## Cycle 0134 (2026-08-08) — Deep redirect after fast-skip threshold
+
+### Cycle 0134 attempt
+Added a second redirect that fires when GTA V's RIP is in GTA V's code region
+(0x90000000-0xA0000000) and many AVs have been processed (>1M). This redirects
+GTA V's RIP to GTA V's code AFTER the outer loops (0x90293844) to try to skip
+the iteration.
+
+### Bug discovered
+Initial implementation used 0x900000000 (9 hex digits = 38GB) as lower bound,
+which is WAY above GTA V's actual code region (0x90000000, 8 hex digits = 2.4GB).
+The condition never matched. Fixed by using 0x90000000.
+
+### Result
+Deep redirect fires once correctly, but GTA V's code at 0x90293844 also AVs.
+GTA V's RIP stays at 0x90293844 and walks through GTA V's code region (+16 per AV).
+The deep redirect doesn't help GTA V progress past the outer loops (non-functional).
+GTA V continues to run for 2+ minutes.
+
+### Files changed
+- `src/loader/runtimeLinker.cpp` (commit 6d10a46): cycle 0134 deep redirect
+
 ## Cycle 0132-0133 (2026-08-08) — Lower redirect threshold + RAX preset
 
 ### Cycle 0132
