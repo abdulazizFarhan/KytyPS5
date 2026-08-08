@@ -748,7 +748,7 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 					// outer loops all exiting at once. GTA V's main can then continue past
 					// the loops to do more setup.
 					// Excluded from the big skip below so the loop skip can fire first.
-					if (fault_ip >= 0x90293760ULL && fault_ip < 0x90293a00ULL && fault_ip >= 0x90293760ULL && fault_ip < 0x90293a00ULL &&
+					if (fault_ip >= 0x90293760ULL && fault_ip < 0x90293a00ULL &&
 						    fast_skip_count > 1000000ULL) {
 						static uint64_t loop_skip_count = 0;
 						loop_skip_count++;
@@ -782,7 +782,7 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 					// (0x90293a15-0x9029e346), jump to GTA V's main return at 0x9029e346
 					// with RAX=0. This simulates GTA V's main completing all its setup
 					// and returning. GTA V's launcher might continue when GTA V's main returns.
-					if (fault_ip >= 0x90293a15ULL && fault_ip < 0x9029e346ULL && fault_ip >= 0x90293a15ULL && fault_ip < 0x9029e346ULL &&
+					if (fault_ip >= 0x90293a15ULL && fault_ip < 0x9029e346ULL &&
 						    fast_skip_count > 1000000ULL) {
 						static uint64_t main_skip_count = 0;
 						main_skip_count++;
