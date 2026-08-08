@@ -240,6 +240,17 @@ and bumped the skip size from 1MB to 16MB.
 - `src/loader/runtimeLinker.cpp` (commit 610fea0): cycle 0135 1MB big skip
 - `src/loader/runtimeLinker.cpp` (commit 313b96b): cycle 0136 16MB big skip extended range
 
+### Cycle 0137 attempt (reverted)
+Tried to redirect GTA V's RIP to its 3rd outer loop check (0x90293832) with
+RAX=0x8002000d to force the loop to exit. Tested but reverted because GTA V's
+code after the loops also calls PLT functions that AV, so the loop exit
+redirect doesn't help GTA V progress past the iteration.
+
+Result: cycle 0137 fires once (going 0x902937ef → 0x90293832 with RAX=0x8002000d),
+but GTA V's RIP then keeps walking through GTA V's data region via the big skip.
+
+The big skip is the simpler mechanism that remains in place.
+
 ### Assessment
 The big skip doesn't help GTA V reach GPU rendering - GTA V's code still doesn't
 have the necessary functions implemented. But it does let GTA V's RIP move past
