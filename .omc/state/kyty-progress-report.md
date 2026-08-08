@@ -271,11 +271,42 @@ GTA V still doesn't reach GPU rendering - GTA V's code after the loop
 range also calls PLT functions that AV, but the loop-skip reduces the
 number of redundant PLT calls.
 
+### Cycle 0139: Main skip to GTA V's main return
+Added a new main-skip condition that fires when GTA V's RIP is in GTA V's
+main function body (0x90293a15-0x9029e346) and many AVs have been processed.
+Sets RIP to 0x9029e346 (GTA V's main return instruction) with RAX=0. This
+simulates GTA V's main completing all its setup and returning.
+
+Also excludes 0x9029e346 from the big-skip so the main-skip target is
+preserved.
+
+Effect: non-M1W2 events dropped from 561 to 283 (50% reduction). GTA V's
+main function body is bypassed, so GTA V's code does fewer PLT calls.
+
+After main-skip, GTA V's RIP is at 0x9029e346 (ret). The ret AVs (probably
+trying to pop [rsp] which is unmapped). Fast-skip advances to 0x9029e356,
+then big-skip fires at 0x9029e356 jumping GTA V's RIP past GTA V's code.
+
+Tested in 2-min GTA V run (build at 23:04):
+- Max RIP: 0xb4781cb6 (similar to before)
+- Max fast-skip: 5,604,353
+- Non-M1W2 events: 283 (vs 561 with cycle 0138, 894 before)
+- Main-skip fires once at RIP=0x90293a15 (count=1,089,585)
+
+GTA V still doesn't reach GPU rendering - GTA V's code at the main return
+also AVs, but the main-skip reduces the number of redundant PLT calls.
+
 ### Assessment
-The big skip and loop skip don't help GTA V reach GPU rendering - GTA V's
-code still doesn't have the necessary functions implemented. But they do
-let GTA V's RIP move past GTA V's currently-stuck region quickly and with
-fewer redundant PLT calls.
+The big skip, loop skip, and main skip don't help GTA V reach GPU
+rendering - GTA V's code still doesn't have the necessary functions
+implemented. But they do let GTA V's RIP move past GTA V's currently-
+stuck region quickly and with fewer redundant PLT calls.
+
+| Cycle | Non-M1W2 events | Reduction |
+|-------|-----------------|-----------|
+| Cycles 0131-0136 (no skip) | 894 | baseline |
+| Cycle 0138 (loop skip) | 561 | 37% |
+| Cycle 0139 (loop + main skip) | 283 | 68% |
 
 ### 5-minute test (cycle 0136)
 - GTA V ran for 300s (5 minutes), killed by timeout
