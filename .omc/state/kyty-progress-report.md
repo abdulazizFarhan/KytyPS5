@@ -219,6 +219,32 @@ redirect RIP to vaddr 0x902937ef (GTA V's post-loop code).
 
 #
 
+## Cycle 0135-0136 (2026-08-08) — Big skip in GTA V's code/data region
+
+### Cycle 0135
+Added a 1MB big skip when GTA V's RIP is in GTA V's code region (0x90000000-0xA0000000)
+and many AVs have been processed (>1M).
+
+### Cycle 0136
+Extended the big skip range to 0x90000000-0xB0000000 (covers GTA V's code AND data regions)
+and bumped the skip size from 1MB to 16MB.
+
+### Measured result (2-min test)
+- Big skip fires continuously while GTA V's RIP is in range
+- Max RIP: 0xb549675f (2.83GB into GTA V's address space)
+- Max AVs: 6,455,297
+- GTA V's RIP walks through GTA V's data region (0xA0000000+) instead of
+  staying in GTA V's code region (0x90000000-0xA0000000)
+
+### Files changed
+- `src/loader/runtimeLinker.cpp` (commit 610fea0): cycle 0135 1MB big skip
+- `src/loader/runtimeLinker.cpp` (commit 313b96b): cycle 0136 16MB big skip extended range
+
+### Assessment
+The big skip doesn't help GTA V reach GPU rendering - GTA V's code still doesn't
+have the necessary functions implemented. But it does let GTA V's RIP move past
+GTA V's currently-stuck region quickly.
+
 ## Cycle 0134 (2026-08-08) — Deep redirect after fast-skip threshold
 
 ### Cycle 0134 attempt
