@@ -616,14 +616,19 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 		                               av_addr < 0x100000ULL;
 		const bool     is_dyn_mem_addr = av_addr != g_invalid_memory &&
 		                               av_addr < 0x10000000000000ULL;  // M1W2 v1.5b: extended to 256TB for GTA V sentinel table
-		const bool     is_exe_av      = info->access_violation_type == Common::HostException::AccessViolationType::Execute &&
-		                               (is_low_addr || is_dyn_mem_addr);
-		const bool     is_lo_write    = info->access_violation_type == Common::HostException::AccessViolationType::Write &&
-		                               (is_low_addr || is_dyn_mem_addr);
+		// M1W2 v1.6: GTA V's dispatch-table iterator produces sentinel values
+		// like ffff80000373fd30 (sign-extended high addresses). Catch Execute AVs at
+		// these sentinel-like addresses too so the iterator can advance past them.
+		const bool     is_high_sentinel_exe = info->access_violation_type == Common::HostException::AccessViolationType::Execute &&
+		                                       av_addr != g_invalid_memory && av_addr > 0xFFFF000000000000ULL;
+		const bool     is_exe_av            = info->access_violation_type == Common::HostException::AccessViolationType::Execute &&
+		                                       (is_low_addr || is_dyn_mem_addr || is_high_sentinel_exe);
+		const bool     is_lo_write          = info->access_violation_type == Common::HostException::AccessViolationType::Write &&
+		                                       (is_low_addr || is_dyn_mem_addr);
 		// M1W2 v1.5: Sentinel-like high addresses (negative-looking values like
 		// 0xffffffffffffff8d) are also stubs in GTA V's virtual dispatch tables.
 		const bool     is_high_sentinel = info->access_violation_type == Common::HostException::AccessViolationType::Write &&
-		                                 av_addr != g_invalid_memory && av_addr > 0xFFFFFFFF00000000ULL;
+		                                 av_addr != g_invalid_memory && av_addr > 0xFFFF000000000000ULL;
 		// M1W2 v1.5: Also catch Read AVs at the 0xffffffffffffffff sentinel
 		// (a typical "null pointer -1" that GTA V tries to dereference after
 		// M1W2 has stubbed the original sentinel table entry).
@@ -653,14 +658,22 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 					fault_ip = reinterpret_cast<uint64_t>(stack[0]) - 2;
 				}
 			}
-			LOGF("[M1W2 v1.4] av_type=%s fault_ip=%016" PRIx64 " ctx_rip=%016" PRIx64
-			     " exc_addr=%016" PRIx64 "\n",
-			     is_exe_av ? "Execute" : "Write",
-			     fault_ip,
-			     ctx == nullptr
-			         ? 0ULL
-			         : reinterpret_cast<uint64_t>(ctx->Rip),
-			     info->exception_address);
+			// M1W2 v1.6: GTA V's sentinel-table iteration triggers ~17K
+			// unique Execute AVs in a 3-minute run. Logging each one floods
+			// the log with little diagnostic value, so throttle: log the
+			// first 3 faults normally, then every 1000th, cap at 100 logs.
+			static std::atomic<uint64_t> g_m1w2_v14_av_count {0};
+			const uint64_t v14_count = g_m1w2_v14_av_count.fetch_add(1, std::memory_order_relaxed) + 1;
+			if (v14_count <= 3 || (v14_count <= 1000 * 100 && (v14_count % 1000) == 0)) {
+				LOGF("[M1W2 v1.4] av_type=%s fault_ip=%016" PRIx64 " ctx_rip=%016" PRIx64
+				     " exc_addr=%016" PRIx64 "\n",
+				     is_exe_av ? "Execute" : "Write",
+				     fault_ip,
+				     ctx == nullptr
+				         ? 0ULL
+				         : reinterpret_cast<uint64_t>(ctx->Rip),
+				     info->exception_address);
+			}
 
 			if (fault_ip != 0) {
 				// 32-byte aligned patch site (covers call + jmp [rip+rel32]
@@ -674,7 +687,10 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 				// RIP by a full 1 MB on every sentinel AV so a single fault
 				// clears the entire 71 KB table. For code-section sentinels
 				// (original v1.3 path), still NOP-out the actual call site.
-				const bool in_dyn_mem = av_addr < 0x10000000000000ULL;  // M1W2 v1.5b: 16TB
+				// M1W2 v1.6: also treat high sentinel addresses (> 0xFFFFFFFF00000000) as
+				// sentinel-table iteration - skip past them so GTA V's iterator advances.
+				const bool in_dyn_mem       = av_addr < 0x10000000000000ULL;  // M1W2 v1.5b: 16TB
+				const bool in_high_sentinel = av_addr != g_invalid_memory && av_addr > 0xFFFF000000000000ULL;
 				if ((is_invalid_read || is_heap_read) && ctx != nullptr) {
 					// GTA V tried to deref a sentinel-like address. Skip the
 					// read and return a defined value so the caller can continue.
@@ -684,7 +700,7 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 					ctx->Rip = (ctx->Rip != 0 ? ctx->Rip : fault_ip) + 16;
 					return true;
 				}
-				if (is_exe_av && in_dyn_mem && ctx != nullptr) {
+				if (is_exe_av && (in_dyn_mem || in_high_sentinel) && ctx != nullptr) {
 					// M1W2 v1.5c: GTA V iterates a huge function-pointer
 					// table across 64+ TB of virtual address space.
 					// Advance RIP by 1 GB per AV so a single fault
