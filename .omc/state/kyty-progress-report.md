@@ -318,6 +318,45 @@ code makes minimal GPU-related calls. The skip reduces PLT calls inside
 GTA V's main function but doesn't bypass GTA V's launcher which doesn't
 make GPU calls either.
 
+### Cycle 0140: PLT 0xf8 intercept (attempted + reverted)
+Attempted to detect when GTA V's RIP is at the sentinel address (high
+sentinel pattern, 0xFFFF...) and read the call return address from
+[rsp - 24]. The wrapper at 0x93076da6 does `add rsp, 8; pop rbx; pop
+ebp; jmp rax`, so the call return address is at [rsp - 24] when GTA V's
+RIP is at the sentinel. If the return address is one of GTA V's loop call
+return addresses (0x902937a2, 0x902937e2, 0x90293832, 0x90293902),
+simulate PLT 0xf8 returning 0x8002000d by setting RAX=0x8002000d and
+RIP=return_addr.
+
+Used VirtualQuery to check that [rsp - 24] is mapped before reading.
+
+Tested but found to be NON-FUNCTIONAL:
+- GTA V's RIP never reaches high sentinel addresses (0xFFFF...)
+- GTA V's RIP walks through the function pointer table at 0x371fd20-0x3731410
+- After cycle 0131 redirects to GTA V's code, GTA V's RIP enters the loop range
+- Cycle 0138/0139 chain bypasses the loops, leaving GTA V's RIP at 0x9029e346
+- GTA V's RIP walks through unmapped memory past GTA V's address space
+- High sentinel RIPs never occur because the cycle 0131 redirect jumps
+  GTA V's RIP to GTA V's code before any sentinel AV
+
+Reverted in cycle 0140b (no code changes, just the original code state).
+
+The fast-skip log confirms: 5687 fast-skip entries with RIP range
+0x372fd30 to 0xb4aa5e36 (no high sentinel addresses).
+
+### Current assessment
+The M1W2 v1.7 + cycle 0138/0139/0136 chain reduces GTA V's PLT iteration
+to a single sequence: sentinel walk → cycle 0131 redirect → cycle 0138
+loop-skip → cycle 0139 main-skip → cycle 0136 big-skip → unmapped memory.
+GTA V doesn't execute any of its main function body meaningfully.
+
+Next steps require either:
+1. Properly implementing GTA V's PLT 0xf8 function (not patching the
+   binary, but providing a real implementation in the emulator)
+2. Or finding a way to make GTA V's code skip the PLT calls entirely
+3. Or finding a different entry point into GTA V's code (e.g., GTA V's
+   launcher)
+
 ### Assessment
 The big skip, loop skip, and main skip don't help GTA V reach GPU
 rendering - GTA V's code still doesn't have the necessary functions
@@ -391,6 +430,19 @@ GTA V's post-loop code at 0x902937ef calls PLT 0x4 first, which clobbers RAX.
 - 13x more AVs processed
 - 8.5x longer runtime
 - **No GPU rendering reached yet** (still no Vulkan calls after redirect)
+
+## GTA V current status (cycle 0140)
+- GTA V RIP range: 0x372fd30 to 0xb4aa5e36 (2.5GB walk)
+- Max fast-skip entries: 5,687 in 2-min run
+- Late-sentinel events: 5,249
+- Cycle 0138 loop-skip: fires once (0x902937ef -> 0x90293a15)
+- Cycle 0139 main-skip: fires once (0x90293a15 -> 0x9029e346)
+- Cycle 0136 big-skip: fires ~32 times (covers 0x90000000-0xB029e356)
+- Non-M1W2 events: 974 (67% of baseline 894 events from cycle 0125)
+- GTA V's RIP walks through GTA V's address space then unmapped memory
+- Cycle 0140 PLT 0xf8 intercept: NON-FUNCTIONAL (GTA V's RIP never reaches
+  high sentinel addresses because cycle 0131 redirects to GTA V's code
+  before any sentinel AV); reverted
 
 ### File changed
 - `src/loader/runtimeLinker.cpp` (commit 5e9b165): cycle 0131 redirect
