@@ -765,7 +765,9 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 					// function via PLT), simulate a function return by popping the return
 					// address from the stack and setting RAX to 0. This lets GTA V's main
 					// body continue executing past unimplemented PLT calls.
-					if (fault_ip >= 0x90308e000ULL && fault_ip < 0x903090000ULL) {
+					// Cycle 0141m: Fixed range to use mapped C addresses (0x903075300-0x903077100)
+					// since GTA V's loaded memory uses mapped C for PLT entries.
+					if (fault_ip >= 0x903075300ULL && fault_ip < 0x903077100ULL) {
 						static uint64_t plt_stub_count = 0;
 						plt_stub_count++;
 						if ((plt_stub_count & 0x3FF) == 1) {
