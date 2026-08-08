@@ -472,13 +472,13 @@ static KYTY_SYSV_ABI int MtxInit(LibKernel::PthreadMutex* mtx, int type) {
 
 	constexpr int mtx_recursive = 0x100;
 	if ((type & mtx_recursive) == 0) {
-		return mtx_result(LibKernel::PthreadMutexInit(mtx, nullptr));
+		return mtx_result(LibKernel::PthreadMutexInit(mtx, nullptr, nullptr));
 	}
 
 	LibKernel::PthreadMutexattr attr   = nullptr;
 	int                         result = LibKernel::PthreadMutexattrInit(&attr);
 	result = (result == OK ? LibKernel::PthreadMutexattrSettype(&attr, 2) : result);
-	result = (result == OK ? LibKernel::PthreadMutexInit(mtx, &attr) : result);
+	result = (result == OK ? LibKernel::PthreadMutexInit(mtx, &attr, nullptr) : result);
 	(void)LibKernel::PthreadMutexattrDestroy(&attr);
 
 	return mtx_result(result);
