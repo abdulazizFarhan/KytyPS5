@@ -446,8 +446,6 @@ void CommandProcessor::FinishCommandProcessors() {
 }
 
 void CommandProcessor::Reset() {
-	BufferWait();
-
 	Common::LockGuard lock(m_mutex);
 
 	Sync::DeleteBuffers();
@@ -574,7 +572,6 @@ void CommandProcessor::WaitDeDiff(uint32_t diff) {
 
 void CommandProcessor::IncremenetDe() {
 	BufferFlush();
-	BufferWait();
 
 	m_de_counter.mutex.Lock();
 	m_de_counter.value++;
@@ -1789,7 +1786,6 @@ void CommandProcessor::TriggerEvent(uint32_t event_type, uint32_t event_index) {
 				     event_index);
 			}
 			MemoryBarrier();
-			SynchronizeGpu();
 			break;
 		// DbDataWritebackInvalidate, DbMetadataWritebackInvalidate, CbMetadataWritebackInvalidate.
 		case 0x0000002a:
