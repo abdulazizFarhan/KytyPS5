@@ -369,7 +369,16 @@ bool Audio::QueueSdlAudio(PortOut* port, const void* data, bool blocking) {
 	}
 
 	if (blocking) {
-		const auto min_queued_size = queue_size * 2u;
+		// Target ~40 ms of buffered audio so device-paced outputs never starve while
+		// still leaving SDL's queue some headroom. Two buffers is the lower bound
+		// for any port; sixteen is the practical upper bound to avoid stalling on
+		// huge grain counts. (PR #147 / upstream 66f6405)
+		constexpr uint64_t target_latency_us = 40000;
+		const auto buffer_us = port->freq != 0 ? (1000000ULL * port->samples_num) / port->freq : 0;
+		const auto buffers =
+		    buffer_us != 0 ? static_cast<uint32_t>((target_latency_us + buffer_us - 1) / buffer_us)
+		                   : 2u;
+		const auto min_queued_size = queue_size * std::clamp(buffers, 2u, 16u);
 		const auto wait_start      = LibKernel::KernelGetProcessTime();
 		while (SDL_GetQueuedAudioSize(port->audio_device) > min_queued_size) {
 			if (LibKernel::KernelGetProcessTime() - wait_start > 200000) {

@@ -466,6 +466,15 @@ int KYTY_SYSV_ABI AudioOut2ContextDestroy(AudioOut2ContextHandle ctx) {
 	PRINT_NAME();
 	LOGF("\t ctx = 0x%016" PRIx64 "\n", ctx);
 
+	// Clear the context entry BEFORE releasing the audio handles so any concurrent
+	// audioout2_find_context_locked call observes the destroyed context and refuses to
+	// touch its ports (PR #147 fix).
+	g_audioout2_context_mutex.Lock();
+	if (auto* state = audioout2_find_context_locked(ctx); state != nullptr) {
+		*state = AudioOut2ContextState {};
+	}
+	g_audioout2_context_mutex.Unlock();
+
 	std::array<int, 256> audio_handles {};
 	size_t               audio_handles_num = 0;
 
@@ -483,12 +492,6 @@ int KYTY_SYSV_ABI AudioOut2ContextDestroy(AudioOut2ContextHandle ctx) {
 	for (size_t i = 0; i < audio_handles_num; i++) {
 		audioout2_close_audio_handle(audio_handles[i]);
 	}
-
-	g_audioout2_context_mutex.Lock();
-	if (auto* state = audioout2_find_context_locked(ctx); state != nullptr) {
-		*state = AudioOut2ContextState {};
-	}
-	g_audioout2_context_mutex.Unlock();
 
 	return OK;
 }
