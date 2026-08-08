@@ -40,7 +40,10 @@ namespace Libs::Graphics {
 	EXIT("unsupported render state; details were printed above\n");
 }
 
-static VkStencilOp ConvertStencilOp(uint8_t value) {
+static VkStencilOp ConvertStencilOp(uint8_t value, uint8_t write_mask, uint8_t op_value) {
+	if (write_mask == 0) {
+		return VK_STENCIL_OP_KEEP;
+	}
 	switch (static_cast<Prospero::StencilOp>(value)) {
 		case Prospero::StencilOp::kKeep: return VK_STENCIL_OP_KEEP;
 		case Prospero::StencilOp::kZero: return VK_STENCIL_OP_ZERO;
@@ -51,7 +54,17 @@ static VkStencilOp ConvertStencilOp(uint8_t value) {
 		case Prospero::StencilOp::kInvert: return VK_STENCIL_OP_INVERT;
 		case Prospero::StencilOp::kAddWrap: return VK_STENCIL_OP_INCREMENT_AND_WRAP;
 		case Prospero::StencilOp::kSubWrap: return VK_STENCIL_OP_DECREMENT_AND_WRAP;
-		default: DepthFatal("unsupported stencil operation");
+		case Prospero::StencilOp::kXor:
+			if ((write_mask & op_value) == 0) {
+				return VK_STENCIL_OP_KEEP;
+			}
+			if ((write_mask & ~op_value) != 0) {
+				DepthFatal("unsupported stencil XOR operands: write mask=0x%02" PRIx8
+				           ", operation value=0x%02" PRIx8,
+				           write_mask, op_value);
+			}
+			return VK_STENCIL_OP_INVERT;
+		default: DepthFatal("unsupported stencil operation: 0x%02" PRIx8, value);
 	}
 }
 
@@ -332,6 +345,8 @@ void ResolveRenderDepthTarget(uint64_t submit_id, CommandBuffer* buffer, const H
 	r->stencil_clear_value  = hw.GetStencilClearValue();
 	r->stencil_test_enable  = has_stencil && dc.stencil_enable;
 	if (r->stencil_test_enable) {
+		const uint8_t front_write_mask = rc.stencil_clear_enable ? 0 : sm.stencil_writemask;
+		const uint8_t back_write_mask  = rc.stencil_clear_enable ? 0 : sm.stencil_writemask_bf;
 		if (dc.stencilfunc > static_cast<uint8_t>(VK_COMPARE_OP_ALWAYS) ||
 		    (dc.backface_enable &&
 		     dc.stencilfunc_bf > static_cast<uint8_t>(VK_COMPARE_OP_ALWAYS)) ||
@@ -343,18 +358,18 @@ void ResolveRenderDepthTarget(uint64_t submit_id, CommandBuffer* buffer, const H
 			DepthFatal("unsupported stencil compare or replacement state");
 		}
 		r->stencil_static_front = {
-		    ConvertStencilOp(sc.stencil_fail), ConvertStencilOp(sc.stencil_zpass),
-		    ConvertStencilOp(sc.stencil_zfail), static_cast<VkCompareOp>(dc.stencilfunc)};
-		r->stencil_dynamic_front = {sm.stencil_mask,
-		                            rc.stencil_clear_enable ? 0u : sm.stencil_writemask,
-		                            sm.stencil_testval};
+		    ConvertStencilOp(sc.stencil_fail, front_write_mask, sm.stencil_opval),
+		    ConvertStencilOp(sc.stencil_zpass, front_write_mask, sm.stencil_opval),
+		    ConvertStencilOp(sc.stencil_zfail, front_write_mask, sm.stencil_opval),
+		    static_cast<VkCompareOp>(dc.stencilfunc)};
+		r->stencil_dynamic_front = {sm.stencil_mask, front_write_mask, sm.stencil_testval};
 		if (dc.backface_enable) {
 			r->stencil_static_back = {
-			    ConvertStencilOp(sc.stencil_fail_bf), ConvertStencilOp(sc.stencil_zpass_bf),
-			    ConvertStencilOp(sc.stencil_zfail_bf), static_cast<VkCompareOp>(dc.stencilfunc_bf)};
-			r->stencil_dynamic_back = {sm.stencil_mask_bf,
-			                           rc.stencil_clear_enable ? 0u : sm.stencil_writemask_bf,
-			                           sm.stencil_testval_bf};
+			    ConvertStencilOp(sc.stencil_fail_bf, back_write_mask, sm.stencil_opval_bf),
+			    ConvertStencilOp(sc.stencil_zpass_bf, back_write_mask, sm.stencil_opval_bf),
+			    ConvertStencilOp(sc.stencil_zfail_bf, back_write_mask, sm.stencil_opval_bf),
+			    static_cast<VkCompareOp>(dc.stencilfunc_bf)};
+			r->stencil_dynamic_back = {sm.stencil_mask_bf, back_write_mask, sm.stencil_testval_bf};
 		} else {
 			r->stencil_static_back  = r->stencil_static_front;
 			r->stencil_dynamic_back = r->stencil_dynamic_front;
