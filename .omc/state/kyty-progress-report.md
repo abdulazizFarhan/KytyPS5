@@ -296,6 +296,28 @@ Tested in 2-min GTA V run (build at 23:04):
 GTA V still doesn't reach GPU rendering - GTA V's code at the main return
 also AVs, but the main-skip reduces the number of redundant PLT calls.
 
+### Cycle 0139: 5-min test results
+5-min GTA V test for cycle 0139 (loop + main skip):
+- Max RIP: 0xbd8d8d36 (3.20 GB, deeper into GTA V's data region)
+- Max fast-skip: 15,141,889 (5x more than 2-min test)
+- Non-M1W2 events: 283 (same as 2-min, 68% reduction from baseline)
+- GTA V ran full 5 minutes without exiting
+
+Event type breakdown:
+- Relocate: 216 (GTA V's PLT import patches)
+- PS5 NID lookups: 26
+- Vulkan: 18 (initialization)
+- Loading: 3 (libc, libSceJobManager, libSceNpCppWebApi)
+- queue: 3
+- Pthread: 2
+- Can: 3 (file errors)
+- cond: 1
+
+GTA V still doesn't reach GPU rendering - even with main skip, GTA V's
+code makes minimal GPU-related calls. The skip reduces PLT calls inside
+GTA V's main function but doesn't bypass GTA V's launcher which doesn't
+make GPU calls either.
+
 ### Assessment
 The big skip, loop skip, and main skip don't help GTA V reach GPU
 rendering - GTA V's code still doesn't have the necessary functions
