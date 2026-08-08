@@ -212,14 +212,64 @@ GTA V's code DOES create a window before exiting:
 8. GTA V enters sentinel iteration (~1.2M-2M AVs in 30-45s)
 9. GTA V's main returns 0 cleanly with no error
 
-### Current GTA V blocker
+### Current GTA V blocker (updated cycles 0129-0130)
 GTA V exits cleanly after sentinel iteration. No "INIT_CORE", "MAIN_MENU",
 "Game Init", or other init phase strings appear in the log. GTA V's main
 decides to return 0 before reaching game initialization.
 
-The exact cause of the early return is still under investigation.
-GTA V's RIP walks through 27MB of unmapped memory (sentinel range 0x368fd30
-to 0x5537d30) before main returns.
+**Updated understanding (cycle 0130)**: GTA V's RIP walks through ONLY ~10MB
+of unmapped sentinel memory (0x4000010 to 0x4a29900), not the previously
+thought 27MB range. The early return is likely GTA V's RIP hitting a `0xC3`
+(ret) byte in BSS by chance, which unwinds the stack and returns `main()`.
 
-### File changed
-- No source changes this cycle (verification only)
+### Files changed
+- `src/loader/runtimeLinker.cpp` (commit 2eab3ed): cycle 0129 late-sentinel log
+- `src/loader/runtimeLinker.cpp` (commit a05fd2f): cycle 0129 code-region log
+- `src/loader/runtimeLinker.cpp` (commit 063edd2): cycle 0130 threshold fix
+
+
+## Cycle 0129-0130 (2026-08-08) — M1W2 v1.7 late-sentinel threshold discovery
+
+### Investigation (cycle 0129)
+Added `late-sentinel` and `code-region` debug logs to M1W2 v1.7 to track
+where GTA V's RIP exits the sentinel iteration and whether it returns to
+GTA V's mapped code region.
+
+Initial thresholds:
+- late-sentinel: `fault_ip > 0x55400000` (above observed sentinel max)
+- code-region: `fault_ip >= 0x900000000` (GTA V's code base)
+
+Both logs did NOT fire in initial tests. Investigated further by lowering
+the late-sentinel threshold.
+
+### Investigation (cycle 0130)
+- Lowered late-sentinel threshold to `0x4000000` (above GTA V's main code at
+  `0x2900000`)
+- Added `total` counter to track all late-sentinel events (throttled to
+  first 5 + every 1000th)
+- Switched from `LOGF` to `printf` + `fflush` for immediate visibility
+  (reverted later to avoid runtime overhead)
+- Discovered **critical bug**: initial threshold `0x55400000` was actually
+  ABOVE GTA V's RIP exit range. `0x55400000 > 0x4a30000` in DECIMAL comparison
+  makes the threshold unreachable.
+
+### Measured result (cycle 0130, 5-min test, threshold=0x4000000)
+- **666,000 late-sentinel events** in 40 seconds
+- GTA V's RIP walked from `0x4000010` to `0x4a29900` (only ~10MB range)
+- NOT the previously-thought 27MB range
+- GTA V's main exited naturally at fast-skip count ~1.17M
+- Max RIP `0x4a29900` is well below GTA V's code region `0x900000000+`
+
+### Updated understanding of GTA V behavior
+GTA V's RIP walks through ~10MB of unmapped sentinel memory (0x4000000 to
+0x4a30000) and then exits naturally. The natural exit is likely GTA V's RIP
+hitting a `0xC3` (ret) byte in BSS or mapped memory by chance, which returns
+up through GTA V's stack and eventually `main()` returns 0.
+
+This is a much smaller and more localized iteration than previously assumed.
+
+### Files changed
+- `src/loader/runtimeLinker.cpp` (commit 063edd2):
+  - Lowered late-sentinel threshold to `0x4000000`
+  - Added `total` counter
+  - Throttled logging (first 5 + every 1000th)
