@@ -743,6 +743,10 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 					// which is iterating through sentinel addresses. After advance, GTA V's
 					// RIP might land in unmapped memory (which fast-skip continues to handle)
 					// or in GTA V's mapped code (which GTA V might execute).
+					// Cycle 0136: Big skip in GTA V's code/data region
+					// (Cycle 0137 loop-exit redirect was reverted - it didn't help GTA V
+					// progress because GTA V's code after the loops also calls PLT functions
+					// that AV. The big skip is the simpler mechanism.)
 					if (fault_ip >= 0x90000000ULL && fault_ip < 0xB0000000ULL &&
 					    fast_skip_count > 1000000ULL) {
 						static uint64_t big_skip_count = 0;
