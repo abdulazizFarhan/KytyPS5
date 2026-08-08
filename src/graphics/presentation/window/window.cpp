@@ -1,4 +1,5 @@
 #include "graphics/presentation/window.h"
+#include "kytyGitVersion.h"
 
 #include "SDL.h"
 #include "SDL_error.h"
@@ -1146,7 +1147,7 @@ void WindowUpdateTitle() {
 	static bool has_app_ver =
 	    Loader::SystemContentParamSfoGetString("APP_VER", app_ver, sizeof(app_ver));
 
-	auto fps = fmt::format("{}{}{}{}{}{}[{}] [{}], frame: {}, fps: {:f}", (has_title ? title : ""),
+	auto fps = fmt::format("[{}] {}{}{}{}{}{}[{}] [{}], frame: {}, fps: {:f}", KYTY_BUILD_LABEL, (has_title ? title : ""),
 	                       (has_title ? ", " : ""), (has_title_id ? title_id : ""),
 	                       (has_title_id ? ", " : ""), (has_app_ver ? app_ver : ""),
 	                       (has_app_ver ? " " : ""), g_window_ctx->device_name,
