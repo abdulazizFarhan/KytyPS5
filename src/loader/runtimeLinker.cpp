@@ -748,8 +748,8 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 					// outer loops all exiting at once. GTA V's main can then continue past
 					// the loops to do more setup.
 					// Excluded from the big skip below so the loop skip can fire first.
-					if (fault_ip >= 0x90293760ULL && fault_ip < 0x90293a00ULL &&
-					    fast_skip_count > 1000000ULL) {
+					if (fault_ip >= 0x90293760ULL && fault_ip < 0x90293a00ULL && fault_ip >= 0x90293760ULL && fault_ip < 0x90293a00ULL &&
+						    fast_skip_count > 1000000ULL) {
 						static uint64_t loop_skip_count = 0;
 						loop_skip_count++;
 						if (loop_skip_count == 1) {
@@ -760,12 +760,30 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 						ctx->Rax = 0x8002000dULL;
 						return true;
 					}
+					// M1W2 v1.7 cycle 0141h: GTA V PLT stub
+					// When GTA V's RIP is in a PLT entry (trying to call an unimplemented
+					// function via PLT), simulate a function return by popping the return
+					// address from the stack and setting RAX to 0. This lets GTA V's main
+					// body continue executing past unimplemented PLT calls.
+					if (fault_ip >= 0x90308e000ULL && fault_ip < 0x903090000ULL) {
+						static uint64_t plt_stub_count = 0;
+						plt_stub_count++;
+						if ((plt_stub_count & 0x3FF) == 1) {
+							LOGF("[M1W2 v1.7 cycle0141h] plt-stub #%" PRIu64 " at [%016" PRIx64 "] RSP=%016" PRIx64 "\n",
+							     plt_stub_count, fault_ip, ctx->Rsp);
+						}
+						uint64_t ret_addr = *reinterpret_cast<uint64_t*>(ctx->Rsp);
+						ctx->Rsp += 8;
+						ctx->Rip = ret_addr;
+						ctx->Rax = 0;
+						return true;
+					}
 					// Cycle 0139: When GTA V's RIP is in GTA V's post-loop main function
 					// (0x90293a15-0x9029e346), jump to GTA V's main return at 0x9029e346
 					// with RAX=0. This simulates GTA V's main completing all its setup
 					// and returning. GTA V's launcher might continue when GTA V's main returns.
-					if (fault_ip >= 0x90293a15ULL && fault_ip < 0x9029e346ULL &&
-					    fast_skip_count > 1000000ULL) {
+					if (fault_ip >= 0x90293a15ULL && fault_ip < 0x9029e346ULL && fault_ip >= 0x90293a15ULL && fault_ip < 0x9029e346ULL &&
+						    fast_skip_count > 1000000ULL) {
 						static uint64_t main_skip_count = 0;
 						main_skip_count++;
 						if (main_skip_count == 1) {
@@ -784,7 +802,10 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 					if (fault_ip >= 0x90000000ULL && fault_ip < 0x10000000000ULL &&
 					    fault_ip != 0x90293a15ULL &&  // Don't skip the loop-skip target
 					    fault_ip != 0x9029e346ULL &&  // Don't skip the main-skip target
-					    fast_skip_count > 1000000ULL) {
+	fault_ip >= 0x90000000ULL && fault_ip < 0x10000000000ULL &&
+						    fault_ip != 0x90293a15ULL &&  // Don't skip the loop-skip target
+						    fault_ip != 0x9029e346ULL &&  // Don't skip the main-skip target
+						    fast_skip_count > 1000000ULL) {
 						static uint64_t big_skip_count = 0;
 						big_skip_count++;
 						if ((big_skip_count & 0xFF) == 1) {
