@@ -156,3 +156,30 @@ GTA V still exits cleanly in 60s with no GPU work.
 
 ### File changed
 - `src/kernel/memory.cpp` (modified then reverted, no commit)
+
+## Cycle 0127 (2026-08-08) — M1W2 v1.7 log message fix + re-verification
+
+### Discovery
+The M1W2 log messages in runtimeLinker.cpp said "v1.5" even though the
+logic was v1.7. This made the log confusing - showing v1.5 labels but
+running v1.7 logic.
+
+### Fix
+Updated log message format strings:
+- "[M1W2 v1.5] fast-skip #..." → "[M1W2 v1.7] fast-skip #..."
+- "[M1W2 v1.5] illegal-instruction skip at [...]" → "[M1W2 v1.7] ..."
+- Updated M1W2 v1.5 comment block to explain why v1.7 changed from 1GB
+  to 16 bytes advance
+
+### Re-verification (GTA V PPSA04264)
+Rebuilt and re-tested with the new log message format:
+- Runtime: 31 seconds (was 60s with old binary)
+- Exit code: 0 (clean exit)
+- Log size: 192,660 bytes (188KB, was 199KB)
+- M1W2 v1.7 fast-skips: 1,655 (max count 1,689,601)
+- 0 M1W2 v1.5 log lines (all converted to v1.7)
+- Vulkan initialized for GTA V: NVIDIA GeForce GTX 1650 SUPER
+- Same event profile as cycle 0125 (no new stages reached)
+
+### File changed
+- `src/loader/runtimeLinker.cpp` (commit f0629f3): log message format strings
