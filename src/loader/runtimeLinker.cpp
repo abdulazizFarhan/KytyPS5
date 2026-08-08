@@ -720,6 +720,22 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 					// instead of 1GB. Let GTA V's post-call code execute so its
 					// outer loop can naturally terminate when it reaches its iteration
 					// count or finds a real (non-sentinel) entry.
+					// Cycle 0131: When GTA V's RIP approaches the natural exit point
+					// (~0x4a30000), redirect RIP to GTA V's post-loop code at
+					// vaddr 0x902937ef (file offset 0x2937ef). This lets GTA V's
+					// outer loop epilogue execute on real code instead of in the
+					// unmapped range, potentially avoiding the early main() return.
+					if (fault_ip > 0x49a0000ULL && fault_ip < 0x50000000ULL) {
+						static uint64_t redirect_count = 0;
+						redirect_count++;
+						if (redirect_count <= 5) {
+							LOGF("[M1W2 v1.7 cycle0131] redirect RIP=%016" PRIx64 " to 0x902937ef (count=%" PRIu64 ")\n",
+							     fault_ip, fast_skip_count);
+						}
+						ctx->Rip = 0x902937efULL;
+						ctx->Rax = 0;
+						return true;
+					}
 					ctx->Rip = fault_ip + 16;
 					ctx->Rax = 0;
 					// Cycle 0130 debug: log AVs above 0x4000000 with throttle
