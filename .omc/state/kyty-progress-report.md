@@ -183,3 +183,43 @@ Rebuilt and re-tested with the new log message format:
 
 ### File changed
 - `src/loader/runtimeLinker.cpp` (commit f0629f3): log message format strings
+
+## Cycle 0128 (2026-08-08) — 5-min verification + GTA V window creation observed
+
+### Re-verification (cycle 0127 binary, 5-min test)
+- Runtime: 45 seconds (vs 31s for 2-min test - timing variation)
+- Exit code: 0 (clean exit)
+- Log size: 167,856 bytes (164 KB)
+- M1W2 v1.7 fast-skips: 1,187 logged (max count 1,214,465)
+- M1W2 v1.4 patches: 106 (3 NULL writes, 103 Execute AVs)
+- Same event profile as 2-min test (891 non-M1W2 events)
+
+### GTA V WindowCreate observation
+GTA V's code DOES create a window before exiting:
+- "WindowCreate(): width = 1280, height = 720"
+- This happens BEFORE Vulkan init and BEFORE sentinel iteration
+- GTA V opens a 720p window then continues to sentinel iteration
+- Fork's Vulkan subsystem IS initialized for GTA V (NVIDIA GTX 1650 SUPER)
+
+### GTA V behavior summary (cycles 0125-0128)
+1. Fork's GTA V loader initializes
+2. GTA V opens 1280x720 window
+3. GTA V patches 167 fs:[0x28] TLS addresses
+4. Fork's Vulkan subsystem initializes (47 lines of Vulkan init)
+5. GTA V creates 8 semaphores (max 32767 each)
+6. GTA V allocates 800MB memory at 0x0 (backing-unavailable)
+7. GTA V does 3 NULL pointer Write AVs (NOP-patched by M1W2 v1.4)
+8. GTA V enters sentinel iteration (~1.2M-2M AVs in 30-45s)
+9. GTA V's main returns 0 cleanly with no error
+
+### Current GTA V blocker
+GTA V exits cleanly after sentinel iteration. No "INIT_CORE", "MAIN_MENU",
+"Game Init", or other init phase strings appear in the log. GTA V's main
+decides to return 0 before reaching game initialization.
+
+The exact cause of the early return is still under investigation.
+GTA V's RIP walks through 27MB of unmapped memory (sentinel range 0x368fd30
+to 0x5537d30) before main returns.
+
+### File changed
+- No source changes this cycle (verification only)
