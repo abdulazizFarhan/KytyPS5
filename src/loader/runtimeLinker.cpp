@@ -787,10 +787,10 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 						static uint64_t main_skip_count = 0;
 						main_skip_count++;
 						if (main_skip_count == 1) {
-							LOGF("[M1W2 v1.7 cycle0139] main-skip #%" PRIu64 " RIP=%016" PRIx64 " -> 0x900307B00 with RAX=0 (count=%" PRIu64 ")\n",
+							LOGF("[M1W2 v1.7 cycle0139] main-skip #%" PRIu64 " RIP=%016" PRIx64 " -> 0x900000089 with RAX=0 (count=%" PRIu64 ")\n",
 							     main_skip_count, fault_ip, fast_skip_count);
 						}
-						ctx->Rip = 0x900307B00ULL;
+						ctx->Rip = 0x900000089ULL;
 						ctx->Rax = 0;
 						return true;
 					}
@@ -802,9 +802,6 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 					if (fault_ip >= 0x90000000ULL && fault_ip < 0x10000000000ULL &&
 					    fault_ip != 0x90293a15ULL &&  // Don't skip the loop-skip target
 					    fault_ip != 0x9029e346ULL &&  // Don't skip the main-skip target
-	fault_ip >= 0x90000000ULL && fault_ip < 0x10000000000ULL &&
-						    fault_ip != 0x90293a15ULL &&  // Don't skip the loop-skip target
-						    fault_ip != 0x9029e346ULL &&  // Don't skip the main-skip target
 						    fast_skip_count > 1000000ULL) {
 						static uint64_t big_skip_count = 0;
 						big_skip_count++;
