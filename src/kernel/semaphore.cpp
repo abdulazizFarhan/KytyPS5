@@ -9,6 +9,7 @@
 #include "libs/libs.h"
 
 #include <algorithm>
+#include <atomic>
 #include <limits>
 #include <unordered_map>
 #include <vector>
@@ -44,6 +45,13 @@ public:
 	}
 
 	[[nodiscard]] const std::string& GetName() const { return m_name; }
+
+	// Poll counter used by KernelPollSema to throttle its LOGF output (see comment
+	// there). Atomic because Poll can be entered from multiple guest threads (rare
+	// but the headers say nothing prevents it; e.g. a game with several
+	// GPU-command-producer threads each calling sceKernelPollSema). Public so
+	// the free function KernelPollSema can update it without a getter.
+	std::atomic<uint64_t> m_poll_count = 0;
 
 private:
 	enum class Status { Set, Deleted };
@@ -96,6 +104,12 @@ KernelSemaPrivate::~KernelSemaPrivate() {
 		Common::Thread::SleepMicro(10);
 		m_mutex.Lock();
 	}
+
+	// Final poll tally at teardown. Mirrors the Signal() summary above.
+	if (m_poll_count.load(std::memory_order_relaxed) > 3) {
+		LOGF("\t Semaphore deleted after %" PRIu64 " polls: %s\n", m_poll_count.load(std::memory_order_relaxed),
+		     m_name.c_str());
+	}
 }
 
 KernelSemaPrivate::Result KernelSemaPrivate::Cancel(int set_count, int* num_waiting_threads) {
@@ -126,6 +140,13 @@ KernelSemaPrivate::Result KernelSemaPrivate::Cancel(int set_count, int* num_wait
 
 	m_cond_var.SignalAll();
 
+	// Final poll tally when a waiter was canceled out (rare; usually games use Signal
+	// or Delete instead). Mirrors the Signal()/destructor summaries.
+	if (m_poll_count.load(std::memory_order_relaxed) > 3) {
+		LOGF("\t Semaphore cancel after %" PRIu64 " polls: %s\n", m_poll_count.load(std::memory_order_relaxed),
+		     m_name.c_str());
+	}
+
 	return Result::Ok;
 }
 
@@ -141,6 +162,13 @@ KernelSemaPrivate::Result KernelSemaPrivate::Signal(int signal_count) {
 	}
 
 	m_count += signal_count;
+
+	// If the polling side was being throttled, surface a final tally now so the log
+	// shows the full poll count for the lifetime of this semaphore.
+	if (m_poll_count.load(std::memory_order_relaxed) > 3) {
+		LOGF("\t Semaphore signal after %" PRIu64 " polls: %s\n", m_poll_count.load(std::memory_order_relaxed),
+		     m_name.c_str());
+	}
 
 	WakeWaiters();
 
@@ -315,7 +343,23 @@ int KYTY_SYSV_ABI KernelPollSema(KernelSema sem, int need) {
 		return KERNEL_ERROR_ESRCH;
 	}
 
-	LOGF("\t Semaphore poll: %s, %d\n", sem->GetName().c_str(), need);
+	// Throttle the per-poll LOGF: GTA V's main render thread polls a never-signaling
+	// semaphore ~150K times in 5 minutes, which fills the log with hundreds of MB of
+	// "Semaphore poll: <name>, <need>" lines and drowns out all other diagnostics.
+	// We keep the first few calls visible so the polling pattern is still observable,
+	// then sample one in every kPollThrottleStride calls. A final tally prints when
+	// the semaphore is signaled, canceled, or destroyed (see KernelSignalSema /
+	// KernelCancelSema / ~KernelSemaPrivate below).
+	const uint64_t poll_id = sem->m_poll_count.fetch_add(1, std::memory_order_relaxed);
+	const uint64_t kPollLogFirst   = 3;
+	const uint64_t kPollLogStride  = 1000;
+	const uint64_t kPollLogCap     = 100;
+	const bool log_poll = (poll_id < kPollLogFirst) ||
+	                      (poll_id < kPollLogFirst + kPollLogStride * kPollLogCap &&
+	                       (poll_id - kPollLogFirst) % kPollLogStride == 0);
+	if (log_poll) {
+		LOGF("\t Semaphore poll: %s, %d\n", sem->GetName().c_str(), need);
+	}
 
 	auto result = sem->Poll(need);
 
