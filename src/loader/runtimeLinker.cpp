@@ -769,10 +769,10 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 						static uint64_t main_skip_count = 0;
 						main_skip_count++;
 						if (main_skip_count == 1) {
-							LOGF("[M1W2 v1.7 cycle0139] main-skip #%" PRIu64 " RIP=%016" PRIx64 " -> 0x9029e346 with RAX=0 (count=%" PRIu64 ")\n",
+							LOGF("[M1W2 v1.7 cycle0139] main-skip #%" PRIu64 " RIP=%016" PRIx64 " -> 0x9002854e1 with RAX=0 (count=%" PRIu64 ")\n",
 							     main_skip_count, fault_ip, fast_skip_count);
 						}
-						ctx->Rip = 0x9029e346ULL;
+						ctx->Rip = 0x9002854e1ULL;
 						ctx->Rax = 0;
 						return true;
 					}
@@ -1503,6 +1503,41 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 				}
 			}
 			LOGF("Patch PLT 0xf8: %" PRIu64 " sites\n", static_cast<uint64_t>(plt_patch_count));
+		}
+	}
+	// M1W2 v1.7 cycle 0141e: GTA V's main epilogue patch
+	// Replace the ret in GTA V's main epilogue with "jmp -2" to prevent
+	// GTA V's main from returning to the emulator's launcher (which crashes).
+	// Unique 32-byte pattern identifies GTA V's main function epilogue:
+	//   cmp rax, [rsp+0x280]; jne +X; mov eax, r15d; lea rsp, [rbp-0x28];
+	//   pop rbx, pop r12-r15, pop rbp; ret
+	{
+		const std::string epi_program_name = Common::PathToString(program->file_name);
+		if (epi_program_name.find("gtav") != std::string::npos) {
+			constexpr uint8_t epi_pattern[32] = {
+				0x48, 0x3b, 0x84, 0x24, 0x80, 0x02, 0x00, 0x00,
+				0x0f, 0x85, 0x1d, 0x03, 0x00, 0x00,
+				0x44, 0x89, 0xf8,
+				0x48, 0x8d, 0x65, 0xd8,
+				0x5b, 0x41, 0x5c, 0x41, 0x5d, 0x41, 0x5e, 0x41, 0x5f, 0x5d,
+				0xc3
+			};
+			size_t epi_count = 0;
+			auto* epi_start = reinterpret_cast<uint8_t*>(address);
+			auto* epi_end   = epi_start + size - 32;
+			for (auto* ptr = epi_start; ptr <= epi_end; ptr++) {
+				if (memcmp(ptr, epi_pattern, 32) == 0) {
+					// Replace ret (last 2 bytes) with jmp -2 (eb fe)
+					ptr[30] = 0xeb;
+					ptr[31] = 0xfe;
+					epi_count++;
+					LOGF("Patch GTA V main epilogue at 0x%" PRIx64 " (ret->jmp-2)\n",
+					     reinterpret_cast<uint64_t>(ptr));
+				}
+			}
+			if (epi_count > 0) {
+				LOGF("Patch GTA V main epilogue: %" PRIu64 " sites\n", static_cast<uint64_t>(epi_count));
+			}
 		}
 	}
 }
