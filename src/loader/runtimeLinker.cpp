@@ -743,11 +743,30 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 					// which is iterating through sentinel addresses. After advance, GTA V's
 					// RIP might land in unmapped memory (which fast-skip continues to handle)
 					// or in GTA V's mapped code (which GTA V might execute).
+					// Cycle 0138: When GTA V's RIP is in GTA V's loop range (0x90293760-0x90293a00),
+					// jump past the loop range with RAX=0x8002000d. This simulates GTA V's
+					// outer loops all exiting at once. GTA V's main can then continue past
+					// the loops to do more setup.
+					// Excluded from the big skip below so the loop skip can fire first.
+					if (fault_ip >= 0x90293760ULL && fault_ip < 0x90293a00ULL &&
+					    fast_skip_count > 1000000ULL) {
+						static uint64_t loop_skip_count = 0;
+						loop_skip_count++;
+						if ((loop_skip_count & 0xFF) == 1) {
+							LOGF("[M1W2 v1.7 cycle0138] loop-skip #%" PRIu64 " RIP=%016" PRIx64 " -> 0x90293a15 with RAX=0x8002000d (count=%" PRIu64 ")\n",
+							     loop_skip_count, fault_ip, fast_skip_count);
+						}
+						ctx->Rip = 0x90293a15ULL;  // After the je at 0x90293a0f, in GTA V's post-loop code
+						ctx->Rax = 0x8002000dULL;
+						return true;
+					}
 					// Cycle 0136: Big skip in GTA V's code/data region
 					// (Cycle 0137 loop-exit redirect was reverted - it didn't help GTA V
 					// progress because GTA V's code after the loops also calls PLT functions
 					// that AV. The big skip is the simpler mechanism.)
+					// (Cycle 0138 loop-skip fires before this for the loop range)
 					if (fault_ip >= 0x90000000ULL && fault_ip < 0xB0000000ULL &&
+					    fault_ip != 0x90293a15ULL &&  // Don't skip the loop-skip target
 					    fast_skip_count > 1000000ULL) {
 						static uint64_t big_skip_count = 0;
 						big_skip_count++;
