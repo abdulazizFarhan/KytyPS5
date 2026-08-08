@@ -743,15 +743,15 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 					// which is iterating through sentinel addresses. After advance, GTA V's
 					// RIP might land in unmapped memory (which fast-skip continues to handle)
 					// or in GTA V's mapped code (which GTA V might execute).
-					if (fault_ip >= 0x90000000ULL && fault_ip < 0xA0000000ULL &&
+					if (fault_ip >= 0x90000000ULL && fault_ip < 0xB0000000ULL &&
 					    fast_skip_count > 1000000ULL) {
 						static uint64_t big_skip_count = 0;
 						big_skip_count++;
 						if ((big_skip_count & 0xFF) == 1) {
-							LOGF("[M1W2 v1.7 cycle0135] big-skip #%" PRIu64 " RIP=%016" PRIx64 " -> +1MB (count=%" PRIu64 ")\n",
+							LOGF("[M1W2 v1.7 cycle0136] big-skip #%" PRIu64 " RIP=%016" PRIx64 " -> +16MB (count=%" PRIu64 ")\n",
 							     big_skip_count, fault_ip, fast_skip_count);
 						}
-						ctx->Rip = fault_ip + 0x100000ULL;  // +1MB
+						ctx->Rip = fault_ip + 0x1000000ULL;  // +16MB
 						ctx->Rax = 0;
 						return true;
 					}
