@@ -666,13 +666,14 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 			const uint64_t v14_count = g_m1w2_v14_av_count.fetch_add(1, std::memory_order_relaxed) + 1;
 			if (v14_count <= 3 || (v14_count <= 1000 * 100 && (v14_count % 1000) == 0)) {
 				LOGF("[M1W2 v1.4] av_type=%s fault_ip=%016" PRIx64 " ctx_rip=%016" PRIx64
-				     " exc_addr=%016" PRIx64 "\n",
+				     " exc_addr=%016" PRIx64 " av_addr=%016" PRIx64 "\n",
 				     is_exe_av ? "Execute" : "Write",
 				     fault_ip,
 				     ctx == nullptr
 				         ? 0ULL
 				         : reinterpret_cast<uint64_t>(ctx->Rip),
-				     info->exception_address);
+				     info->exception_address,
+				     info->access_violation_vaddr);
 			}
 
 			if (fault_ip != 0) {
@@ -713,11 +714,11 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 					if ((fast_skip_count & 0x3FF) == 1) {
 						LOGF("[M1W2 v1.5] fast-skip #%" PRIu64 " at [%016" PRIx64 "]\n", fast_skip_count, fault_ip);
 					}
-					uint64_t skip_amount = 0x40000000ULL;  // 1 GB
-					if (fault_ip > 0x10000000000000ULL - skip_amount) {
-						skip_amount = 0x4000000ULL;  // 64 MB if near 256 TB top
-					}
-					ctx->Rip = fault_ip + skip_amount;
+					// M1W2 v1.7: advance RIP by 16 bytes (past the failing call)
+					// instead of 1GB. Let GTA V's post-call code execute so its
+					// outer loop can naturally terminate when it reaches its iteration
+					// count or finds a real (non-sentinel) entry.
+					ctx->Rip = fault_ip + 16;
 					ctx->Rax = 0;
 					return true;
 				}
