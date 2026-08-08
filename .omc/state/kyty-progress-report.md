@@ -775,6 +775,72 @@ By patching the ret to jmp -2:
   from 0x9029e346 to 0x9002854e1 (the actual epilogue)
 
 
+
+### 5-minute test verification (2026-08-09)
+
+Re-ran cycle 0141e with the 5-minute test to verify stability over
+longer periods. Result:
+
+**Test outcome:**
+- Ran for full 5 minutes (timeout exit)
+- No ucrtbase crash
+- No native AV
+- GTA V's main-skip fired once, redirected to patched epilogue
+- GTA V's RIP entered infinite loop in epilogue
+- Emulator stable throughout
+
+**Comparison vs 2-minute test:**
+| Metric | 2-min | 5-min | Note |
+|---|---|---|---|
+| ucrtbase crash | NO | NO | Fixed! |
+| GTA V RIP stuck | epilogue | epilogue | Infinite loop |
+| Emulator exit | clean timeout | clean timeout | Both stable |
+| Fast-skips | ~1.1M | ~1.1M | Same pattern |
+
+**Conclusion:** Cycle 0141e is stable for at least 5 minutes. The
+ucrtbase crash is permanently fixed. GTA V does NOT progress further
+(stuck in infinite loop at patched epilogue).
+
+### Attempted alternative: cycle 0141f (REVERTED)
+
+Tried changing cycle 0139 main-skip target from 0x9002854e1 (patched
+epilogue) to 0x90027ad0c (GTA V's launcher continuation code).
+
+**Hypothesis:** Skip GTA V's main entirely and go directly to the
+launcher's post-main code, which is what runs after GTA V's main
+returns.
+
+**Test result:**
+- GTA V's launcher continuation executes for ~200 bytes
+- Then AV at [ffffffffffffffb8] (NULL-8)
+- guest r14 = 0 (GTA V's main didn't set it up)
+- The launcher's continuation does `mov rdi, r14` then calls a function
+- The function AVs because rdi is NULL
+
+**Conclusion:** Skipping GTA V's main doesn't work because the
+launcher's continuation code expects r14 to be set up by GTA V's main
+(presumably to argv or some other pointer). Without GTA V's main
+running, the state is missing.
+
+**Action:** REVERTED cycle 0141f. Back to cycle 0141e (infinite loop).
+
+### Next steps
+
+1. **Find a way to make GTA V's main actually do something useful**:
+   - Option A: Implement more PLT functions (hard, requires understanding
+     GTA V's needs)
+   - Option B: Find more "loop skip" patterns in GTA V's main body
+   - Option C: Find a different way to skip GTA V's main
+
+2. **Investigate GTA V's main body (file offsets 0x293a15-0x29e346)**:
+   - This is 112KB of code that GTA V's main executes after the loops
+   - Identify what functions it calls and which ones need patching
+
+3. **Investigate GTA V's PLT entries**:
+   - GTA V's main body calls many PLT functions
+   - Find which PLT entries need patching (like PLT 0xf8)
+
+
 ## GTA V current status (cycle 0141d)
 - **CYCLE 0141c PATCH IS WORKING** - 4 PLT 0xf8 call sites patched
 - GTA V RIP range: 0x4000010 to 0xba3a5e36 (after main return)
