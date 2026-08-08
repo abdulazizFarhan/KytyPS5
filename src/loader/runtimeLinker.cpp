@@ -729,6 +729,17 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 						LOGF("[M1W2 v1.7 late-sentinel] RIP=%016" PRIx64 " count=%" PRIu64 "\n",
 						     fault_ip, fast_skip_count);
 					}
+					// Cycle 0129: log when GTA V's RIP returns to GTA V's mapped code region
+					// (0x900000000+ = code base, 0x800000000+ = data base)
+					// This signals that GTA V's RIP left the sentinel iteration
+					if (fault_ip >= 0x900000000ULL && fault_ip < 0xA00000000ULL) {
+						static std::atomic<uint64_t> code_av_count {0};
+						uint64_t n = code_av_count.fetch_add(1) + 1;
+						if (n <= 10) {
+							LOGF("[M1W2 v1.7 code-region] RIP=%016" PRIx64 " count=%" PRIu64 " fast_skip=%" PRIu64 "\n",
+							     fault_ip, n, fast_skip_count);
+						}
+					}
 					return true;
 				}
 				const auto patch_addr = fault_ip & ~0x1F;
