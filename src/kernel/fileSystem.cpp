@@ -224,6 +224,32 @@ void MountPoints::Umount(const std::string& folder_or_point) {
 	}
 }
 
+// Encode characters that are valid in FreeBSD/PS5 file names but invalid on Windows hosts.
+// We use percent-encoding so the mapping is deterministic and collision-free.
+// (Issue #141: Arcade Spirits save corruption.)
+static std::string EncodeHostPathSegment(const std::string& input) {
+#if KYTY_PLATFORM == KYTY_PLATFORM_WINDOWS
+	std::string out;
+	out.reserve(input.size());
+	for (unsigned char ch : input) {
+		switch (ch) {
+			case '%': out += "%25"; break;
+			case ':': out += "%3A"; break;
+			case '*': out += "%2A"; break;
+			case '?': out += "%3F"; break;
+			case '"': out += "%22"; break;
+			case '<': out += "%3C"; break;
+			case '>': out += "%3E"; break;
+			case '|': out += "%7C"; break;
+			default: out += static_cast<char>(ch); break;
+		}
+	}
+	return out;
+#else
+	return input;
+#endif
+}
+
 std::filesystem::path MountPoints::GetRealFilename(const std::string& mounted_file_name) {
 	Common::LockGuard lock(m_mutex);
 
@@ -241,10 +267,7 @@ std::filesystem::path MountPoints::GetRealFilename(const std::string& mounted_fi
 			rel_path = Common::RemoveFirst(rel_path, 1);
 		}
 #if KYTY_PLATFORM == KYTY_PLATFORM_WINDOWS
-		if (rel_path.find_first_of("<>:\"|?*") != std::string::npos) {
-			::printf("FileSystem: Windows-incompatible guest filename: %s\\n",
-			         mounted_file_name.c_str());
-		}
+		rel_path = EncodeHostPathSegment(rel_path);
 #endif
 		return p.dir / rel_path;
 	}
@@ -267,6 +290,9 @@ std::filesystem::path MountPoints::GetRealDirectory(const std::string& mounted_d
 		while (Common::StartsWith(rel_path, '/')) {
 			rel_path = Common::RemoveFirst(rel_path, 1);
 		}
+#if KYTY_PLATFORM == KYTY_PLATFORM_WINDOWS
+		rel_path = EncodeHostPathSegment(rel_path);
+#endif
 		return p.dir / rel_path;
 	}
 
