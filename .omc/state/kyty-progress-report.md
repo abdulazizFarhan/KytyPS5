@@ -245,6 +245,14 @@ The big skip doesn't help GTA V reach GPU rendering - GTA V's code still doesn't
 have the necessary functions implemented. But it does let GTA V's RIP move past
 GTA V's currently-stuck region quickly.
 
+### 5-minute test (cycle 0136)
+- GTA V ran for 300s (5 minutes), killed by timeout
+- Max RIP: 0xbde34edf (3.11GB into GTA V's address space)
+- Max fast-skip: 15,488,001 (15.5M AVs - 13x more than before redirect)
+- Non-M1W2 events: 894 (same as 2-min test - no new events)
+- 187 PS5 NID fallback events for Graphics5 functions (NID lookups, not actual calls)
+- 0 sceGnm/sceVideo/sceKernelGnm function calls (GTA V doesn't reach GPU init)
+
 ## Cycle 0134 (2026-08-08) — Deep redirect after fast-skip threshold
 
 ### Cycle 0134 attempt
