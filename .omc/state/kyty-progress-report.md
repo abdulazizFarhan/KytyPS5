@@ -432,6 +432,9 @@ GTA V's post-loop code at 0x902937ef calls PLT 0x4 first, which clobbers RAX.
 - **No GPU rendering reached yet** (still no Vulkan calls after redirect)
 - **Cycle 0141e**: GTA V's main epilogue patched (ret -> jmp-2) - eliminates ucrtbase crash
 - **Cycle 0141h**: PLT stub + PLT 0x24 patch added as infrastructure (not yet effective)
+- **Cycle 0141i**: cycle 0139 redirect to GTA V launcher continuation (0x900000089) - launcher runs cleanly
+- **Cycle 0141j**: tried GTA V main target (0x90398800) - GTA V's RIP got lost in mapped memory
+- **Cycle 0141k**: reverted to launcher continuation target - clean exit
 
 ## Cycle 0141 (2026-08-08) — M1W2 v1.7 GTA V PLT 0xf8 patch
 
@@ -994,6 +997,88 @@ RIP doesn't naturally reach it without a waypoint.
 ### Files changed
 - `src/loader/runtimeLinker.cpp` (commit 64801ea): cycle 0141h PLT stub + PLT 0x24 patch range fix
 
+
+## Cycle 0141i (2026-08-09) — M1W2 v1.7 cycle 0139 redirect to launcher continuation
+
+### Investigation
+Changed cycle 0139 main-skip target from 0x9002854e1 (patched epilogue) to
+0x900000089 (GTA V's launcher continuation, file offset 0x18ed9).
+
+This lets GTA V's main return to GTA V's launcher code, which calls PLT
+functions. The PLT functions AV in ucrtbase.dll, but M1W2 v1.4 patches
+the AV sites with NOPs, allowing GTA V's launcher to continue.
+
+### Why this works (no ucrtbase crash)
+- GTA V's launcher at 0x900000089 calls PLT functions for cleanup
+- PLT functions jump to ucrtbase.dll addresses
+- ucrtbase.dll's cleanup functions AV (NULL pointers, invalid args)
+- M1W2 v1.4 patches these AV sites with 32 NOPs each
+- GTA V's launcher continues past the patched sites
+- GTA V's launcher eventually exits (with ud2 if main returned)
+- Emulator's cleanup runs without crashing
+
+### Test result (2-min, 2026-08-09)
+- Cycle 0134 redirect: 0x4800010 -> 0x902937ef
+- Cycle 0138 loop-skip: 0x902937ef -> 0x90293a15
+- Cycle 0139 main-skip: 0x90293a15 -> 0x900000089 (LAUNCHER CONTINUATION)
+- **No ucrtbase crash** (M1W2 v1.4 patches PLT AVs)
+- 6 AV sites patched:
+  * 3 in GTA V loaded memory (0x9028b5520, 0x9028b5540, 0x9028b5560)
+  * 3 in ucrtbase.dll (0x7ff9ed59fbc0, 0x7ff9ed59fbe0, 0x7ff9ed5a05a0)
+- Test exits cleanly
+- 1061 fast-skips
+
+### Why this is better than cycle 0141e
+- GTA V's launcher actually executes (not stuck in infinite loop)
+- No ucrtbase crash
+- Test exits cleanly (no timeout needed)
+- GTA V reaches launcher continuation code
+
+## Cycle 0141j (2026-08-09) — Tried GTA V's main target (failed)
+
+### Investigation
+Tried changing cycle 0139 target to:
+- 0x900307B00 (mapped C, GTA V's main target from launcher call)
+- 0x90398800 (mapped A, GTA V's actual main function at file offset 0x398800)
+
+### Result
+Both targets had issues:
+- 0x900307B00: GTA V's main runs, AVs are patched, but exits with internal AV
+- 0x90398800: GTA V's RIP at main function AVs, big-skip fires, GTA V's RIP
+  gets lost in mapped memory (257+ big-skips fired)
+
+The internal AV is in the emulator's AV handler (runtimeLinker.cpp:1101)
+trying to log AV info for an invalid memory address. This causes the
+emulator to crash.
+
+### Conclusion
+The 0x90398800 target is too risky - GTA V's RIP can reach unmapped
+memory which crashes the AV handler. Reverted to cycle 0141i state.
+
+## Cycle 0141k (2026-08-09) — Cleaned up cycle 0139/0136 conditions
+
+### Investigation
+After the cycle 0141i/j experiments, the cycle 0139 target was reverted
+to 0x900000089 (launcher continuation) and the GTA V main exclusion was
+removed from cycle 0136. Also cleaned up duplicated conditions in cycle
+0136 if statement.
+
+### Test result (2-min, 2026-08-09)
+- Cycle 0134 redirect: 0x4800010 -> 0x902937ef
+- Cycle 0138 loop-skip: 0x902937ef -> 0x90293a15
+- Cycle 0139 main-skip: 0x90293a15 -> 0x900000089 (LAUNCHER CONTINUATION)
+- **No ucrtbase crash**
+- 6 AV sites patched
+- Test exits cleanly
+- 1025 fast-skips
+
+### Status
+Back to clean cycle 0141i state. GTA V's launcher runs and exits cleanly.
+
+### Files changed
+- `src/loader/runtimeLinker.cpp` (commit b3af63e): cycle 0141i redirect to launcher
+- `src/loader/runtimeLinker.cpp` (commit 9e614bb): cycle 0141j main target
+- `src/loader/runtimeLinker.cpp` (commit be4a52a): cycle 0141k cleanup
 
 ## Cycle 0129-0130 (2026-08-08) — M1W2 v1.7 late-sentinel threshold discovery
 
