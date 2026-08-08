@@ -209,7 +209,8 @@ void GameController::AddState(const ControllerState& state) {
 void GameController::Button(int id, uint32_t button, bool down) {
 	Common::LockGuard lock(m_mutex);
 
-	if (m_active_id == id) {
+	// The keyboard shares the player-1 pad with the active gamepad (PR #194).
+	if (m_active_id == id || id == KEYBOARD_CONTROLLER_ID) {
 		auto state = GetLastState();
 
 		state.time = LibKernel::KernelGetProcessTime();
@@ -227,7 +228,7 @@ void GameController::Button(int id, uint32_t button, bool down) {
 void GameController::Axis(int id, Controller::Axis axis, int value) {
 	Common::LockGuard lock(m_mutex);
 
-	if (m_active_id == id) {
+	if (m_active_id == id || id == KEYBOARD_CONTROLLER_ID) {
 		auto state = GetLastState();
 
 		state.time = LibKernel::KernelGetProcessTime();
