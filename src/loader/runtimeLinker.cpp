@@ -1540,6 +1540,50 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 			}
 		}
 	}
+	// M1W2 v1.7 cycle 0141g: GTA V's PLT 0x24 patch
+	// GTA V's main body calls PLT 0x24 (file offset 0x308e390) ~29 times.
+	// Each call is followed by "test eax, eax; je <skip>". If we make the
+	// call return 0, GTA V's main skips the include path. If we make it
+	// return non-zero, GTA V's main includes the item.
+	//
+	// Strategy: patch each call to "mov eax, 1" (b8 01 00 00 00) so the
+	// include path is taken. Pattern after the call: 85 c0 0f 84 (test eax, eax;
+	// je near) or 85 c0 74 (test eax, eax; je short).
+	{
+		const std::string plt24_program_name = Common::PathToString(program->file_name);
+		if (plt24_program_name.find("gtav") != std::string::npos) {
+			constexpr uint8_t MOV_EAX_1[5] = {0xb8, 0x01, 0x00, 0x00, 0x00};
+			constexpr uint8_t TEST_JE_NEAR[4] = {0x85, 0xc0, 0x0f, 0x84};
+			constexpr uint8_t TEST_JE_SHORT[3] = {0x85, 0xc0, 0x74};
+			size_t plt24_count = 0;
+			auto* plt24_start = reinterpret_cast<uint8_t*>(address);
+			auto* plt24_end   = plt24_start + size - 4;
+			for (auto* ptr = plt24_start; ptr <= plt24_end; ptr++) {
+				// Look for test+je pattern, then check if 5 bytes before is e8
+				if (memcmp(ptr, TEST_JE_NEAR, 4) == 0 || memcmp(ptr, TEST_JE_SHORT, 3) == 0) {
+					if (ptr >= plt24_start + 5 && ptr[-5] == 0xe8) {
+						// Verify call target is PLT 0x24 (0x903075540 in loaded memory)
+						auto* call_ptr = ptr - 5;
+						int32_t disp = static_cast<int32_t>(
+						    (static_cast<uint32_t>(call_ptr[1])) |
+						    (static_cast<uint32_t>(call_ptr[2]) << 8) |
+						    (static_cast<uint32_t>(call_ptr[3]) << 16) |
+						    (static_cast<uint32_t>(call_ptr[4]) << 24));
+						uint64_t call_vaddr = reinterpret_cast<uint64_t>(call_ptr) -
+						    reinterpret_cast<uint64_t>(plt24_start) + 0x900000000ULL;
+						uint64_t target_vaddr = call_vaddr + 5 + static_cast<int64_t>(disp);
+						if (target_vaddr == 0x903075540ULL) {
+							memcpy(call_ptr, MOV_EAX_1, 5);
+							plt24_count++;
+						}
+					}
+				}
+			}
+			if (plt24_count > 0) {
+				LOGF("Patch PLT 0x24: %" PRIu64 " sites\n", static_cast<uint64_t>(plt24_count));
+			}
+		}
+	}
 }
 
 uint64_t RuntimeLinker::GetEntry() {
