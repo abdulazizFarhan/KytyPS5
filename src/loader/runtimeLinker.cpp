@@ -729,11 +729,15 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 						static uint64_t redirect_count = 0;
 						redirect_count++;
 						if (redirect_count <= 5) {
-							LOGF("[M1W2 v1.7 cycle0131] redirect RIP=%016" PRIx64 " to 0x902937ef (count=%" PRIu64 ")\n",
+							LOGF("[M1W2 v1.7 cycle0133] redirect RIP=%016" PRIx64 " to 0x902937ef with RAX=0x8002000d (count=%" PRIu64 ")\n",
 							     fault_ip, fast_skip_count);
 						}
+						// Cycle 0133: Set RAX=0x8002000d (HRESULT_FROM_WIN32(ERROR_INVALID_DATA))
+						// so GTA V's outer loop check at 0x902937e2 ('cmp eax, 0x8002000d')
+						// passes and the loop exits. Then GTA V's main continues past
+						// the sentinel iteration.
 						ctx->Rip = 0x902937efULL;
-						ctx->Rax = 0;
+						ctx->Rax = 0x8002000dULL;
 						return true;
 					}
 					ctx->Rip = fault_ip + 16;
