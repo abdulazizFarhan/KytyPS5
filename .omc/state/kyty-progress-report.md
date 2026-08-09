@@ -478,6 +478,91 @@ This is the **first upstream port** in 11 cycles (since cycle 0141n). It demonst
 - No new AV sites introduced (3 known GTA V sites at 0x9028b5520, 0x9028b5540, 0x9028b5564)
 - All tests passing (no regressions)
 
+
+## Cycle 0141ad: Port upstream commit 4f2b5eb 'libSystemService fixes' (2026-08-09)
+
+**Commit**: `7faf83b M1W2: cycle 0141ad - port upstream commit 4f2b5eb 'libSystemService fixes'`
+
+### What was ported
+
+- `src/libs/libSystemService.cpp`: 
+  - Added `PARAM_ID_CC_ENABLE = 100` case returning `PARAM_CC_DISABLED`
+  - Added `PARAM_CC_DISABLED`/`PARAM_CC_ENABLED` constants  
+  - Changed default case from `EXIT()` (crash) to `LOGF_COLOR` warning
+  - Now unknown param_ids return 0 instead of terminating emulator
+
+### GTA V impact
+
+- GTA V calls `SystemServiceParamGetInt` with various param_ids
+- Previously unknown param_ids would call `EXIT()` and crash emulator
+- Now logs a yellow warning and returns 0
+- Test results: GTA V still reaches WindowCreate + Vulkan + Main
+- Same 103 unique AV sites, 3 cycles fire
+- Variance in fast-skips (2.6M vs 7M previously) is test runtime variation
+- Max fault_ip still reaches 0x9028b5564
+
+## Cycle 0141ae: Failed experiment - disable cycle 0136 big-skip (2026-08-09)
+
+**Result**: REVERTED. Documented in this section for future reference.
+
+### What was tried
+
+Disabled cycle 0136 (big-skip) to see if GTA V's RIP could make
+more progress through GTA V's actual code without being jumped
+16MB at a time.
+
+### Result (regression)
+
+- GTA V's RIP got STUCK at 0x376fd30 (sentinel area)
+- 6.7M fast-skips all at the same RIP
+- Log size dropped to 450K (vs 962K with cycle 0136 enabled)
+- No cycle events fired (cycle0134/0138/0136/0139 all absent)
+- GTA V entered an infinite loop in the late-sentinel area
+
+### Root cause
+
+Without cycle 0136's big-skip, GTA V's RIP doesn't get bridged
+out of the late-sentinel area into GTA V's mapped code area.
+GTA V's RIP keeps AVing at the same address in a tight loop
+(0x376fd30).
+
+### Reverted to cycle 0141ac state
+
+Backup at `runtimeLinker.cpp.backup_cycle0141ae` was used to
+restore the source. The backup was deleted after restore.
+
+## Cycle 0141af: Port upstream commit 9c263a9 'gpu: accept disabled default clip planes' (2026-08-09)
+
+**Commit**: `7ff915f M1W2: cycle 0141af - port upstream commit 9c263a9 'gpu: accept disabled default clip planes'`
+
+### What was ported
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `src/graphics/guest_gpu/pm4.h` | +1 | Add `PA_CL_UCP_5_W = 0x186` constant |
+| `src/graphics/guest_gpu/command_processor/pm4Handlers.cpp` | +10 | Add `HwCtxIgnoreDisabledUserClipPlane` function and registration loop |
+
+### Adapts to kyty's conventions
+
+The function signature was changed from `CommandProcessor&` (reference)
+to `CommandProcessor*` (pointer) since cp is already a pointer in
+the lambda capture. The body uses `cp->GetCtx()->GetClipControl()`
+instead of `cp.GetCtx().GetClipControl()`.
+
+### GTA V impact
+
+- GTA V does not currently exercise this code path (no GPU rendering)
+- Same test results as cycle 0141ac: WindowCreate (1280x720),
+  Vulkan init, Main executes, 3 cycles fire, 4.5M fast-skips
+- 1 big-skip event (matches cycle 0141ac pattern)
+- Max fault_ip reaches 0x9028b5564 (GTA V's loop function)
+
+### Why this matters
+
+This is a clean upstream port that doesn't regress anything.
+Future versions of GTA V or other PS5 games that reach GPU
+rendering may exercise the disabled clip plane code path.
+
 ## Session summary (cycles 0141n-0141w, 2026-08-09)
 
 ### Code improvements (3 meaningful commits)
