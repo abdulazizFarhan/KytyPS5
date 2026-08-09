@@ -1525,42 +1525,7 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 			LOGF("Patch PLT 0xf8: %" PRIu64 " sites\n", static_cast<uint64_t>(plt_patch_count));
 		}
 	}
-	// M1W2 v1.7 cycle 0141e: GTA V's main epilogue patch
-	// Replace the ret in GTA V's main epilogue with "jmp -2" to prevent
-	// GTA V's main from returning to the emulator's launcher (which crashes).
-	// Unique 32-byte pattern identifies GTA V's main function epilogue:
-	//   cmp rax, [rsp+0x280]; jne +X; mov eax, r15d; lea rsp, [rbp-0x28];
-	//   pop rbx, pop r12-r15, pop rbp; ret
-	{
-		const std::string epi_program_name = Common::PathToString(program->file_name);
-		if (epi_program_name.find("gtav") != std::string::npos) {
-			constexpr uint8_t epi_pattern[32] = {
-				0x48, 0x3b, 0x84, 0x24, 0x80, 0x02, 0x00, 0x00,
-				0x0f, 0x85, 0x1d, 0x03, 0x00, 0x00,
-				0x44, 0x89, 0xf8,
-				0x48, 0x8d, 0x65, 0xd8,
-				0x5b, 0x41, 0x5c, 0x41, 0x5d, 0x41, 0x5e, 0x41, 0x5f, 0x5d,
-				0xc3
-			};
-			size_t epi_count = 0;
-			auto* epi_start = reinterpret_cast<uint8_t*>(address);
-			auto* epi_end   = epi_start + size - 32;
-			for (auto* ptr = epi_start; ptr <= epi_end; ptr++) {
-				if (memcmp(ptr, epi_pattern, 32) == 0) {
-					// Replace ret (last 2 bytes) with jmp -2 (eb fe)
-					ptr[30] = 0xeb;
-					ptr[31] = 0xfe;
-					epi_count++;
-					LOGF("Patch GTA V main epilogue at 0x%" PRIx64 " (ret->jmp-2)\n",
-					     reinterpret_cast<uint64_t>(ptr));
-				}
-			}
-			if (epi_count > 0) {
-				LOGF("Patch GTA V main epilogue: %" PRIu64 " sites\n", static_cast<uint64_t>(epi_count));
-			}
-		}
-	}
-	// M1W2 v1.7 cycle 0141g: GTA V's PLT 0x24 patch
+		// M1W2 v1.7 cycle 0141g: GTA V's PLT 0x24 patch
 	// GTA V's main body calls PLT 0x24 (file offset 0x308e390) ~29 times.
 	// Each call is followed by "test eax, eax; je <skip>". If we make the
 	// call return 0, GTA V's main skips the include path. If we make it
