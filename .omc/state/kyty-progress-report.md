@@ -1153,6 +1153,54 @@ of PS5 system functions that GTA V's init function depends on.
 AI-assisted disclosure: Yes, AI-assisted.
 
 
+## Cycle 0141r (2026-08-09) — GTA V PS5 SDK library requirements
+
+### Discovery
+Analyzed kyty's log of unresolved PLT imports for GTA V. Each import is
+patched to a stub that returns 0 (kyty's RegisterStubbedImport behavior).
+
+### GTA V's PS5 SDK dependencies (217 imports across 24 libraries)
+- **Agc_v1: 111 imports** (AMD GPU Compute - graphics)
+- **AgcDriver_v1: 25 imports** (AMD GPU driver - graphics)
+- **libkernel_v1: 12 imports** (kernel - memory, threads, etc.)
+- **VideoRecordingP_v1: 9 imports**
+- **NpCommerce_v1: 7 imports** (network/PlayStation)
+- **ContentSearch_v1: 6 imports**
+- **ContentExport_v1: 5 imports**
+- **ImeDialog_v1: 5 imports** (input method)
+- **NpUtility_v1: 5 imports**
+- **NpEntitlementAccess_v1: 5 imports**
+- **NpWebApi2_v1: 4 imports**
+- **WebBrowserDialog_v1: 4 imports**
+- **RazorCpu_v1: 3 imports** (CPU profiling)
+- **Net_v1: 3 imports**
+- And 11 more smaller libraries
+
+### Significance
+The **136 graphics imports (Agc + AgcDriver)** are the critical blockers
+for any GTA V progress beyond launcher. These need actual AMD GPU compute
+implementation in kyty to function.
+
+Without graphics initialization, GTA V can't:
+- Initialize the GPU
+- Compile shaders
+- Set up render targets
+- Draw anything
+- Display a frame
+- Show menus
+
+### Next steps for actual GTA V progression
+To make GTA V reach actual game code, kyty needs to implement:
+1. Agc_v1 / AgcDriver_v1 (AMD GPU compute) - massive effort
+2. libkernel_v1 memory allocation (PLT 0x09, 0x0a, 0x0c) - moderate effort
+3. libkernel_v1 thread/module APIs - moderate effort
+
+This is beyond the scope of a single cycle. The current state (stable
+launcher with all patches) is the achievable baseline.
+
+AI-assisted disclosure: Yes, AI-assisted.
+
+
 ## Cycle 0129-0130 (2026-08-08) — M1W2 v1.7 late-sentinel threshold discovery
 
 ### Investigation (cycle 0129)
