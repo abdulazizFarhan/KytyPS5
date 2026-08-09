@@ -69,6 +69,7 @@ LIB_DEFINE(InitSystemService_1);
 namespace LibTextToSpeech2 {
 LIB_DEFINE(InitTextToSpeech2_1);
 } // namespace LibTextToSpeech2
+LIB_DEFINE(InitUlowObjMgr_1);
 LIB_DEFINE(InitUserService_1);
 LIB_DEFINE(InitVideoOut_1);
 
@@ -105,6 +106,7 @@ void InitAll(Loader::SymbolDatabase* s) {
 	LIB_LOAD(InitSystemService_1);
 	LIB_LOAD(LibTextToSpeech2::InitTextToSpeech2_1);
 	LIB_LOAD(LibUlt::InitUlt_1);
+	LIB_LOAD(InitUlowObjMgr_1);
 	LIB_LOAD(InitUserService_1);
 	LIB_LOAD(VideoDec2::InitVideoDec2_1);
 	LIB_LOAD(InitVideoOut_1);
