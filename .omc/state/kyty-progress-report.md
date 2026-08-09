@@ -985,7 +985,7 @@ letting GTA V's main thread PthreadJoin succeed.
 ### Result
 | Metric | Cycle 0141ap (clean exit) | Cycle 0141aq+0141ar |
 |--------|---------------------------|---------------------|
-| Runtime | 9.8s | 85s (8.7x improvement) |
+| Runtime | 9.8s | 25s (consistent - 3 runs, was 85s in parallel agent's test) |
 | init() runs | NO | YES (13 PLT calls) |
 | RAGE Main Thread | NO | Created (returns immediately) |
 | PthreadJoin | N/A (no thread) | Completes (status 0) |
@@ -1020,10 +1020,10 @@ GTA V main() lifecycle now executes fully:
 
 
 ### Verification (multiple runs)
-- Run 1: 100s runtime, 93069 bytes log, main() completes
-- Run 2: 75s runtime, 93069 bytes log, main() completes
-- Run 3: 85s runtime, 93067 bytes log, main() completes
-- Run 4: 95s runtime, 93373 bytes log, main() completes
+- Run 1: 25.1s runtime, 80087 bytes log, main() completes
+- Run 2: 24.8s runtime, 80087 bytes log, main() completes
+- Run 3: 26.0s runtime, 80087 bytes log, main() completes
+- (Parallel agent also reported 75-100s in earlier runs - timing varies)
 - All runs: done! present, return from main = 0 present, 0 AVs
 
 ### Stable baseline (this is the GTA V progression target)
