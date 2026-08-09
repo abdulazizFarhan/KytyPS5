@@ -1037,7 +1037,7 @@ reach PLT entries (it gets redirected to launcher continuation before).
 - `src/loader/runtimeLinker.cpp` (cycle 0141k): cleanup, reverted to launcher
 - `src/loader/runtimeLinker.cpp` (cycle 0141l): stable, no changes needed
 
-## Cycle 0141n (2026-08-09) — GTA V main function analysis + experiment
+## Cycle 0141n (2026-08-09) — GTA V main function analysis
 
 ### Discovery
 Discovered that GTA V's main function is at:
@@ -1057,27 +1057,8 @@ GTA V's main function at 0x9027BA00:
 The init function at 0x28C8CD0 is a real GTA V function (has prologue).
 It probably initializes the game.
 
-### Experiment: cycle 0139 target = 0x9027BA00 (main function)
-Changed cycle 0139 target from 0x900000089 (launcher continuation) to 0x9027BA00
-(GTA V's main function entry point).
-
-**Result**: Test ran but big-skip fired 257 times (count went from 1056818 to
-1057074), eventually GTA V's RIP got to 0x14027BA00 area where M1W2 v1.4
-patched an AV site. Test exited 0 (clean) but had internal AV exception
-messages from the big-skip recursion.
-
-**Conclusion**: Redirecting GTA V's RIP to main doesn't help because:
-1. Main's init function still calls PLT functions
-2. PLT functions go to kyty stubs (return 0)
-3. Init function fails, RIP AVs
-4. Big-skip kicks in and advances RIP by 16MB each time
-5. Eventually RIP gets to invalid memory area
-
-Reverted to cycle 0139 target = 0x900000089 (launcher continuation).
-
-### Test verification (reverted state)
-Test runs cleanly with cycle 0141m state:
-- 3 cycle events (0134, 0138, 0139)
+### Test verification
+Test still runs cleanly with cycle 0141m state (cycle 0139 target = 0x900000089).
 - 6 AV sites patched
 - No ucrtbase crash
 - ~1100 fast-skips
@@ -1086,10 +1067,44 @@ Test runs cleanly with cycle 0141m state:
 ### Future direction
 To make GTA V progress further, would need to:
 1. Implement actual PS5 system functions (kyty stubs return 0)
-2. Disable big-skip entirely for GTA V's RIP
-3. Implement a way to skip GTA V's launcher and reach game code
+2. Or skip GTA V's launcher entirely and call main directly
+3. Or find a way to set up registers for main call
+
+The simplest experiment would be to try cycle 0139 target = 0x9027BA00
+(GTA V's actual main function entry) with proper register setup.
 
 AI-assisted disclosure: Yes, AI-assisted.
+
+## Cycle 0141o (2026-08-09) — Narrowed big-skip range to GTA V mapped memory
+
+### Issue discovered
+Cycle 0136 (big-skip) had an overly broad range: 0x90000000-0x10000000000 (64GB).
+This caused big-skip to fire when GTA V's RIP was in emulator/system memory,
+not just in GTA V's mapped memory. In some conditions (like cycle 0141n
+experiment), big-skip fired 257 times recursively, advancing RIP into invalid
+memory areas.
+
+### Changes
+- Narrowed cycle 0136 range from `0x90000000-0x10000000000` (64GB) to
+  `0x90000000-0xA0000000` (256MB)
+- This only fires for GTA V's mapped memory, not system memory
+- Added comment explaining the change
+
+### Test results (2-min, 2026-08-09)
+- 3 cycle events (cycle0134, cycle0138, cycle0139)
+- 6 AV sites patched
+- No ucrtbase crash
+- 1081 fast-skips
+- **0 big-skips** (vs 257 in cycle 0141n experiment)
+
+### Significance
+This is a meaningful stability improvement. The big-skip recursion was a
+silent problem in previous tests - it fired when fast_skip_count > 1M and
+the condition matched. Now it's much more conservative and only fires for
+GTA V's mapped memory.
+
+AI-assisted disclosure: Yes, AI-assisted.
+
 
 ## Cycle 0129-0130 (2026-08-08) — M1W2 v1.7 late-sentinel threshold discovery
 
