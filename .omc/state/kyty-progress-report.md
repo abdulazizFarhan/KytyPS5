@@ -854,31 +854,37 @@ running, the state is missing.
    - Find which PLT entries need patching (like PLT 0xf8)
 
 
-## GTA V current status (cycle 0141d)
-- **CYCLE 0141c PATCH IS WORKING** - 4 PLT 0xf8 call sites patched
-- GTA V RIP range: 0x4000010 to 0xba3a5e36 (after main return)
-- Fast-skips: 11,419 (vs 15,141,889 in cycle 0139 - **1300x improvement**)
-- Late-sentinel events: 11,082 (614,447 before reaching GTA V's loops)
-- Max RIP: 0x920010588 (~38GB - much higher than before)
-- Unique GTA V region RIPs: 384 (visits libc.prx and GTA V's data)
-- Cycle events fired:
-  - cycle0134 redirect: 0x4800010 → 0x902937ef
-  - cycle0138 loop-skip: 0x902937ef → 0x90293a15
-  - cycle0139 main-skip: 0x90293a15 → 0x9029e346
-  - cycle0136 big-skip: 0x9029e356 → +16MB (RIP to 0x10029e356)
-- **Cycle 0141c PLT 0xf8 patch (WORKING)**: Replaces `call PLT_0xf8` with
-  `mov eax, 0x8002000d` at 4 known call sites. GTA V's outer loops now
-  exit on the first iteration.
-- GTA V's main returns cleanly (via cycle0139 main-skip)
-- After main return, GTA V's RIP walks through libc.prx and unmapped
-  memory (post-main functions not yet implemented)
-- 2-minute test: 11,419 fast-skips, max RIP 0xba3a5e36
-- 5-minute test: same 4 cycle events, GTA V's RIP never reaches new
-  GTA V code region after main-skip
+## GTA V current status (cycle 0141s)
+- **Cycle 0141q PATCH IS WORKING** - 1 main->init call site patched (NOPed)
+- GTA V's launcher runs cleanly: argc, argv, envp set; memory_type=12 allocation
+- GTA V's main is ACTUALLY EXECUTING (Execute: Main log event)
+- GTA V's main does memory setup (PLT 0x09 AllocateDirectMemory call), then
+  iterates through structures (3 AVs in loop function at 0x28b5520 patched)
+- Main returns immediately (init NOPed) - 38 PLT calls skipped
+- Test metrics (current cycle 0141s state):
+  - Fast-skips: ~1.14M (cycle 0141o narrowed big-skip range)
+  - 0 big-skips (was 257 in earlier experiments)
+  - 3 cycle events (cycle0134, cycle0138, cycle0139)
+  - 6 AV sites patched (3 GTA V + 3 ucrtbase)
+  - Window created (1280x720)
+  - No ucrtbase crash
+  - Process killed at 2-min timeout
+- **Cycle 0141o improvement**: Narrowed big-skip range from 64GB to 256MB
+  - Eliminated big-skip recursion
+  - 0 big-skips in normal tests
+- **Cycle 0141q improvement**: NOPed main->init call
+  - Skips 38 failed PLT calls in init function
+  - Cleaner exit path: main returns immediately, launcher cleanup runs normally
+- GTA V doesn't reach game code (PLT functions not implemented - 217 imports
+  across 24 libraries; biggest blocker: Agc_v1 with 111 graphics imports)
+- Test flow: GTA V code runs → 3 GTA V AVs patched → M1W2 sentinel fast-skip
+  traversal → cycle 0134 redirects → cycles 0138/0139 fire → launcher runs →
+  main returns → cleanup → ud2 → ucrtbase cleanup → test timeout
 
 ### Files changed
-- `src/loader/runtimeLinker.cpp` (cycle 0141c): pattern-based PLT 0xf8
-  patch in PatchProgram() using `3d 0d 00 02 80` byte sequence search
+- `src/loader/runtimeLinker.cpp`:
+  - Cycle 0141q: NOPed GTA V's main->init call (file offset 0x294897)
+  - Cycle 0141o: Narrowed big-skip range to 0xA0000000 (256MB)
 
 
 ## GTA V current status (cycle 0141)
