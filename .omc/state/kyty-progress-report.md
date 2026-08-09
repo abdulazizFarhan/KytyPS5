@@ -1,3 +1,11 @@
+**⚠️ CURRENT STATE (2026-08-10)**: GTA V exits cleanly in **4.7 seconds** with **0 frames rendered**. Cycle 0141ar (RAGE Main Thread NOP) is REQUIRED to prevent GTA V from crashing in RAGE init's NULL global pointer dereference. The 4.7s runtime is **not progress** - it's the same 9s milestone achieved with faster relocation. Real rendering progress requires implementing Agc_v1 GPU compute APIs (79 NIDs, multi-week effort).
+
+**⚠️ STUBS THAT RETURN 0 ARE NO-OPS**: All 25 NID stubs added in cycles 0141ay+az+bb+bc+bd return 0, identical to PLT fallback behavior. They do not change GTA V's behavior. They only document which NIDs GTA V uses.
+
+**⚠️ TO RESTORE FRAME=2 IN 10-MIN MILESTONE**: Cycle 0141ar must be removed. This was achieved in cycle 0108 v1.5d state but lost when 0141ar was added to prevent the misalignment crash.
+
+---
+
 
 
 **Cycles 0141ay, 0141az, 0141ba (2026-08-09)**:
