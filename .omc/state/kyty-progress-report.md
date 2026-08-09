@@ -880,9 +880,25 @@ The clean exit means:
 4. No more 2-minute timeouts in tests
 
 Next steps to consider:
-1. Look at GTA V's actual static init functions (some may be real code)
-2. Implement the most-called PLT functions to enable further GTA V progress
-3. Continue porting useful upstream commits
+1. Investigate GTA V's pre-main code at 0x293a15-0x294850 (56 PLT calls that don't execute
+   because cycle 0139 redirects RIP to main entry directly). Letting these run might let
+   GTA V's full launcher setup complete.
+2. Implement one of the most-called PLTs (PLT 0x05 x6, PLT 0x06 x1, PLT 0x07 x1,
+   PLT 0xdf x2, PLT 0xe0 x2, PLT 0xe1 x2, PLT 0xef x1). The ones called from main are
+   the easiest targets.
+3. Port upstream pthread fix 3a76563 - ALREADY PORTED in our fork (verified). NIDs 0TyVk4MSLt0
+   and ytQULN-nhL4 are registered, functions exist.
+4. Port upstream 26781e6 (guest red-zone protection) - HUGE commit (1843 insertions, 18 files),
+   risky to port while we're deep in M1W2 cycles. Defer.
+5. Cycle 0141an experiment showed kyty stubs return 0 where GTA V expects pointers/handles.
+   The fix requires implementing the actual PLT functions, not bypassing them.
+
+Lessons from cycle 0141an (FAILED EXPERIMENT):
+- Letting init() run sounds promising in theory but causes GTA V static initializers to fault
+  on kyty stubs that return 0 instead of real pointers
+- 3 AV sites at 0x9028b5520, 0x9028b5540, 0x9028b5560 (vtable dispatch `call qword ptr [rax+0x58]`)
+- 41,689 fast-skips wandering through unmapped memory
+- Current NOP strategy (cycle 0141q for init) is correct for now
 
 
 ## Cycle 0141an (commits 01eac22 + 6aad935) - 2026-08-09: FAILED EXPERIMENT - let init() run
