@@ -1018,6 +1018,28 @@ GTA V main() lifecycle now executes fully:
 
 
 
+
+### Verification (multiple runs)
+- Run 1: 100s runtime, 93069 bytes log, main() completes
+- Run 2: 75s runtime, 93069 bytes log, main() completes
+- Run 3: 85s runtime, 93067 bytes log, main() completes
+- Run 4: 95s runtime, 93373 bytes log, main() completes
+- All runs: done! present, return from main = 0 present, 0 AVs
+
+### Stable baseline (this is the GTA V progression target)
+- GTA V eboot.bin is loaded successfully
+- launcher_init returns cleanly (cycle 0141al)
+- main() executes fully
+- init() runs all 13 PLT calls
+- RAGE Main Thread is created and immediately returns (cycle 0141ar)
+- PthreadJoin completes
+- main() returns 0
+- kyty emits "done!" and "return from main = 0"
+- Process exits with returncode 0
+- 268 PS5 NID fallbacks logged (showing GTA V's API surface area)
+- NO access violations in the log
+
+
 ## 
 
 
