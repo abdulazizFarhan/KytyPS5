@@ -813,13 +813,13 @@ across 3 libraries and fixed a critical registration bug:
 - 2 new NIDs (BG26hBGiNlw, Smf+fUNblPc) are now resolved via UlowObjMgr_v1.1 (was NID fallback)
 - 9 new libkernel_v1 NIDs registered and called from GTA V's libc.prx
 
-**Current GTAV status (HEAD: 467a3d9):**
+**Current GTAV status (HEAD: 2efbd6c):**
 
 - GTA V completes main() lifecycle, status 0 exit (clean)
-- Runtime: 10-19s (varies with library cache state)
+- Runtime: 16-19s (3-run verification: 18.7s, 18.5s, 16.8s, 19.3s)
 - 6 GTA V patches fire (launcher_init, init() let run, confirm failure x2, RAGE entry, RAGE setup, RAGE virtual)
 - 0 Access Violations (cycle 0141ar bypasses RAGE entry, no AVs reach M1W2 handler)
-- 25 new GTA V NID stubs added this session (libc_v1, ulobjmgr_v1, libkernel_v1)
+- 25 new GTA V NID stubs added across 3 libraries (libc_v1, ulobjmgr_v1, libkernel_v1)
 - 270 PS5 NID fallbacks (164 Graphics5 + 52 Json2 + 25 Graphics5Driver + 18 libc + 9 other + 2 ulobjmgr)
 - Thread create: 1 (RAGE Main Thread), Thread join: 1 (status 0)
 - 17 SceLibc mutex init events, 1 cond init event, 5 Execute events
@@ -827,7 +827,19 @@ across 3 libraries and fixed a critical registration bug:
 - 47 Vulkan initialization events
 - main() returns 0, kyty emits 'done!' and 'return from main = 0'
 
-**Total commits**: 269 ahead of upstream (up from 260 in previous session)
+**Cycle 0141ar experiment (2026-08-10)**: CONFIRMED cycle 0141ar is REQUIRED.
+Temporarily disabled cycle 0141ar (`if (false && ...)`) to test GTA V's RAGE entry
+behavior. Result: GTA V hangs at 17.6s in pthread_join. RAGE entry at 0x9028b0950
+runs (no longer NOPed), calls RAGE setup function at 0x902813560 (cycle 0141aw makes
+it return immediately), then GTA V's RAGE thread enters a DIFFERENT function at
+~0x902813b20 which has 9 AVs (M1W2 patches each with 32 NOPs but GTA V never finishes).
+Reverted cycle 0141ar. GTA V back to stable 16-19s runtime with 0 AVs.
+
+**76 unique Agc_v1 NIDs** are referenced in GTA V's relocation table but never actually
+called (because cycle 0141ar bypasses RAGE entry before Agc_v1 is invoked). Implementing
+these requires real PS5 GPU compute knowledge - multi-week effort per upstream analysis.
+
+**Total commits**: 271 ahead of upstream (up from 260 in previous session)
 
 ## Latest result (cycle 0141an - 2-min test, **MAJOR WIN**)
 
