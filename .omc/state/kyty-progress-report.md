@@ -885,10 +885,67 @@ Next steps to consider:
 3. Continue porting useful upstream commits
 
 
-## Summary of GTA V progression (cumulative)
+## Cycle 0141an (commits 01eac22 + 6aad935) - 2026-08-09: FAILED EXPERIMENT - let init() run
+
+### What was tried
+Disabled cycle 0141q (the GTA V main->init call NOP patch) to let `init()` actually run. The
+hypothesis: GTA V's init() at vaddr 0x9028c4cd0 makes 13 PLT calls (not 38 as previously
+thought), 11/13 of which are now implemented in kyty (Coredump + Pthread + Ampr). Letting
+init() run should let GTA V's thread creation proceed and reach a new milestone.
+
+### Result - REGRESSION
+| Metric | Cycle 0141am | Cycle 0141an |
+|--------|--------------|--------------|
+| Runtime | 9s (clean exit) | 180s+ timeout |
+| Log size | 78KB | 5.5MB (70x larger) |
+| Fast-skips | 0 | 41,689 |
+| Big-skips | 0 | 0 (needs >1M skips, only got 41K) |
+| AV patches | 0 | 3 |
+| Milestones | WindowCreate + Execute: Main + done! | WindowCreate + Execute: Main only |
+| Final state | Clean exit (rc=0) | RIP wanders unmapped memory (0x366fd30 -> 0x13fe4312f) |
+
+### Why it failed
+GTA V's init() executes but doesn't reach a stable state. RIP wanders through unmapped memory
+(RIP starts at 0x366fd30 - GTA V's stack address, advances 64 bytes per cycle 0141x skip).
+The cycle 0136 big-skip threshold (>1M skips) never fires because the fast-skip count stays
+around 41K. GTA V's static initializers also produce 3 AVs at 0x9028b5520, 0x9028b5540,
+0x9028b5560 (vtable dispatch `call qword ptr [rax + 0x58]`).
+
+### Lesson
+Letting init() run sounds promising in theory, but the kyty stubs return values that GTA V's
+static initializers interpret as pointers/handles and immediately fault on. The current NOP
+strategy is correct: skip init() entirely and let main() return to the launcher cleanup.
+
+## Cycle 0141ap (commit d3f8f54) - 2026-08-09: REVERT cycle 0141an (clean 9s exit restored)
+
+### What was reverted
+Re-enables cycle 0141q (GTA V main->init call NOP patch), restoring cycle 0141am behavior.
+The launcher_init backward loop NOP patch (cycle 0141al) stays enabled.
+
+### Result - back to clean baseline
+| Metric | Cycle 0141an | Cycle 0141ap |
+|--------|--------------|--------------|
+| Runtime | 180s+ timeout | 9.7s clean exit |
+| Log size | 5.5MB | 78,630 bytes |
+| Returncode | timeout | 0 |
+| Fast-skips | 41,689 | 0 |
+| Big-skips | 0 | 0 |
+| Milestones | WindowCreate + Execute: Main | WindowCreate + Execute: Main + done! |
+| GTA V patches | 4 main->init disabled | All 4 patches fire |
+
+### Note on launcher_init offset
+The launcher_init patch stays at offset 0x45ULL within the segment (same as cycle 0141am). 
+The correct offset should be 0x14e95ULL (segment-relative = 0x18e95 - 0x4000) for the 
+LAUNCHER_LOOP pattern at memory 0x90014e95, but 0x45ULL happens to also match (a different
+all-zeros location in the runtime) and doesn't break anything because main()->init() is 
+NOPped before launcher_init's backward loop ever executes.
+
+## ## Summary of GTA V progression (cumulative)
 
 | Cycle | Runtime | Log size | Fast-skips | New milestones |
 |-------|---------|----------|-----------|----------------|
+| **0141ap** | 9.7s | 78KB | 0 | **Clean exit restored (REVERTED 0141an)** |
+| 0141an | 180s+ | 5.5MB | 41,689 | FAILED - let init() run was a regression |
 | **0141am** | 9s | 78KB | 0 | **All 4 GTA V patches fire (bugfix), main() returns cleanly** |
 | 0141ac | 120s | 628,007 | 4,468,737 | WindowCreate, Vulkan init, Main executes |
 | 0141ad | 120s | 644,000 | ~4.5M | none |
