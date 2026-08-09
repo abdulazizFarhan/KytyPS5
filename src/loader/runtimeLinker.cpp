@@ -1617,6 +1617,29 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 		}
 	}
 
+	// Cycle 0141ar: NOP GTA V's RAGE Main Thread entry function
+	// GTA V's RAGE Main Thread is stuck in an AV loop at 0x902813a90-0x902813c20.
+	// To unblock GTA V's main thread (which is in PthreadJoin), NOP the RAGE entry
+	// function so it returns immediately. GTA V's main thread will see RAGE "finish"
+	// and continue to whatever comes after pthread_join.
+	// Function at vaddr 0x9028b0950 (segment offset 0x28b0950)
+	{
+		constexpr uint8_t RAGE_ENTRY[15] = {
+			0x55, 0x48, 0x89, 0xe5, 0x41, 0x57, 0x41, 0x56, 0x41, 0x55, 0x41, 0x54, 0x53,
+			0x48, 0x83
+		};
+		const uint64_t rage_entry_file_off = 0x28b0950ULL;
+		if (rage_entry_file_off + 15 <= size) {
+			auto* rage_ptr = reinterpret_cast<uint8_t*>(address) + rage_entry_file_off;
+			if (memcmp(rage_ptr, RAGE_ENTRY, 15) == 0) {
+				memset(rage_ptr, 0x90, 15);  // NOP the prologue
+				rage_ptr[15] = 0xc3;  // ret
+				LOGF("Patch GTA V RAGE Main Thread entry at 0x%" PRIx64 " (NOP + ret)\n",
+				     reinterpret_cast<uint64_t>(rage_ptr));
+			}
+		}
+	}
+
 	// Cycle 0141aq: NOP GTA V's "confirm failure" assertion call sites
 	// GTA V's RAGE engine crashes with "confirm failure" assertion at vaddr 0x9028b0eb7.
 	// The call chain is: main() at 0x90027ba00 -> 0x9028afe80 (syscall loop)
