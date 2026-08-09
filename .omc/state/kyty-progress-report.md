@@ -6,6 +6,17 @@
 
 **Cycle 0141az**: Added `z+P+xCnWLBk` libc_v1 stub in `src/libs/libC.cpp`. Returns 0 (same as PLT fallback). GTA V behavior unchanged.
 
+**Cycle 0141bb (2026-08-09)**: Added 12 more libc_v1 NID stubs in `src/libs/libC.cpp`:
+- MELi-cKqWq0, 3BytPOQgVKc, YNzNkJzYqEg, hdm0YfMa7TQ
+- MLWl90SFWNE, OJjm-QOIHlI, Vla-Z+eXlxo, gigoVHZvVPE
+- mfHdJTIvhuo, -hn1tcVHq5Q, W6SiVSiCDtI, kHg45qPC6f0
+
+All return 0 (same as PLT fallback). GTA V behavior unchanged.
+
+**Total libc_v1 NID coverage**: 14/15 (only hcuQgD53UxM was already in kyty as `libc_printf`).
+
+3-run verification: 9.4s, 9.1s, 9.0s average 9.2s, all exit 0, 0 AVs.
+
 **Cycle 0141ba**: EXPERIMENT - temporarily disabled cycle 0141ar (RAGE Main Thread NOP+ret). 
 - Result: REGRESSION. GTA V crashes at 4.6s with STATUS_INSTRUCTION_MISALIGNMENT (0xC0000096).
 - M1W2 v1.4 patches 9 AV sites at 0x902813b20-c20 but causes RIP misalignment.
