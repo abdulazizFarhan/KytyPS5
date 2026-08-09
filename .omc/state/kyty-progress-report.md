@@ -1037,50 +1037,7 @@ reach PLT entries (it gets redirected to launcher continuation before).
 - `src/loader/runtimeLinker.cpp` (cycle 0141k): cleanup, reverted to launcher
 - `src/loader/runtimeLinker.cpp` (cycle 0141l): stable, no changes needed
 
-## Cycle 0141m (2026-08-09) — PLT stub range corrected to mapped C
-
-### Critical discovery
-While analyzing GTA V's binary, discovered that GTA V's loaded memory has
-two different vaddr mappings:
-
-- **Mapping A**: `vaddr = file_offset + 0x90000000` (for code section 0x90293xxx-0x90308xxx)
-- **Mapping C**: `vaddr = file_offset + 0x90000000 - 0x18e50` = `file_offset + 0x8FFFE71B0`
-
-PLT entries in GTA V's loaded memory use **mapped C** addresses:
-- PLT 0x00 (file offset 0x308e150) -> vaddr 0x903075300
-- PLT 0x24 (file offset 0x308e390) -> vaddr 0x903075540
-- PLT 0xff (file offset 0x308ff50) -> vaddr 0x903077100
-
-### Changes
-- Updated PLT stub range from `0x90308e000-0x903090000` (mapped A - WRONG) to
-  `0x903075300-0x903077100` (mapped C - CORRECT)
-- Added comment explaining the mapping
-
-### Important finding: PLT entries are NEVER actually executed
-After further investigation, discovered that kyty's loader patches GTA V's
-GOT entries with "stub" function vaddrs (RegisterStubbedImport). This means:
-
-1. GTA V's launcher calls PLT entry (e.g., PLT 0x01 at 0x903075310)
-2. PLT entry does `jmp [GOT[0x01]]`
-3. GOT[0x01] is patched by kyty's loader to point to a stub function
-4. GTA V's RIP jumps to kyty's stub, NOT to PLT entry's import thunk
-5. The stub function either resolves the import or returns 0
-
-So GTA V's RIP never actually lands on PLT entry code. The PLT stub
-infrastructure is technically incorrect for the actual flow, but doesn't
-hurt anything.
-
-### Test results (2-min, 2026-08-09)
-- PLT stub events: 0 (GTA V's RIP never reaches PLT entries)
-- Cycle 0134/0138/0139 redirect events: 3
-- Patched AV sites: 6 (consistent with cycle 0141l)
-- No ucrtbase crash
-- Test exits cleanly
-
-AI-assisted disclosure: Yes, AI-assisted.
-
-
-## Cycle 0141n (2026-08-09) — GTA V main function analysis
+## Cycle 0141n (2026-08-09) — GTA V main function analysis + experiment
 
 ### Discovery
 Discovered that GTA V's main function is at:
@@ -1100,8 +1057,27 @@ GTA V's main function at 0x9027BA00:
 The init function at 0x28C8CD0 is a real GTA V function (has prologue).
 It probably initializes the game.
 
-### Test verification
-Test still runs cleanly with cycle 0141m state (cycle 0139 target = 0x900000089).
+### Experiment: cycle 0139 target = 0x9027BA00 (main function)
+Changed cycle 0139 target from 0x900000089 (launcher continuation) to 0x9027BA00
+(GTA V's main function entry point).
+
+**Result**: Test ran but big-skip fired 257 times (count went from 1056818 to
+1057074), eventually GTA V's RIP got to 0x14027BA00 area where M1W2 v1.4
+patched an AV site. Test exited 0 (clean) but had internal AV exception
+messages from the big-skip recursion.
+
+**Conclusion**: Redirecting GTA V's RIP to main doesn't help because:
+1. Main's init function still calls PLT functions
+2. PLT functions go to kyty stubs (return 0)
+3. Init function fails, RIP AVs
+4. Big-skip kicks in and advances RIP by 16MB each time
+5. Eventually RIP gets to invalid memory area
+
+Reverted to cycle 0139 target = 0x900000089 (launcher continuation).
+
+### Test verification (reverted state)
+Test runs cleanly with cycle 0141m state:
+- 3 cycle events (0134, 0138, 0139)
 - 6 AV sites patched
 - No ucrtbase crash
 - ~1100 fast-skips
@@ -1110,11 +1086,8 @@ Test still runs cleanly with cycle 0141m state (cycle 0139 target = 0x900000089)
 ### Future direction
 To make GTA V progress further, would need to:
 1. Implement actual PS5 system functions (kyty stubs return 0)
-2. Or skip GTA V's launcher entirely and call main directly
-3. Or find a way to set up registers for main call
-
-The simplest experiment would be to try cycle 0139 target = 0x9027BA00
-(GTA V's actual main function entry) with proper register setup.
+2. Disable big-skip entirely for GTA V's RIP
+3. Implement a way to skip GTA V's launcher and reach game code
 
 AI-assisted disclosure: Yes, AI-assisted.
 
