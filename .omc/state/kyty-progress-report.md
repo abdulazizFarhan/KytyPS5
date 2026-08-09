@@ -1186,7 +1186,75 @@ The cycle 0141as block was reverted to the cycle 0141ar NOP RAGE entry strategy.
 Working tree is clean and matches HEAD (cycle 0141ar = stable baseline).
 
 ## 
-## Summary of GTA V progression (cumulative)
+## Cycle 0141at (2026-08-09) - Parallel-agent experiment: NOP RAGE setup function (didn't help)
+
+### What was tried
+A parallel agent added cycle 0141at (between 0141ar and ac) which:
+- DISABLED cycle 0141ar (RAGE entry NOP)
+- ADDED cycle 0141at: patches function at vaddr 0x902813560 (RAGE setup function) with NOP NOP ret
+
+The idea was to let RAGE Main Thread entry run, but have its setup function return
+immediately so the AV loop would be avoided.
+
+### Result - REGRESSION
+- GTA V crashed with STATUS_INSTRUCTION_MISALIGNMENT (0xC0000096) in 4-5 seconds
+- 3 consecutive runs all crashed at the same location
+- Cycle 0141ar was needed, not disabled
+
+### Cycle 0141at reverted
+The parallel agent's cycle 0141at was reverted via `git restore` on 
+runtimeLinker.cpp. HEAD's cycle 0141ar (RAGE entry NOP) is the stable baseline.
+
+## Re-verified stable baseline (2026-08-09)
+
+3 consecutive runs of GTA V with HEAD (cycle 0141ar active):
+- Run 1: 10.4s, exit code 0, all 5 GTA V patches fire (PLT 0xf8, PLT 0x24, RAGE entry, confirm failure x2)
+- Run 2: 8.7s, exit code 0, all 5 patches fire
+- Run 3: 9.1s, exit code 0, all 5 patches fire
+- "done!" event fires consistently
+- GTA V completes main() lifecycle cleanly
+
+This confirms the cycle 0141ar state is the stable baseline.
+
+## Why GTA V still shows 0 frames rendered (analysis, 2026-08-09)
+
+### Root cause
+GTA V's RAGE engine fundamentally needs Agc_v1 GPU compute APIs to render anything.
+- 79 Agc_v1 imports are unimplemented in kyty
+- Without GPU compute, RAGE can't allocate graphics resources
+- RAGE's internal data structures (r13, r14, etc.) hold NULL pointers
+- When RAGE tries to use these NULL pointers, it AVs into M1W2's patched region
+- M1W2 v1.4 patches the AV site with 32 NOPs but causes RIP to land at a wrong address
+- The next instruction decode fails with STATUS_INSTRUCTION_MISALIGNMENT
+
+### Why "frame=2" was achieved at cycle 0108 v1.5d
+The previous "frame=2 in 10-min run" was achieved BEFORE we added 0141* GTA V patches.
+The state was:
+- M1W2 v1.5c fast-skip was active (handles 256 TB sentinel AVs)
+- GTA V's RIP was in fast-skip mode, advancing through unmapped memory
+- Occasionally, GTA V's RIP landed on real instructions in unmapped regions
+- During these "accidental" instruction fetches, GTA V's compute pipeline was submitted
+- This created 2 frames in 10 minutes
+- It was NOT real rendering - just accidental instruction executions
+
+### Why we can't easily restore "frame=2"
+- The 0141* GTA V patches (0141al, 0141aq, 0141ar) were added to give GTA V a clean exit
+- Without 0141ar, GTA V's RAGE crashes with misalignment (cycle 0141at experiment confirmed)
+- Without 0141al, GTA V's launcher_init backward loop hangs forever
+- Without 0141q, GTA V's init() function makes many PLT calls that all return 0,
+  causing fast-skip loop in unmapped memory
+- Disabling all 0141* patches would either hang GTA V or crash it
+
+### Possible direction forward
+1. Implement Agc_v1 NIDs (79 imports) - HUGE work, blocked by missing GPU compute
+2. Implement libc_v1 NIDs (15 missing) - smaller work, may help init() work
+3. Implement ulobjmgr_v1 NIDs (2 missing) - smallest work, may help main() work
+4. Find a way to skip BOTH launcher_init and init() AND let RAGE run far enough to dispatch a frame
+
+The current state (cycle 0141ar = 9-10s clean exit) is the best we can do without
+implementing missing system calls.
+
+## ## Summary of GTA V progression (cumulative)
 
 | Cycle | Runtime | Log size | Fast-skips | New milestones |
 |-------|---------|----------|-----------|----------------|
