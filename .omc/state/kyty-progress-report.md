@@ -162,6 +162,10 @@ of single-cycle work.
 
 - Reverted. Increasing RIP advance from +16 to +64 caused REGRESSION (5.8M fast-skips). Cycle 0136's `fast_skip_count > 1M` threshold couples to AV rate - changing rate breaks coupling. Source unchanged.
 
+### Cycle 0141y (2026-08-09) — Reserve 2MB system area in PhysicalMemory
+
+- GTA V's AllocateDirectMemory was returning phys_addr=0 (NULL) because physical memory started at 0. Now reserves first 2MB so first allocation returns 0x200000. Fixes real underlying issue but doesn't advance GTA V further (loop function AVs have separate cause).
+
 ## GTA V progression
 
 ### Current GTAV status (HEAD: 3d8682a)
@@ -296,6 +300,8 @@ All kyty stubs return 0 (no error), but the launched code has no GPU rendering p
 
 - **Cycle 0141x**: Failed experiment (+64 byte fast-skip) - REGRESSION to 5.8M fast-skips. Cycle 0136 threshold (fast_skip_count > 1M) couples to AV rate. Reverted.
 
+- **Cycle 0141y**: Reserve 2MB system area in PhysicalMemory - AllocateDirectMemory now returns phys_addr=0x200000 (was 0). Fixes underlying issue but loop function AVs persist (separate root cause - PLT 0xef returns NULL).
+
 ## Session summary (cycles 0141n-0141w, 2026-08-09)
 
 ### Code improvements (3 meaningful commits)
@@ -326,6 +332,7 @@ All kyty stubs return 0 (no error), but the launched code has no GPU rendering p
 
 - 0141v: This compacted report
 - 0141x: Failed +64 byte fast-skip experiment
+- 0141y: Reserve 2MB system area fix (AllocateDirectMemory returns 0x200000)
 
 ### Failed experiment (cycle 0141u)
 
