@@ -738,7 +738,10 @@ public:
 
 	PhysicalMemory() {
 		EXIT_NOT_IMPLEMENTED(!Common::Thread::IsMainThread());
-		m_free.emplace(0, Size());
+		// Cycle 0141y: reserve first 2 MB (system reserved area) so first allocation
+		// does not return NULL (GTA V dereferences phys_addr from AllocateDirectMemory).
+		constexpr uint64_t RESERVED_SYSTEM_AREA = 0x200000ULL;
+		m_free.emplace(RESERVED_SYSTEM_AREA, Size() - RESERVED_SYSTEM_AREA);
 	}
 	virtual ~PhysicalMemory() { KYTY_NOT_IMPLEMENTED; }
 
