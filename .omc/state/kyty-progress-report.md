@@ -1201,6 +1201,42 @@ launcher with all patches) is the achievable baseline.
 AI-assisted disclosure: Yes, AI-assisted.
 
 
+## Cycle 0141s (2026-08-09) — Test flow analysis and timeout behavior
+
+### Key findings
+1. **GTA V's RIP never reaches launcher entry directly**: It enters GTA V
+   code (loop function), then walks into M1W2 sentinel area (0x371xxxx)
+   where it fast-skips through ~17.5 MB of unmapped memory.
+2. **Test takes 2 minutes due to fast-skip traversal**: 1.1M+ fast-skips
+   at ~9000/sec to cover the 17.5 MB range before cycle 0134 catches.
+3. **Process is killed at timeout, not exited cleanly**: The emulator
+   process runs for the full 2 minutes, then PowerShell kills it.
+   PowerShell script exits with code 0 (script success, not emulator exit).
+
+### Complete test flow
+1. GTA V binary loads (217 PLT imports → stubs)
+2. GTA V's RIP enters loop function (0x9028b5xxx)
+3. 3 AVs in loop function patched by M1W2 v1.4
+4. RIP enters low memory (0x371fd30) - fast-skip advances 16 bytes/AV
+5. After ~17.5 MB traversal (1.1M fast-skips), cycle 0134 catches RIP at 0x4800010
+6. cycle 0134 redirects RIP to 0x902937ef (GTA V post-loop code)
+7. cycle 0138 fires (loop-skip) - RIP to 0x90293a15
+8. cycle 0139 fires (main-skip) - RIP to 0x900000089 (launcher continuation)
+9. Launcher runs (main returns immediately due to cycle 0141q NOP)
+10. Cleanup runs (PLT 0x02, PLT 0x03 - return 0)
+11. ud2 fires, exception handler terminates program
+12. Emulator cleanup runs - 3 ucrtbase AVs patched
+13. Process killed at 2-minute timeout
+
+### Implications
+- The cycle 0141e epilogue patch (ret→jmp-2) is no longer needed
+  because GTA V's main returns normally after the init NOP (cycle 0141q)
+- The test is bottlenecked by the fast-skip traversal in M1W2 sentinel area
+- GTA V never reaches actual game code (PLT functions not implemented)
+
+AI-assisted disclosure: Yes, AI-assisted.
+
+
 ## Cycle 0129-0130 (2026-08-08) — M1W2 v1.7 late-sentinel threshold discovery
 
 ### Investigation (cycle 0129)
