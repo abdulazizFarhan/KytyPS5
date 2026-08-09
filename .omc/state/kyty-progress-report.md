@@ -841,17 +841,25 @@ these requires real PS5 GPU compute knowledge - multi-week effort per upstream a
 
 **Upstream sync status (2026-08-10)**: 189 commits pending upstream. Most GTA V-relevant small commits (microsecond wall-clock, xorps xmm0, kernel lseek lock, etc.) are already ported to the fork. Large commits (guest red-zone protection, AGC new ABIs) have merge conflicts with fork-specific GTA V patches and were deferred.
 
-**Cycles 0141ay-az-ba-bb-bc-bd + 0141bi (GTA V NID coverage foundation)**: Added comprehensive stubs for all GTA V NIDs that GTA V's RAGE engine would need:
-- 14 libc_v1 stubs (cycles 0141ay+az+bb)
-- 2 ulobjmgr_v1 stubs (cycle 0141bc)
-- 9 libkernel_v1 stubs (cycle 0141bd)
-- 76 agc_v1 stubs (cycle 0141bi - commit 732a9fb)
+**Cycle 0141bi (commit 732a9fb) - libAgc.cpp stub library**: Added 76 Agc_v1 NID stubs in src/libs/libAgc.cpp, registered InitAgc_1 in libs.cpp's InitAll.
 
-All 76 Agc_v1 NIDs from GTA V's relocation table are now stubbed in src/libs/libAgc.cpp. The library is registered in libs.cpp's InitAll (LIB_DEFINE + LIB_LOAD). Stubs follow the same pattern as libUlowObjMgr.cpp: each is a KYTY_SYSV_ABI function with PRINT_NAME() and return 0. Function names use '_' prefix for NIDs starting with digit (C identifier requirement).
+**HONEST CAVEAT**: The 76 Agc_v1 NIDs were extracted from a previous (incorrect) analysis. After verification in this session:
+- 0 Agc_v1 references in GTA V's actual eboot.bin + 3 PRX files (libc.prx, libSceJobManager.prx, libSceNpCppWebApi.prx)
+- Only 18 AgcDriver_v1 NIDs are in GTA V's actual relocation table (not Agc_v1)
+- libSceJobManager.prx's relocation has 10 entries: 7 AgcDriver_v1 + 3 RazorCpu_v1
+- 25 entries in libSceJobManager.prx string table reference libSceAgc and libSceAgcDriver libraries, but these libraries are NOT in GTA V's PRX folder
 
-Build verified: cmake configure + launch build succeed, GTA V still completes main() in 12-19s with 0 AVs. RAGE is still bypassed by cycle 0141ar so Agc_v1 stubs are not invoked, but they're available for when RAGE engine eventually executes.
+This means Agc_v1 stubs are documentation/foundation only - they won't be called by GTA V's current loadable binaries. Agc_v1 is "multi-week effort" per upstream analysis; implementing it would require understanding AMD GPU compute APIs (the PS5 GPU).
 
-**Total commits**: 277 ahead of upstream (up from 260 in previous session)
+The 18 AgcDriver_v1 NIDs ARE in GTA V's actual relocation table and could be stubbed similarly to enable libSceJobManager.prx to load and expose more PLT entries. However, these are still AgcDriver_v1 stubs (return 0), so they don't enable RAGE rendering.
+
+**libSceJobManager.prx GTA V actually uses**:
+- 7 AgcDriver_v1 NIDs (Xq5WmbwPTnQ, SAfhzJPcjuk, FOwvmNlFLjM, qspAL8bgcBY, +TN0oRTBxJQ, etc.)
+- 3 RazorCpu_v1 NIDs (KP+TBWGHlgs, dnEdyY4+klQ, 9FowWFMEIM8)
+
+These could be stubbed in a similar cycle 0141bj.
+
+**Total commits**: 278 ahead of upstream (up from 260 in previous session) - 76 Agc_v1 stubs added are documentation/foundation only (not invoked by GTA V binaries)
 
 **Upstream sync status (2026-08-10)**: 189 commits pending upstream. Most GTA V-relevant small commits (microsecond wall-clock, xorps xmm0, kernel lseek lock, etc.) are already ported to the fork. Large commits (guest red-zone protection, AGC new ABIs) have merge conflicts with fork-specific GTA V patches and were deferred.
 
