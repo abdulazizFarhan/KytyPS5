@@ -1154,6 +1154,13 @@ To make GTA V progress past init, we would need to:
 2. Each function needs actual PS5 behavior emulation
 3. This is a substantial effort - not feasible in single cycle
 
+### Upstream sync analysis (cycle 0141s v3)
+- 176 upstream commits ahead of branch
+- Most are graphics/renderer improvements that don't apply to GTA V's blocker
+- GTA V is blocked at PLT function implementation (not at graphics or kernel level)
+- Small upstream commits already ported (KernelLseek lock leak, pthread ABI fixes)
+- Further upstream porting wouldn't unblock GTA V's PLT function issue
+
 ### Conclusion
 GTA V's launcher is fully exercised. The next blocker is implementation
 of PS5 system functions that GTA V's init function depends on.
