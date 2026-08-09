@@ -1,4 +1,6 @@
-**⚠️ CURRENT STATE (2026-08-10)**: GTA V exits cleanly in **4.7 seconds** with **0 frames rendered**. Cycle 0141ar (RAGE Main Thread NOP) is REQUIRED to prevent GTA V from crashing in RAGE init's NULL global pointer dereference. The 4.7s runtime is **not progress** - it's the same 9s milestone achieved with faster relocation. Real rendering progress requires implementing Agc_v1 GPU compute APIs (79 NIDs, multi-week effort).
+
+
+**⚠️ CURRENT STATE (2026-08-10)**: GTA V exits cleanly in **9.7 seconds** with **0 frames rendered**. Cycle 0141ar (RAGE Main Thread NOP) is REQUIRED to prevent GTA V from crashing in RAGE init's NULL global pointer dereference. The 9.7s runtime is **not progress** - it's the same 9s milestone achieved with faster relocation. Real rendering progress requires implementing Agc_v1 GPU compute APIs (79 NIDs, multi-week effort).
 
 **⚠️ STUBS THAT RETURN 0 ARE NO-OPS**: All 25 NID stubs added in cycles 0141ay+az+bb+bc+bd return 0, identical to PLT fallback behavior. They do not change GTA V's behavior. They only document which NIDs GTA V uses.
 
@@ -30,6 +32,25 @@ All return 0 (same as PLT fallback). GTA V behavior unchanged.
 All return 0 (same as PLT fallback). With these stubs, GTA V's libc.prx relocation resolves these NIDs directly via NID fallback instead of PLT stubbing.
 
 3-run verification: 9.7s, 8.7s, 8.8s avg 9.1s, all exit 0, 0 AVs.
+
+## Cycle 0141bf (commit 6e949e5) - 2026-08-10: port upstream d7063d0 - vulkan: remove validation layer configuration from device creation
+
+**Description**: Upstream commit d7063d0 (PR #221 by Pouare514, merged by nmzik) 
+removes the validation layer configuration from Vulkan device creation. The 
+validation layer fields are no longer needed in `VkDeviceCreateInfo`.
+
+**Change**: 4-line delete in `src/graphics/presentation/window/vulkanWindow.cpp`:
+```cpp
+create_info.enabledLayerCount = (r->enable_validation_layers ? static_cast<uint32_t>(r->required_layers.size()) : 0);
+create_info.ppEnabledLayerNames = (r->enable_validation_layers ? r->required_layers.data() : nullptr);
+```
+
+**3-run verification**: 9.96s, 9.65s, 9.50s avg 9.71s (consistent with cycle 0141ar baseline).
+All 5 GTA V patches fire, "done!" fires, exit code 0.
+
+**Impact on GTA V**: None observable. GTA V's RAGE engine is bypassed via cycle 0141ar, 
+so this Vulkan-level change doesn't affect the current state. May matter if GTA V's 
+RAGE runs in the future and validation issues arise.
 
 **Updated NID coverage summary**:
 - libc_v1: 14/15 implemented (cycles 0141ay, 0141az, 0141bb)
