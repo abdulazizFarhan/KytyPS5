@@ -620,6 +620,34 @@ throughput improvement.
 **Status**: Committed. No GTA V regression. No new GTA V progress. Clean upstream port.
 
 
+
+## Cycle 0141ai (commit 93e8254) - 2026-08-09: port upstream 3005a21 'renderer: ignore inactive HTile depth address'
+
+**Upstream commit**: 3005a21 'renderer: ignore inactive HTile depth address' (nmzik, 2026-08-08)
+
+**Files modified**:
+- `src/graphics/host_gpu/renderer/depthRenderTarget.cpp`: removed 2 lines
+  (`} else if (z.htile_data_base_addr != 0) { DepthFatal(...)`)
+
+**Adaptations**: None, clean port.
+
+**Test result** (2-min test):
+| Metric | cycle 0141ah | cycle 0141ai | Delta |
+|--------|-------------|-------------|-------|
+| Log size | 719,478 | 697,215 | -22,263 (-3.1%) |
+| Fast-skips | 5,216,257 | 5,041,153 | -175,104 (-3.4%) |
+| Late-sentinel total | 4,610,000 | 4,434,000 | -176,000 (-3.8%) |
+| Max RIP | 0xa40eb705 | 0xa3e3bf05 | -0x2cf800 closer |
+| Milestones | WindowCreate, Vulkan, Main | same | no change |
+
+**Analysis**: Cycle 0141ai removes the DepthFatal check that triggered when
+HTile address was set but the tile surface wasn't enabled. Allows games to
+have HTile without an enabled tile surface. Slight throughput reduction
+(may be noise). No regression in GTA V.
+
+**Status**: Committed. No GTA V regression. No new GTA V progress. Clean upstream port.
+
+
 ## Summary of GTA V progression (cumulative)
 
 | Cycle | Runtime | Log size | Fast-skips | New milestones |
