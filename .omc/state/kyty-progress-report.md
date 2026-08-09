@@ -74,6 +74,7 @@ rewritten and renamed upstream to CfgLoopEarlyContinuesNoSelection.
 - 110 commits in fork branch (was 109 pre-cycle-0103).
 - Pushed to ork remote (abdulazizFarhan/KytyPS5.git).
 
+
 ## Cycle 0125 (2026-08-08) — M1W2 v1.7: GTA V exits cleanly in 60s
 
 ### Investigation
@@ -1166,6 +1167,18 @@ GTA V's launcher is fully exercised. The next blocker is implementation
 of PS5 system functions that GTA V's init function depends on.
 
 AI-assisted disclosure: Yes, AI-assisted.
+
+## Cycle 0141t (2026-08-09) — Cleanup of obsolete cycle 0141e patch
+- Investigated the cycle 0141e patch target (GTA V's main epilogue at 0x29e350)
+- Searched entire GTA V binary for callers of 0x29e331-0x29e360 range
+- Found **zero callers** - the patched function is dead code
+- The cycle 0141e patch (ret -> jmp-2) has no functional effect on GTA V execution
+- The patch was originally added to prevent GTA V's main from returning to launcher
+- But cycle 0141q (NOP main->init) already prevents main from doing anything
+- Removed the obsolete 36-line patch block from PatchProgram()
+- Build + test confirmed: zero behavioral change (3 cycles, 6 patches, ~1.1M fast-skips)
+- Minor code cleanup: faster PatchProgram (no dead-code scan)
+- Commit: 9d7091d "Cleanup: remove obsolete cycle 0141e patch (targets dead code with no callers)"
 
 
 ## Cycle 0141r (2026-08-09) — GTA V PS5 SDK library requirements
