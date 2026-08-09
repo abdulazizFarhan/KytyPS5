@@ -15,6 +15,21 @@ All return 0 (same as PLT fallback). GTA V behavior unchanged.
 
 **Total libc_v1 NID coverage**: 14/15 (only hcuQgD53UxM was already in kyty as `libc_printf`).
 
+**Cycle 0141bc (2026-08-09)**: Added `libUlowObjMgr.cpp` with 2 ulobjmgr_v1 NID stubs:
+- `BG26hBGiNlw` (PLT 4 in launcher_init wrapper, PLT 58 in libSceJobManager.prx)
+- `Smf+fUNblPc` (PLT 6 in main(), PLT 68 in libSceJobManager.prx)
+
+Both return 0 (same as PLT fallback). Stubs are documented and registered but not actually called in current state (libSceJobManager.prx code never runs because init() is NOPped).
+
+3-run verification: 9.8s, 8.8s, 8.6s average 9.1s, all exit 0, 0 AVs.
+
+**Updated NID coverage summary**:
+- libc_v1: 14/15 implemented (cycles 0141ay, 0141az, 0141bb)
+- ulobjmgr_v1: 2/2 implemented (cycle 0141bc)
+- Agc_v1: 0/76 implemented (MAJOR blocker - need real GPU compute)
+- AgcDriver_v1: 0/18 implemented
+- Graphics5_v1: implemented (uses different NID space)
+
 3-run verification: 9.4s, 9.1s, 9.0s average 9.2s, all exit 0, 0 AVs.
 
 **Cycle 0141ba**: EXPERIMENT - temporarily disabled cycle 0141ar (RAGE Main Thread NOP+ret). 
