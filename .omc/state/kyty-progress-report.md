@@ -955,12 +955,45 @@ The correct offset should be 0x14e95ULL (segment-relative = 0x18e95 - 0x4000) fo
 LAUNCHER_LOOP pattern at memory 0x90014e95, but 0x45ULL happens to also match (a different
 all-zeros location in the runtime) and doesn't break anything because main()->init() is 
 NOPped before launcher_init's backward loop ever executes.
+## Cycle 0141aq (REVERTED - regression) - 2026-08-09: parallel-agent experiment
+
+### What was tried
+A parallel agent modified runtimeLinker.cpp to introduce cycle 0141aq:
+- DISABLE cycle 0141ap (re-enable main->init to run)
+- RE-ENABLE launcher_init backward loop NOP (cycle 0141al)
+- NOP GTA V's "confirm failure" RAGE engine assertion at vaddr 0x9028b0eb7
+
+The patch had two sites:
+- Call site 1: 0x9002811ac (file_off 0x2811ac) - in scErrorTriggerDisplay
+- Call site 2: 0x9028b0927 (file_off 0x28b0927) - in 0x9028afe80 syscall loop
+
+### Result - REGRESSION
+| Metric | Cycle 0141ap (clean) | Cycle 0141aq (parallel-agent) |
+|--------|---------------------|------------------------------|
+| Runtime | 9.8s | 6.3s (crash) |
+| Returncode | 0 | 3221225622 (STATUS_ACCESS_VIOLATION) |
+| Execute: Main | YES | NO (crash during libc.prx init) |
+| Done! | YES | NO |
+| Log size | 78K | 78K (different content) |
+| Patches firing | 4 | All 3 (launcher_init, main->init disabled, confirm failure x2) |
+
+### Lesson
+Even with the "confirm failure" assertion NOPped, GTA V crashes during libc.prx init. The 
+parallel-agent experiment confirmed cycle 0141ap's strategy is correct: skip init() entirely.
+
+### Cycle 0141aq reverted
+The cycle 0141aq changes were reverted via `git restore`. The runtimeLinker.cpp is back to 
+the cycle 0141ap state. The progress report was updated to document this experiment.
+
+## 
+
 
 ## ## Summary of GTA V progression (cumulative)
 
 | Cycle | Runtime | Log size | Fast-skips | New milestones |
 |-------|---------|----------|-----------|----------------|
 | **0141ap** | 9.7s | 78KB | 0 | **Clean exit restored (REVERTED 0141an)** |
+| 0141aq | 6.3s | 78KB | 0 | REGRESSION (parallel-agent experiment) - reverted |
 | 0141an | 180s+ | 5.5MB | 41,689 | FAILED - let init() run was a regression |
 | **0141am** | 9s | 78KB | 0 | **All 4 GTA V patches fire (bugfix), main() returns cleanly** |
 | 0141ac | 120s | 628,007 | 4,468,737 | WindowCreate, Vulkan init, Main executes |
