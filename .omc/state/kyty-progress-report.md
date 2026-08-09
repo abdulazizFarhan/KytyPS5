@@ -1,4 +1,17 @@
-# Kyty PS5 emulator progress report
+
+
+**Cycles 0141ay, 0141az, 0141ba (2026-08-09)**:
+
+**Cycle 0141ay**: Added `zr094EQ39Ww` libc_v1 stub in `src/libs/libC.cpp`. Returns 0 (same as PLT fallback). GTA V behavior unchanged.
+
+**Cycle 0141az**: Added `z+P+xCnWLBk` libc_v1 stub in `src/libs/libC.cpp`. Returns 0 (same as PLT fallback). GTA V behavior unchanged.
+
+**Cycle 0141ba**: EXPERIMENT - temporarily disabled cycle 0141ar (RAGE Main Thread NOP+ret). 
+- Result: REGRESSION. GTA V crashes at 4.6s with STATUS_INSTRUCTION_MISALIGNMENT (0xC0000096).
+- M1W2 v1.4 patches 9 AV sites at 0x902813b20-c20 but causes RIP misalignment.
+- REVERTED. Cycle 0141ar is REQUIRED to prevent GTA V from crashing.
+
+The current state has 5 active GTA V patches (0141ar, 0141au, 0141av, 0141aq confirm failure x2, 0141aw safety net) and 2 libc_v1 stubs (0141ay, 0141az). GTA V completes main() in 8-11s with 0 AVs.# Kyty PS5 emulator progress report
 
 This report covers **measurable progress toward running Grand Theft Auto V** on the
 
