@@ -304,7 +304,41 @@ play, the missing virtual call at 0x902813b1a (NULL pointer write) needs to be i
 
 After cycle 0141at experiment was reverted, cycle 0141ar restored. Re-verified GTA V completes
 main() lifecycle in 19.142s with 0 AVs, 'done!' and 'return from main = 0' messages present.
-All 5 GTA V patches fire correctly. Cycle 0141ar state is the stable baseline.
+All 5 GTA V patches fire correctly. Cycle 0141ar state is the 
+
+**Cycles 0141au + 0141av (commit 7511601, 2026-08-09) - DECODED RAGE STUB:**
+
+Cycle 0141au: Added debug-only cycle that dumps runtime bytes at GTA V's RAGE entry (vaddr 0x9028b0950)
+and RAGE setup function entry (vaddr 0x902813560). This decodes the actual decrypted bytes from
+kyty's loaded GTA V image.
+
+Cycle 0141av: NOP GTA V's RAGE setup virtual call at vaddr 0x902813b29 (file_off 0x2813b29, 3 NOPs).
+The function at 0x902813b1a does:
+  0x902813b1a: mov rax, [rdi]
+  0x902813b1d: mov esi, 0x128
+  0x902813b22: mov edx, 0x10
+  0x902813b27: xor ecx, ecx
+  0x902813b29: call [rax + 0x48]  <-- AV when rax = 0 (NULL vtable)
+
+**Cycle 0141av alone is INSUFFICIENT** - the function has follow-up AVs at 0x902813b2c (mov [rax], 0x12)
+and others. Cycle 0141ar (NOP RAGE entry) is still needed to bypass RAGE entirely.
+
+**Test result with cycles 0141ar + 0141au + 0141av active:**
+- GTA V completes main() in 15.866s (stable)
+- 0 Access Violations
+- 0 M1W2 v1.4 patches (RAGE entry bypassed)
+- All 5 GTA V patches fire: launcher_init NOP, init() lets run, confirm failure NOP x2, RAGE entry NOP + ret, virtual call NOP
+- Cycle 0141au logs runtime bytes for analysis
+- Cycle 0141av is redundant with cycle 0141ar but provides additional safety net
+
+**Key insight:** GTA V's RAGE setup function at 0x902813560 has a NULL vtable throughout (av_addr=0).
+Multiple virtual calls fail with the same root cause. Fixing the vtable would require implementing
+the missing PLT entries GTA V calls into, which is significantly more work than the current bypass.
+
+**Conclusion:** Cycles 0141ar + 0141au + 0141av form the new stable baseline. GTA V completes main()
+in 15-19s with 0 AVs. The RAGE engine is still bypassed (not actually running). To make RAGE run
+would require implementing the missing PLT entries or pre-initializing GTA V's vtable.
+stable baseline.
 
 ### Latest result (cycle 0141am - 2-min test, BUGFIX)
 
