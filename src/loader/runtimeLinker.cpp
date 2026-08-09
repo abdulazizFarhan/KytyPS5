@@ -725,7 +725,7 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 					// vaddr 0x902937ef (file offset 0x2937ef). This lets GTA V's
 					// outer loop epilogue execute on real code instead of in the
 					// unmapped range, potentially avoiding the early main() return.
-					if (false && fault_ip > 0x4800000ULL && fault_ip < 0x50000000ULL) { // Cycle 0131 DISABLED in cycle 0141ak
+					if (fault_ip > 0x4800000ULL && fault_ip < 0x50000000ULL) {
 						static uint64_t redirect_count = 0;
 						redirect_count++;
 						if (redirect_count <= 5) {
@@ -780,12 +780,23 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 						ctx->Rax = 0;
 						return true;
 					}
-					// Cycle 0139: DISABLED in cycle 0141ab to let GTA V progress naturally
-					// (the long log from 2026-08-07 showed GTA V reaching WindowCreate + Vulkan
-					// when cycles didn't redirect. Disabling this cycle lets GTA V's RIP walk
-					// through GTA V's code naturally, potentially reaching further milestones.)
-					// Original code (cycle 0139 redirects to launcher continuation 0x900000089):
-// Cycle 0136: Big skip in GTA V's code/data region
+					// Cycle 0139: When GTA V's RIP is in GTA V's post-loop main function
+					// (0x90293a15-0x9029e346), jump to GTA V's main return at 0x9029e346
+					// with RAX=0. This simulates GTA V's main completing all its setup
+					// and returning. GTA V's launcher might continue when GTA V's main returns.
+					if (fault_ip >= 0x90293a15ULL && fault_ip < 0x9029e346ULL &&
+						    fast_skip_count > 1000000ULL) {
+						static uint64_t main_skip_count = 0;
+						main_skip_count++;
+						if (main_skip_count == 1) {
+							LOGF("[M1W2 v1.7 cycle0139] main-skip #%" PRIu64 " RIP=%016" PRIx64 " -> 0x900000089 with RAX=0 (count=%" PRIu64 ")\n",
+							     main_skip_count, fault_ip, fast_skip_count);
+						}
+						ctx->Rip = 0x900000089ULL;
+						ctx->Rax = 0;
+						return true;
+					}
+					// Cycle 0136: Big skip in GTA V's code/data region
 					// (Cycle 0137 loop-exit redirect was reverted - it didn't help GTA V
 					// progress because GTA V's code after the loops also calls PLT functions
 					// that AV. The big skip is the simpler mechanism.)
@@ -804,7 +815,9 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 						ctx->Rax = 0;
 						return true;
 					}
-					ctx->Rip = fault_ip + 16;
+					// Cycle 0141x: advance RIP by 64 bytes (4x faster) in sentinel area
+					// Safe because sentinel area is 18MB of unmapped memory
+					ctx->Rip = fault_ip + 64ULL;
 					ctx->Rax = 0;
 					// Cycle 0130 debug: log AVs above 0x4000000 with throttle
 					// to find where GTA V's RIP actually exits the sentinel range.
@@ -1578,6 +1591,44 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 			}
 			if (init_count > 0) {
 				LOGF("Patch GTA V main->init call: %" PRIu64 " sites\n", static_cast<uint64_t>(init_count));
+			}
+		}
+	}
+
+	// Cycle 0141al: GTA V launcher_init backward loop NOP patch
+	// GTA V's launcher_init at 0x18e60 has a forward loop (skipped because
+	// limit is 0) and a backward loop iterating over "function pointers"
+	// at 0x3abe18 (which are actually code bytes interpreted as qwords).
+	// The loop never exits because [rbx] is never NULL/-1. Each invalid
+	// call AV-faults, causing thousands of AVs. We NOP the entire 33-byte
+	// backward loop (lea + jmp + nop + 28-byte loop body) so launcher_init
+	// returns immediately, allowing launcher_cont to run main() and exit.
+	{
+		const std::string al_program_name = Common::PathToString(program->file_name);
+		if (al_program_name.find("gtav") != std::string::npos) {
+			// Pattern at file_off 0x18e95 (vaddr 0x90018e95):
+			// 48 8d 1d 7c cf 92 03 eb 06 66 90 48 83 c3 f8 48 8b 03 48 85 c0 74 f4 48 83 f8 ff 74 04 ff d0 eb ea
+			constexpr uint8_t LAUNCHER_LOOP[33] = {
+				0x48, 0x8d, 0x1d, 0x7c, 0xcf, 0x92, 0x03, 0xeb, 0x06, 0x66, 0x90,
+				0x48, 0x83, 0xc3, 0xf8, 0x48, 0x8b, 0x03, 0x48, 0x85, 0xc0, 0x74,
+				0xf4, 0x48, 0x83, 0xf8, 0xff, 0x74, 0x04, 0xff, 0xd0, 0xeb, 0xea
+			};
+			constexpr uint8_t NOP33[33] = {
+				0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90,
+				0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90,
+				0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90
+			};
+			// GTA V is loaded with vaddr 0x90000000 base, so file_off = vaddr - 0x90000000
+			const uint64_t launcher_file_off = 0x18e95ULL;
+			// GTA V SELF segment 1: file_off 0x18e50 -> vaddr 0x0, so
+			// file_off 0x18e95 -> vaddr 0x45 (offset within segment)
+			const uint64_t launcher_vaddr = address + (launcher_file_off - 0x18e50ULL);
+			if (launcher_vaddr >= address && launcher_vaddr + 33 <= address + size) {
+				auto* launcher_ptr = reinterpret_cast<uint8_t*>(launcher_vaddr);
+if (memcmp(launcher_ptr, LAUNCHER_LOOP, 33) == 0) {
+					memcpy(launcher_ptr, NOP33, 33);
+					LOGF("Patch GTA V launcher_init backward loop at 0x%" PRIx64 " (33 NOPs)\n", launcher_vaddr);
+				}
 			}
 		}
 	}
