@@ -1612,6 +1612,54 @@ uint64_t KYTY_SYSV_ABI KernelGetGPI() {
 	return bits;
 }
 
+
+// GTA V libkernel_v1 cycle 0141bd stubs (returns 0 - safe default for unknown)
+// PLT 15, 43, 45, 53, 71, 79, 95, 97, 99 in GTA V's libc.prx
+static KYTY_SYSV_ABI int LibKernel_VADc3MNQ3cM_stub() {
+	PRINT_NAME();
+	return 0;
+}
+
+static KYTY_SYSV_ABI int LibKernel_YTWqXc3CQ_stub() {
+	PRINT_NAME();
+	return 0;
+}
+
+static KYTY_SYSV_ABI int LibKernel_3k6kxzOOSQ_stub() {
+	PRINT_NAME();
+	return 0;
+}
+
+static KYTY_SYSV_ABI int LibKernel_c7ZnT7V1B98_stub() {
+	PRINT_NAME();
+	return 0;
+}
+
+static KYTY_SYSV_ABI int LibKernel_crb5j7mkk1c_stub() {
+	PRINT_NAME();
+	return 0;
+}
+
+static KYTY_SYSV_ABI int LibKernel_hHlZQUnlxSM_stub() {
+	PRINT_NAME();
+	return 0;
+}
+
+static KYTY_SYSV_ABI int LibKernel_0Cq8ipKr9n0_stub() {
+	PRINT_NAME();
+	return 0;
+}
+
+static KYTY_SYSV_ABI int LibKernel_WlyEAsLDf0_stub() {
+	PRINT_NAME();
+	return 0;
+}
+
+static KYTY_SYSV_ABI int LibKernel_fgIsQ10xYVA_stub() {
+	PRINT_NAME();
+	return 0;
+}
+
 } // namespace LibKernel
 
 namespace LibKernelWriteThrottling {
@@ -3148,6 +3196,17 @@ LIB_DEFINE(InitLibKernel_1) {
 	AddLibkernelUnityFunc(s, "WkwEd3N7w0Y",
 	                      reinterpret_cast<uint64_t>(LibKernel::KernelInstallExceptionHandler),
 	                      "LibKernel::KernelInstallExceptionHandler");
+
+	// GTA V libkernel_v1 cycle 0141bd: stubs for 9 NIDs (returns 0)
+	LIB_FUNC("VADc3MNQ3cM", LibKernel::LibKernel_VADc3MNQ3cM_stub);
+	LIB_FUNC("-YTW+qXc3CQ", LibKernel::LibKernel_YTWqXc3CQ_stub);
+	LIB_FUNC("3k6kx-zOOSQ", LibKernel::LibKernel_3k6kxzOOSQ_stub);
+	LIB_FUNC("c7ZnT7V1B98", LibKernel::LibKernel_c7ZnT7V1B98_stub);
+	LIB_FUNC("crb5j7mkk1c", LibKernel::LibKernel_crb5j7mkk1c_stub);
+	LIB_FUNC("hHlZQUnlxSM", LibKernel::LibKernel_hHlZQUnlxSM_stub);
+	LIB_FUNC("0Cq8ipKr9n0", LibKernel::LibKernel_0Cq8ipKr9n0_stub);
+	LIB_FUNC("WlyEA-sLDf0", LibKernel::LibKernel_WlyEAsLDf0_stub);
+	LIB_FUNC("fgIsQ10xYVA", LibKernel::LibKernel_fgIsQ10xYVA_stub);
 }
 
 } // namespace Libs
