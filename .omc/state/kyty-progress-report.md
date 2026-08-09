@@ -1077,15 +1077,44 @@ hurt anything.
 - No ucrtbase crash
 - Test exits cleanly
 
-### Status
-GTA V's launcher runs, M1W2 v1.4 patches PLT-related AVs, emulator cleanup runs.
-GTA V's launcher calls PLT entries which redirect to kyty's stub functions.
+AI-assisted disclosure: Yes, AI-assisted.
 
-### Key insight
-For GTA V to progress to actual game code, the kyty stubs need to implement
-the actual PS5 system functions that GTA V's launcher calls. The current
-stubs just return 0, which means GTA V's launcher initialization doesn't
-actually do anything meaningful.
+
+## Cycle 0141n (2026-08-09) — GTA V main function analysis
+
+### Discovery
+Discovered that GTA V's main function is at:
+- File offset: 0x294850
+- Mapped C vaddr: 0x9027BA00 (using mapped C: vaddr = file_offset + 0x8FFFE71B0)
+
+This is DIFFERENT from what was tried in cycle 0141j (0x90398800 - mapped A).
+The cycle 0141j attempt failed because the address was wrong.
+
+### Main function analysis
+GTA V's main function at 0x9027BA00:
+- Stores argc/argv to global variables (doesn't use them directly)
+- Checks an init flag [rip+0x4fc9b35] (file offset 0x7911A0)
+- If flag is 0, does initialization (calls function at 0x28C8CD0)
+- If flag is non-zero, just returns
+
+The init function at 0x28C8CD0 is a real GTA V function (has prologue).
+It probably initializes the game.
+
+### Test verification
+Test still runs cleanly with cycle 0141m state (cycle 0139 target = 0x900000089).
+- 6 AV sites patched
+- No ucrtbase crash
+- ~1100 fast-skips
+- Window created
+
+### Future direction
+To make GTA V progress further, would need to:
+1. Implement actual PS5 system functions (kyty stubs return 0)
+2. Or skip GTA V's launcher entirely and call main directly
+3. Or find a way to set up registers for main call
+
+The simplest experiment would be to try cycle 0139 target = 0x9027BA00
+(GTA V's actual main function entry) with proper register setup.
 
 AI-assisted disclosure: Yes, AI-assisted.
 
