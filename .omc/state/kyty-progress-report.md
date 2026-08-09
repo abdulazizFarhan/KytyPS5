@@ -422,6 +422,62 @@ Attempted to make GTA V actually execute its main() function by changing cycle 0
 
 - **Cycle 0141ab** ⭐ MAJOR WIN: Disabled cycle 0139. GTA V's main() executed, WindowCreate (1280x720), Vulkan init, PRX modules loaded (libc.prx, libSceJobManager.prx, libSceNpCppWebApi.prx). 3.2x log, 4x fast-skips, 50% fewer AV sites. Late-sentinel spiral still happens but milestones reached. None of these NIDs are registered in kyty's library files (1550 unique NIDs across 95 LIB_DEFINE blocks). Top blocker: Agc_v1 (79 graphics imports). Implementation requires AMD GPU compute API understanding - massive effort beyond single cycle.
 
+
+## Cycle 0141ac: Port upstream commit e3890fe 'agc: new abi' (2026-08-09)
+
+**Commit**: `b98842b M1W2: cycle 0141ac - port upstream commit e3890fe 'agc: new abi'`
+
+### What was ported
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `src/libs/agc.h` | +2 | Add `GraphicsGetGsOversubscription` declaration |
+| `src/libs/agc.cpp` | +89 | Add helper `get_gs_occupancy_limits()` + `GraphicsGetGsOversubscription()` implementation |
+| `src/libs/libGraphicsDriver.cpp` | +1 | Register `NKIzURsgV7I` -> `Gen5::GraphicsGetGsOversubscription` |
+| `src/graphics/guest_gpu/pm4.h` | +1 | Add `GE_PC_ALLOC = 0x260` constant |
+| `src/graphics/guest_gpu/command_processor/pm4Handlers.cpp` | +6 | Add `GE_PC_ALLOC` no-op handler |
+
+### GTA V impact
+
+- GTA V's `eboot.bin` imports `NKIzURsgV7I` from `Agc_v1.1`
+- Falls back to `Graphics5_v1` (which now has the function via `Gen5::GraphicsGetGsOversubscription`)
+- Test results vs cycle 0141ab:
+  - **Log size**: 962,187 bytes (vs 643,980) — **+50%**
+  - **Fast-skip max**: 7,090,177 (vs 4,609,025) — **+54%**
+  - **Unique fault_ips**: 103 (vs 3) — GTA V walks through more diverse memory
+  - **Max fault_ip reaches**: 0x9028b5564 (GTA V's actual loop function)
+  - **Big-skip target RIPs**: 0xa5e85905-0xa5e95305 (RIP walks 365MB further)
+  - **3 cycles fire** (cycle0134, cycle0138, cycle0136/big-skip)
+  - **WindowCreate** (1280x720) still works
+  - **Vulkan init** still works (47+ extensions)
+  - **8 semaphores** created
+  - **3 PRX modules** loaded (libc, libSceJobManager, libSceNpCppWebApi)
+
+### Root cause analysis
+
+The AGC port is a clean re-implementation of upstream commit `e3890febaac4d8baae1427c08a965dc98f8b3bff` (Nmzik, 2026-08-09). The function `GraphicsGetGsOversubscription` calculates geometry shader oversubscription limits based on vertex/export capacity, NGG subgroup config, and budget parameters.
+
+Even though GTA V imports `NKIzURsgV7I` from `Agc_v1.1` (the newer library), the PS5 NID fallback mechanism finds it in `Graphics5_v1` (where I added the entry). The function pointer in GTA V's PLT will resolve correctly at runtime.
+
+### Remaining Agc_v1 gap
+
+Of GTA V's 69 Agc-related unresolved NIDs:
+- **1 resolved by this cycle** (`NKIzURsgV7I`)
+- **68 still missing** (not in upstream `libGraphicsDriver.cpp` either)
+
+These 68 NIDs are Agc_v1 GPU compute backend functions that neither our fork nor upstream implements. They represent AMD's GPU shader compilation and command building primitives.
+
+### Why this matters
+
+This is the **first upstream port** in 11 cycles (since cycle 0141n). It demonstrates that upstream is actively adding AGC support, but is still far from GTA V's needs. Each port is incremental but doesn't unblock GTA V's GPU rendering yet.
+
+### Verification
+
+- Build: `ninja exit 0` (32 second build, 11 source files recompiled)
+- GTA V 2-min test: clean exit 0
+- No new AV sites introduced (3 known GTA V sites at 0x9028b5520, 0x9028b5540, 0x9028b5564)
+- All tests passing (no regressions)
+
 ## Session summary (cycles 0141n-0141w, 2026-08-09)
 
 ### Code improvements (3 meaningful commits)
