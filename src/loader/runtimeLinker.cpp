@@ -1575,20 +1575,15 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 	// milestones. Cycle 0141ap re-enables the patch (back to cycle 0141am behavior) for a
 	// clean 9s exit while we work on a better init() handling strategy.
 	{
-		constexpr uint8_t INIT_CALL[5] = {0xe8, 0x34, 0x44, 0x63, 0x02};  // call 0x28c8cd0
+		// Cycle 0141aq: DISABLE cycle 0141ap to let init() run.
+		// Goal: GTA V reaches RAGE engine instead of exiting at 9s.
+		constexpr uint8_t INIT_CALL[5] = {0xe8, 0x34, 0x44, 0x63, 0x02};
 		constexpr uint8_t NOP5[5] = {0x90, 0x90, 0x90, 0x90, 0x90};
-		auto* init_start = reinterpret_cast<uint8_t*>(address);
-		auto* init_end = init_start + size - 5;
-		size_t init_count = 0;
-		for (auto* ptr = init_start; ptr <= init_end; ptr++) {
-			if (memcmp(ptr, INIT_CALL, 5) == 0) {
-				memcpy(ptr, NOP5, 5);
-				init_count++;
-			}
-		}
-		if (init_count > 0) {
-			LOGF("Patch GTA V main->init call: %" PRIu64 " sites\n", static_cast<uint64_t>(init_count));
-		}
+		(void)INIT_CALL;
+		(void)NOP5;
+		(void)address;
+		(void)size;
+		LOGF("Patch GTA V main->init call: 0 sites (DISABLED - letting init() run)\n");
 	}
 	// Cycle 0141ao: RE-ENABLE cycle 0141al (launcher_init backward loop NOP) AND keep
 	// cycle 0141q disabled (let init() run). Cycle 0141an had both disabled, causing GTA V
@@ -1618,6 +1613,38 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 				memcpy(launcher_ptr, NOP33, 33);
 				LOGF("Patch GTA V launcher_init backward loop at 0x%" PRIx64 " (33 NOPs)\n",
 				     reinterpret_cast<uint64_t>(launcher_ptr));
+			}
+		}
+	}
+
+	// Cycle 0141aq: NOP GTA V's "confirm failure" assertion call sites
+	// GTA V's RAGE engine crashes with "confirm failure" assertion at vaddr 0x9028b0eb7.
+	// The call chain is: main() at 0x90027ba00 -> 0x9028afe80 (syscall loop)
+	// -> 0x9028b0c90 (crash function). NOP both call sites to bypass the assertion.
+	// - Call site 1: vaddr 0x9002811ac (file_off 0x299ffc) - in scErrorTriggerDisplay
+	// - Call site 2: vaddr 0x9028b0927 (file_off 0x28c9777) - in 0x9028afe80 syscall loop
+	{
+		// Call site 1: e8 df fa 62 02 = call 0x9028b0c90
+		constexpr uint8_t CONFIRM_CALL1[5] = {0xe8, 0xdf, 0xfa, 0x62, 0x02};
+		constexpr uint8_t NOP5[5] = {0x90, 0x90, 0x90, 0x90, 0x90};
+		const uint64_t confirm_file_off1 = 0x2811acULL;
+		if (confirm_file_off1 + 5 <= size) {
+			auto* confirm_ptr = reinterpret_cast<uint8_t*>(address) + confirm_file_off1;
+			if (memcmp(confirm_ptr, CONFIRM_CALL1, 5) == 0) {
+				memcpy(confirm_ptr, NOP5, 5);
+				LOGF("Patch GTA V confirm failure call #1 at 0x%" PRIx64 " (5 NOPs)\n",
+				     reinterpret_cast<uint64_t>(confirm_ptr));
+			}
+		}
+		// Call site 2: e8 64 03 00 00 = call 0x9028b0c90
+		constexpr uint8_t CONFIRM_CALL2[5] = {0xe8, 0x64, 0x03, 0x00, 0x00};
+		const uint64_t confirm_file_off2 = 0x28b0927ULL;
+		if (confirm_file_off2 + 5 <= size) {
+			auto* confirm_ptr2 = reinterpret_cast<uint8_t*>(address) + confirm_file_off2;
+			if (memcmp(confirm_ptr2, CONFIRM_CALL2, 5) == 0) {
+				memcpy(confirm_ptr2, NOP5, 5);
+				LOGF("Patch GTA V confirm failure call #2 at 0x%" PRIx64 " (5 NOPs)\n",
+				     reinterpret_cast<uint64_t>(confirm_ptr2));
 			}
 		}
 	}
