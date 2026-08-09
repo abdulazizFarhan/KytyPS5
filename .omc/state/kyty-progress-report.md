@@ -328,6 +328,39 @@ block was restored from git HEAD. Re-verified GTA V completes main() lifecycle i
 
 This confirms the cycle 0141ar state is the stable baseline.
 
+### Verification after parallel-agent revert (2026-08-09)
+
+**Context:** During this iteration, a parallel agent reverted cycle 0141ar in the working
+tree (twice), then attempted to add cycle 0141as to patch the AV-causing function in
+0x902813a90. Both experiments were investigated and reverted.
+
+**Discovery 1: Cycle 0141as had wrong offset.**
+
+The parallel agent's cycle 0141as claimed to patch vaddr 0x902813ae0 with file_off
+0x2817ae0 (using formula `0x902813ae0 - 0x900000000 + 0x4000`). The +0x4000 was an
+incorrect adjustment. The correct file_off is `0x902813ae0 - 0x900000000 = 0x2813ae0`.
+
+**Discovery 2: Cycle 0141as (corrected) didn't help.**
+
+Even with the correct offset, cycle 0141as didn't progress GTA V because:
+- The AV-causing function in RAGE is NOT at 0x902813ae0
+- The actual function starts at vaddr 0x902813560 (file_off 0x2813560), which is 1406 bytes long
+- The AV happens at vaddr 0x902813ade, which is INSIDE this large function
+- Patching 0x902813ae0 with NOP NOP ret doesn't prevent the AV at 0x902813ade
+- GTA V's RAGE thread hangs after the patched function returns because GTA V calls
+  more functions that hit similar AVs
+
+**Result: Cycle 0141ar remains the stable baseline.**
+
+After each parallel-agent revert, cycle 0141ar was restored from git HEAD. Verified
+GTA V completes main() lifecycle consistently in 10-17 seconds with:
+- done! and return from main = 0 messages present
+- 0 Access Violations
+- All 5 GTA V patches fire correctly (launcher_init NOP, init() let run, confirm
+  failure NOP x2, RAGE entry NOP + ret)
+- 268 PS5 NID fallbacks logged (mostly Graphics5: 164, Json2: 52, Graphics5Driver: 25, libc: 18)
+- Process exits cleanly
+
 ### Current blocker
 
 **GTA V's launcher requires 217 PS5 SDK imports across 24 libraries.**
