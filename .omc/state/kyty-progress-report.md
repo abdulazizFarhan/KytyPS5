@@ -648,6 +648,35 @@ have HTile without an enabled tile surface. Slight throughput reduction
 **Status**: Committed. No GTA V regression. No new GTA V progress. Clean upstream port.
 
 
+
+## Cycle 0141aj (commit 08e3116) - 2026-08-09: port upstream a4da2a9 'json2: implement typed Value constructor'
+
+**Upstream commit**: a4da2a9 'json2: implement typed Value constructor' (nmzik, 2026-08-09)
+
+**Files modified**:
+- `src/libs/libJson2.cpp`: added `JsonValueSetEmptyType` helper, added
+  `JsonValueTypeCtor` function, refactored `JsonValueSetType` to use the
+  helper, added LIB_FUNC registration for NID `CbrT3dwDILo`.
+
+**Adaptations**: None, clean port.
+
+**Test result** (2-min test):
+| Metric | cycle 0141ai | cycle 0141aj | Delta |
+|--------|-------------|-------------|-------|
+| Log size | 697,215 | 707,927 | +10,712 (+1.5%) |
+| Fast-skips | 5,041,153 | 5,117,953 | +76,800 (+1.5%) |
+| Late-sentinel total | 4,434,000 | 4,524,000 | +90,000 (+2.0%) |
+| Max RIP | 0xa3e3bf05 | 0xa3f9b805 | +0x15fc00 further |
+| Milestones | WindowCreate, Vulkan, Main | same | no change |
+
+**Analysis**: Cycle 0141aj adds JsonValueTypeCtor (typed Value constructor)
+that creates a new JsonValue of a given type. GTA V doesn't reach this code
+path yet (no JSON parsing in the late-sentinel loop). Slight throughput
+improvement.
+
+**Status**: Committed. No GTA V regression. No new GTA V progress. Clean upstream port.
+
+
 ## Summary of GTA V progression (cumulative)
 
 | Cycle | Runtime | Log size | Fast-skips | New milestones |
