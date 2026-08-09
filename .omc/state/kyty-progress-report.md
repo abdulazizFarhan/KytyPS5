@@ -563,6 +563,47 @@ This is a clean upstream port that doesn't regress anything.
 Future versions of GTA V or other PS5 games that reach GPU
 rendering may exercise the disabled clip plane code path.
 
+
+## Cycle 0141ag (commit ca712ac) - 2026-08-09: port upstream 4cd6132 'gpu: allow byte-granular memory DMA'
+
+**Upstream commit**: 4cd6132 'gpu: allow byte-granular memory DMA' (nmzik, 2026-08-09)
+
+**Files modified**:
+- `src/graphics/guest_gpu/graphicsRun.cpp`: removed 1 line (`EXIT_NOT_IMPLEMENTED((num_bytes & 3u) != 0)`)
+
+**Adaptations**:
+- The upstream bufferCache.cpp change was NOT applied because kyty's
+  `BufferCache::CopyBuffer` has different structure than upstream (no GDS checks)
+- Only the graphicsRun.cpp part is a clean port
+
+**Test result** (2-min test):
+| Metric | cycle 0141af | cycle 0141ag | Delta |
+|--------|-------------|-------------|-------|
+| Log size | 634,402 | 688,363 | +53,961 (+8.5%) |
+| Fast-skips | 4,524,033 | 4,944,897 | +420,864 (+9.3%) |
+| Late-sentinel count | 4,000,000 | 4,383,000 | +383,000 (+9.6%) |
+| Max RIP | 0x9028b5564 | 0xa3d77615 | new range (in big-skip area) |
+| GTA V Main calls | 0 | 0 | no change |
+| Milestones | WindowCreate, Vulkan, Main | same | no change |
+
+**Analysis**: Cycle 0141ag removes the EXIT_NOT_IMPLEMENTED for non-4-byte-aligned
+DMA. This means GTA V can now perform DMA with any byte alignment instead of crashing.
+The log shows increased throughput (more fast-skips per test) but no new milestones
+because GTA V's RIP is still in the late-sentinel loop before any GPU DMA happens.
+
+**Status**: Committed. No GTA V regression. No new GTA V progress. Clean upstream port.
+
+## Summary of GTA V progression (cumulative)
+
+| Cycle | Runtime | Log size | Fast-skips | New milestones |
+|-------|---------|----------|-----------|----------------|
+| 0141ac | 120s | 628,007 | 4,468,737 | WindowCreate, Vulkan init, Main executes |
+| 0141ad | 120s | 644,000 | ~4.5M | none |
+| 0141ae | 120s | 450K | - | REVERTED (looped at 0x376fd30) |
+| 0141af | 120s | 634,402 | 4,524,033 | none |
+| 0141ag | 120s | 688,363 | 4,944,897 | none (only throughput improvement) |
+
+
 ## Session summary (cycles 0141n-0141w, 2026-08-09)
 
 ### Code improvements (3 meaningful commits)
