@@ -615,6 +615,12 @@ void KYTY_SYSV_ABI cxa_finalize(void* d) {
 	}
 }
 
+
+// GTA V libc_v1 cycle 0141ay: zr094EQ39Ww stub (returns 0 - safe default for unknown)
+static KYTY_SYSV_ABI int zr094EQ39Ww_stub() {
+	return 0;
+}
+
 } // namespace LibC
 
 namespace LibcInternalExt {
@@ -906,6 +912,7 @@ LIB_DEFINE(InitLibC_1) {
 	LIB_FUNC("hPzYSd5Nasc", LibC::MtxTimedlock);
 	LIB_FUNC("gTuXQwP9rrs", LibC::MtxUnlock);
 	LIB_FUNC("VYQwFs4CC4Y", LibC::MtxCurrentOwns);
+	LIB_FUNC("zr094EQ39Ww", LibC::zr094EQ39Ww_stub);
 }
 
 } // namespace Libs
