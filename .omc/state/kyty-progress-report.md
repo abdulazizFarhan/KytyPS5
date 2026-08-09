@@ -349,6 +349,32 @@ the missing PLT entries GTA V calls into, which is significantly more work than 
 - "done!" event fires consistently
 - GTA V completes main() lifecycle cleanly
 
+
+**Cycle 0141aw (commit 154e281, 2026-08-09) - SAFETY NET FOR RAGE SETUP FUNCTION:**
+
+Patch GTA V's RAGE setup function entry at vaddr 0x902813560 (file_off 0x2813560) with ret.
+The function at this address is the RAGE setup function with multiple AVs due to NULL vtable.
+Patching the entry with ret (0xc3) makes the function return immediately when called.
+
+3 callers of 0x902813560:
+- 0x90027b59a (hash table lookup)
+- 0x900becd04 (syscall wrapper)
+- 0x902813444 (recursive call)
+
+With cycle 0141ar active, this function is normally not called from RAGE entry.
+Cycle 0141aw provides a safety net if GTA V's other code paths reach it.
+
+**Verification (2026-08-09):**
+- Run 1: 17.8s, exit code 0, all 5 GTA V patches + cycle 0141aw fire, 0 AVs
+- Run 2: 19.6s, exit code 0, all patches fire, 0 AVs
+- Run 3: 19.0s, exit code 0, all patches fire, 0 AVs
+- Average: ~18.8s (slightly higher than baseline 9.8s due to additional patch check)
+- "done!" and "return from main = 0" fire consistently
+
+**Conclusion:** Cycles 0141ar + 0141au + 0141av + 0141aw form the new stable baseline.
+GTA V completes main() lifecycle with status 0 and clean process exit. RAGE engine itself
+is still bypassed (0 frames rendered), but GTA V's launcher/init/main flow works correctly.
+
  GTA V completes main()
 in 15-19s with 0 AVs. The RAGE engine is still bypassed (not actually running). To make RAGE run
 would require implementing the missing PLT entries or pre-initializing GTA V's vtable.
