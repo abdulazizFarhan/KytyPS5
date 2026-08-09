@@ -1150,7 +1150,43 @@ GTA V main() lifecycle now executes fully:
 ## 
 
 
-## ## Summary of GTA V progression (cumulative)
+## Cycle 0141as (2026-08-09) - FAILED EXPERIMENT: NOP AV-hit function with ret (no improvement)
+
+### What was tried
+Attempted to patch the AV-hit function at vaddr 0x902813ae0 with NOP NOP ret (3 bytes)
+so GTA V's RAGE Main Thread could call the function but it would return immediately
+without triggering the AV loop. Idea was that RAGE's main thread might continue further
+into setup sequence with the function stubbed out.
+
+### Result - REGRESSION
+- GTA V crashed with STATUS_INSTRUCTION_MISALIGNMENT (0xC0000096) at runtime
+- AV fired at 0x902813ade (int3 padding, 2 bytes before patched entry) on every run
+- M1W2 v1.4 patched the AV site (0x902813ac0-0x902813adf with 32 NOPs) but GTA V's RIP
+  ended up misaligned in the next function's body
+- 3 consecutive runs all crashed at the same AV location
+- 0 frames rendered
+
+### Root cause
+GTA V's RAGE init function 0x902813a90 uses global state (registers like r13 loaded
+from a global pointer) to initialize graphics resources. When global pointers are NULL
+(wrong state from earlier in GTA V's init), the function AVs. My NOP NOP ret only
+handled ONE function but the same issue cascades into other functions that RAGE calls.
+The deeper issue is missing Agc_v1 GPU compute implementations - RAGE can't allocate
+graphics resources, so all subsequent operations on them AV.
+
+### Lesson
+- NOP NOP ret on a single function doesn't fix systemic issues across many functions
+- GTA V's RAGE engine needs working Agc_v1 implementations to make progress
+- Without GPU compute, RAGE can never render - any NOPping just delays the crash
+- The current cycle 0141ar state (NOP RAGE Main Thread entry) gives GTA V a clean
+  exit (25s) but at the cost of RAGE never running - this is the right trade-off
+
+### Reverted
+The cycle 0141as block was reverted to the cycle 0141ar NOP RAGE entry strategy.
+Working tree is clean and matches HEAD (cycle 0141ar = stable baseline).
+
+## 
+## Summary of GTA V progression (cumulative)
 
 | Cycle | Runtime | Log size | Fast-skips | New milestones |
 |-------|---------|----------|-----------|----------------|
