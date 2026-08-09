@@ -780,23 +780,12 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 						ctx->Rax = 0;
 						return true;
 					}
-					// Cycle 0139: When GTA V's RIP is in GTA V's post-loop main function
-					// (0x90293a15-0x9029e346), jump to GTA V's main return at 0x9029e346
-					// with RAX=0. This simulates GTA V's main completing all its setup
-					// and returning. GTA V's launcher might continue when GTA V's main returns.
-					if (fault_ip >= 0x90293a15ULL && fault_ip < 0x9029e346ULL &&
-						    fast_skip_count > 1000000ULL) {
-						static uint64_t main_skip_count = 0;
-						main_skip_count++;
-						if (main_skip_count == 1) {
-							LOGF("[M1W2 v1.7 cycle0139] main-skip #%" PRIu64 " RIP=%016" PRIx64 " -> 0x900000089 with RAX=0 (count=%" PRIu64 ")\n",
-							     main_skip_count, fault_ip, fast_skip_count);
-						}
-						ctx->Rip = 0x900000089ULL;
-						ctx->Rax = 0;
-						return true;
-					}
-					// Cycle 0136: Big skip in GTA V's code/data region
+					// Cycle 0139: DISABLED in cycle 0141ab to let GTA V progress naturally
+					// (the long log from 2026-08-07 showed GTA V reaching WindowCreate + Vulkan
+					// when cycles didn't redirect. Disabling this cycle lets GTA V's RIP walk
+					// through GTA V's code naturally, potentially reaching further milestones.)
+					// Original code (cycle 0139 redirects to launcher continuation 0x900000089):
+// Cycle 0136: Big skip in GTA V's code/data region
 					// (Cycle 0137 loop-exit redirect was reverted - it didn't help GTA V
 					// progress because GTA V's code after the loops also calls PLT functions
 					// that AV. The big skip is the simpler mechanism.)
