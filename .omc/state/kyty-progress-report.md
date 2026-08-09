@@ -436,6 +436,9 @@ GTA V's post-loop code at 0x902937ef calls PLT 0x4 first, which clobbers RAX.
 - **Cycle 0141j**: tried GTA V main target (0x90398800) - GTA V's RIP got lost in mapped memory
 - **Cycle 0141k**: reverted to launcher continuation target - clean exit
 - **Cycle 0141l**: confirmed stable state - GTA V's launcher runs, M1W2 v1.4 patches 6 AV sites, clean exit
+- **Cycle 0141m**: PLT stub range corrected to mapped C addresses (0x903075300-0x903077100)
+- **Cycle 0141n**: GTA V main function analysis - discovered main is at 0x9027BA00 (mapped C), tested redirect (didn't help - big-skip recursion)
+- **Cycle 0141o**: Narrowed big-skip range from 0x10000000000 to 0xA0000000 - eliminates big-skip recursion (0 big-skips in tests)
 
 ## Cycle 0141 (2026-08-08) — M1W2 v1.7 GTA V PLT 0xf8 patch
 
