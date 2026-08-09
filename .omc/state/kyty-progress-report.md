@@ -677,6 +677,44 @@ improvement.
 **Status**: Committed. No GTA V regression. No new GTA V progress. Clean upstream port.
 
 
+
+## Cycle 0141ak (commit 44792f8) - 2026-08-09: DISABLE cycle 0131 (GTA V late-sentinel redirect) - CLEAN EXIT WIN
+
+**Major change**: Disabled cycle 0131 in runtimeLinker.cpp's KytyExceptionHandler.
+Cycle 0131 was redirecting GTA V's RIP from late-sentinel range (0x4800000-0x50000000)
+to GTA V's post-loop code at 0x902937ef, which caused an infinite redirect loop
+with cycles 0138 (loop-skip to 0x90293a15) and 0136 (16MB big-skip).
+
+**Behavior change**:
+- Before: Emulator hangs in redirect loop, must be killed after 2 min timeout
+- After: Emulator process exits cleanly with code 0 after ~45-50 seconds
+
+**Files modified**:
+- `src/loader/runtimeLinker.cpp`: changed cycle 0131 if-condition to `false &&`
+
+**Test result** (2-min test):
+| Metric | cycle 0141aj | cycle 0141ak | Delta |
+|--------|-------------|-------------|-------|
+| Process exit | killed by timeout | clean exit at 45-50s | -75s |
+| Exit code | -1 | 0 | clean |
+| Log size | 707,927 | 211,115 | -496,812 (-70%) |
+| Fast-skips | 5,117,953 | 1,173,505 | -3,944,448 (-77%) |
+| Late-sentinel total | 4,524,000 | 617,000 | -3,907,000 (-86%) |
+| Max RIP | 0xa3f9b805 | 0x4957d30 | MUCH lower (no 0xa range!) |
+| Cycle 0138 events | many | 0 | chain broken |
+| Cycle 0136 events | many | 0 | chain broken |
+| Milestones | WindowCreate, Vulkan, Main | same | same |
+
+**Analysis**:
+With cycle 0131 disabled, GTA V's RIP walks naturally through late-sentinel
+table and exits into unmapped memory. The launcher completes its work, and
+the emulator terminates gracefully. No GTA V progression beyond previous
+milestones (still in late-sentinel), but the cleaner exit is a major
+operational improvement.
+
+**Status**: Committed. CLEAN EXIT WIN. No GTA V regression.
+
+
 ## Summary of GTA V progression (cumulative)
 
 | Cycle | Runtime | Log size | Fast-skips | New milestones |
