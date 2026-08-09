@@ -839,7 +839,9 @@ Reverted cycle 0141ar. GTA V back to stable 16-19s runtime with 0 AVs.
 called (because cycle 0141ar bypasses RAGE entry before Agc_v1 is invoked). Implementing
 these requires real PS5 GPU compute knowledge - multi-week effort per upstream analysis.
 
-**Total commits**: 271 ahead of upstream (up from 260 in previous session)
+**Total commits**: 275 ahead of upstream (up from 260 in previous session)
+
+**Upstream sync status (2026-08-10)**: 189 commits pending upstream. Most GTA V-relevant small commits (microsecond wall-clock, xorps xmm0, kernel lseek lock, etc.) are already ported to the fork. Large commits (guest red-zone protection, AGC new ABIs) have merge conflicts with fork-specific GTA V patches and were deferred.
 
 ## Latest result (cycle 0141an - 2-min test, **MAJOR WIN**)
 
