@@ -166,7 +166,53 @@ of single-cycle work.
 
 - GTA V's AllocateDirectMemory was returning phys_addr=0 (NULL) because physical memory started at 0. Now reserves first 2MB so first allocation returns 0x200000. Fixes real underlying issue but doesn't advance GTA V further (loop function AVs have separate cause).
 
-## GTA V progression
+## ### Cycle 0141z (2026-08-09) — GTA V NID analysis reveals 154 unresolved imports
+
+Investigation of GTA V's PS5 SDK imports via test log analysis. Found 154 unresolved imports (and ~63 resolved, total 217 across 24 libraries).
+
+**Unresolved imports by library:**
+- Agc_v1: 79 (AMD GPU compute - critical blocker)
+- AgcDriver_v1: 20
+- VideoRecordingP_v1: 7
+- NpCommerce_v1: 6
+- libkernel_v1: 6
+- NpUtility_v1: 4
+- ContentExport_v1: 4
+- NpWebApi2_v1: 3
+- NpEntitlementAccess_v1: 3
+- ContentSearch_v1: 3
+- Net_v1: 2
+- ImeDialog_v1: 2
+- Posix_v1: 2
+- WebBrowserDialog_v1: 2
+- PlayerInvitationDialog_v1: 2
+- Coredump_v1: 1
+- AudioOut_v1: 1
+- NpManager_v1: 1
+- PlayerSelectionDialog_v1: 1
+- SystemService_v1: 1
+- ContentDelete_v1: 1
+- LibcInternalExt_v1: 1
+- ulobjmgr_v1: 1
+- RazorCpu_v1: 1
+
+**Search across all kyty library files (1550 unique NIDs in 95 LIB_DEFINE blocks) showed ZERO overlap with GTA V's unresolved imports.** None of the GTA V imports that aren't implemented have NIDs registered anywhere in kyty's library files.
+
+**Key observations:**
+- 217 - 154 = 63 imports are RESOLVED (have kyty implementations)
+- Resolved includes sceKernelAllocateDirectMemory (rTXw65xmLIA), basic memory ops, etc.
+- Unresolved includes everything graphics-related (Agc_v1 - 79 functions)
+- The 6 libkernel_v1 unresolved functions are likely newer (1.2+) kernel functions not in kyty's existing 372 LIB_FUNC entries
+
+**Test impact:** ZERO - in current test, GTA V's RIP never reaches PLT calls (cycle 0139 redirects to launcher continuation at 0x900000089 before any PLT call executes). The 154 unresolved imports are only relevant if cycle 0139 target changes.
+
+**PLT calls in GTA V code (file offsets, analyzed from binary):**
+- 111 unique PLT indices called (739 total calls)
+- Most common: PLT 0x09 (52 calls), PLT 0x0a (51), PLT 0x29 (41), PLT 0x0c (38), PLT 0x24 (34), PLT 0x06 (34), PLT 0x07 (34), PLT 0x20 (30), PLT 0xf3 (28), PLT 0xd4 (23)
+
+**Conclusion:** Fundamental blocker remains - implementing Agc_v1's 79 imports + others is massive (requires understanding AMD GPU compute APIs and PS5 SDK behavior). The 2MB reserve fix (cycle 0141y) is a real bug fix but doesn't change GTA V progression.
+
+GTA V progression
 
 ### Current GTAV status (HEAD: 3d8682a)
 
@@ -302,6 +348,8 @@ All kyty stubs return 0 (no error), but the launched code has no GPU rendering p
 
 - **Cycle 0141y**: Reserve 2MB system area in PhysicalMemory - AllocateDirectMemory now returns phys_addr=0x200000 (was 0). Fixes underlying issue but loop function AVs persist (separate root cause - PLT 0xef returns NULL).
 
+- **Cycle 0141z**: NID analysis - GTA V has 154 unresolved PS5 SDK imports across 24 libraries. None of these NIDs are registered in kyty's library files (1550 unique NIDs across 95 LIB_DEFINE blocks). Top blocker: Agc_v1 (79 graphics imports). Implementation requires AMD GPU compute API understanding - massive effort beyond single cycle.
+
 ## Session summary (cycles 0141n-0141w, 2026-08-09)
 
 ### Code improvements (3 meaningful commits)
@@ -333,6 +381,7 @@ All kyty stubs return 0 (no error), but the launched code has no GPU rendering p
 - 0141v: This compacted report
 - 0141x: Failed +64 byte fast-skip experiment
 - 0141y: Reserve 2MB system area fix (AllocateDirectMemory returns 0x200000)
+- 0141z: NID analysis documents GTA V's 154 unresolved PS5 SDK imports
 
 ### Failed experiment (cycle 0141u)
 
