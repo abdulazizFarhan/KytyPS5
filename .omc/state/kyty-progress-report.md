@@ -755,6 +755,49 @@ Attempted to make GTA V actually execute its main() function by changing cycle 0
 
 - **Cycle 0141ab** ⭐ MAJOR WIN: Disabled cycle 0139. GTA V's main() executed, WindowCreate (1280x720), Vulkan init, PRX modules loaded (libc.prx, libSceJobManager.prx, libSceNpCppWebApi.prx). 3.2x log, 4x fast-skips, 50% fewer AV sites. Late-sentinel spiral still happens but milestones reached. None of these NIDs are registered in kyty's library files (1550 unique NIDs across 95 LIB_DEFINE blocks). Top blocker: Agc_v1 (79 graphics imports). Implementation requires AMD GPU compute API understanding - massive effort beyond single cycle.
 
+## Latest GTAV work (cycles 0141ay+az+bb+bc+bd, 2026-08-09/10) - NID STUB COVERAGE EXPANSION
+
+**Major expansion of GTA V NID stub coverage.** This session added 25 new GTA V NID stubs
+across 3 libraries and fixed a critical registration bug:
+
+**Cycles added (this session):**
+- **Cycle 0141az** (commit a578d0c): 1 libc_v1 stub (z+P+xCnWLBk, 2 calls)
+- **Cycle 0141bb** (commit 9c02a3a): 12 more libc_v1 stubs (MELi-cKqWq0, 3BytPOQgVKc, YNzNkJzYqEg,
+  hdm0YfMa7TQ, MLWl90SFWNE, OJjm-QOIHlI, Vla-Z+eXlxo, gigoVHZvVPE, mfHdJTIvhuo, -hn1tcVHq5Q,
+  W6SiVSiCDtI, kHg45qPC6f0) - covers GTA V's libc.prx PLT 3-99
+- **Cycle 0141bc** (commit c105b12): 2 ulobjmgr_v1 stubs (BG26hBGiNlw = PLT 4, Smf+fUNblPc = PLT 6)
+- **Cycle 0141bd** (commit a0c182f): 9 libkernel_v1 stubs (VADc3MNQ3cM, -YTW+qXc3CQ, 3k6kx-zOOSQ,
+  c7ZnT7V1B98, crb5j7mkk1c, hHlZQUnlxSM, 0Cq8ipKr9n0, WlyEA-sLDf0, fgIsQ10xYVA) for PLT 15, 43, 45,
+  53, 71, 79, 95, 97, 99
+- **Commit 467a3d9** (mine): Fix - register InitUlowObjMgr_1 in InitAll (the cycle 0141bc commit
+  added the library file but forgot to register it in libs.cpp's InitAll function, so the stubs
+  were orphaned and never called)
+
+**Total GTA V NID stub coverage**: 14 libc_v1 + 2 ulobjmgr_v1 + 9 libkernel_v1 = 25 new stubs
+
+**GTA V behavior with all stubs active (HEAD: 467a3d9):**
+- Completes main() in 15-17s (3-run verification)
+- 0 AVs, 0 M1W2 patches
+- 'done!' and 'return from main = 0' fire consistently
+- All 4 GTA V cycles fire (0141ar RAGE entry, 0141aw RAGE setup, 0141av RAGE virtual call, 0141au debug)
+- 2 new NIDs (BG26hBGiNlw, Smf+fUNblPc) are now resolved via UlowObjMgr_v1.1 (was NID fallback)
+- 9 new libkernel_v1 NIDs registered and called from GTA V's libc.prx
+
+**Current GTAV status (HEAD: 467a3d9):**
+
+- GTA V completes main() lifecycle, status 0 exit (clean)
+- Runtime: 10-19s (varies with library cache state)
+- 6 GTA V patches fire (launcher_init, init() let run, confirm failure x2, RAGE entry, RAGE setup, RAGE virtual)
+- 0 Access Violations (cycle 0141ar bypasses RAGE entry, no AVs reach M1W2 handler)
+- 25 new GTA V NID stubs added this session (libc_v1, ulobjmgr_v1, libkernel_v1)
+- 270 PS5 NID fallbacks (164 Graphics5 + 52 Json2 + 25 Graphics5Driver + 18 libc + 9 other + 2 ulobjmgr)
+- Thread create: 1 (RAGE Main Thread), Thread join: 1 (status 0)
+- 17 SceLibc mutex init events, 1 cond init event, 5 Execute events
+- WindowCreate: 1280x720 (kyty Vulkan init complete)
+- 47 Vulkan initialization events
+- main() returns 0, kyty emits 'done!' and 'return from main = 0'
+
+**Total commits**: 269 ahead of upstream (up from 260 in previous session)
 
 ## Latest result (cycle 0141an - 2-min test, **MAJOR WIN**)
 
