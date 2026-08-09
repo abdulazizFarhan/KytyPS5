@@ -627,6 +627,66 @@ static KYTY_SYSV_ABI int zPxCnWLBk_stub() {
 	return 0;
 }
 
+// GTA V libc_v1 cycle 0141bb: MELi-cKqWq0 stub (returns 0)
+static KYTY_SYSV_ABI int MELi_cKqWq0_stub() {
+	return 0;
+}
+
+// GTA V libc_v1 cycle 0141bb: 3BytPOQgVKc stub (returns 0)
+static KYTY_SYSV_ABI int _3BytPOQgVKc_stub() {
+	return 0;
+}
+
+// GTA V libc_v1 cycle 0141bb: YNzNkJzYqEg stub (returns 0)
+static KYTY_SYSV_ABI int YNzNkJzYqEg_stub() {
+	return 0;
+}
+
+// GTA V libc_v1 cycle 0141bb: hdm0YfMa7TQ stub (returns 0)
+static KYTY_SYSV_ABI int hdm0YfMa7TQ_stub() {
+	return 0;
+}
+
+// GTA V libc_v1 cycle 0141bb: MLWl90SFWNE stub (returns 0)
+static KYTY_SYSV_ABI int MLWl90SFWNE_stub() {
+	return 0;
+}
+
+// GTA V libc_v1 cycle 0141bb: OJjm-QOIHlI stub (returns 0)
+static KYTY_SYSV_ABI int OJjm_QOIHlI_stub() {
+	return 0;
+}
+
+// GTA V libc_v1 cycle 0141bb: Vla-Z+eXlxo stub (returns 0)
+static KYTY_SYSV_ABI int Vla_ZeXlxo_stub() {
+	return 0;
+}
+
+// GTA V libc_v1 cycle 0141bb: gigoVHZvVPE stub (returns 0)
+static KYTY_SYSV_ABI int gigoVHZvVPE_stub() {
+	return 0;
+}
+
+// GTA V libc_v1 cycle 0141bb: mfHdJTIvhuo stub (returns 0)
+static KYTY_SYSV_ABI int mfHdJTIvhuo_stub() {
+	return 0;
+}
+
+// GTA V libc_v1 cycle 0141bb: -hn1tcVHq5Q stub (returns 0)
+static KYTY_SYSV_ABI int hn1tcVHq5Q_stub() {
+	return 0;
+}
+
+// GTA V libc_v1 cycle 0141bb: W6SiVSiCDtI stub (returns 0)
+static KYTY_SYSV_ABI int W6SiVSiCDtI_stub() {
+	return 0;
+}
+
+// GTA V libc_v1 cycle 0141bb: kHg45qPC6f0 stub (returns 0)
+static KYTY_SYSV_ABI int kHg45qPC6f0_stub() {
+	return 0;
+}
+
 } // namespace LibC
 
 namespace LibcInternalExt {
@@ -920,6 +980,18 @@ LIB_DEFINE(InitLibC_1) {
 	LIB_FUNC("VYQwFs4CC4Y", LibC::MtxCurrentOwns);
 	LIB_FUNC("z+P+xCnWLBk", LibC::zPxCnWLBk_stub);
 	LIB_FUNC("zr094EQ39Ww", LibC::zr094EQ39Ww_stub);
-}
+	LIB_FUNC("MELi-cKqWq0", LibC::MELi_cKqWq0_stub);
+	LIB_FUNC("3BytPOQgVKc", LibC::_3BytPOQgVKc_stub);
+	LIB_FUNC("YNzNkJzYqEg", LibC::YNzNkJzYqEg_stub);
+	LIB_FUNC("hdm0YfMa7TQ", LibC::hdm0YfMa7TQ_stub);
+	LIB_FUNC("MLWl90SFWNE", LibC::MLWl90SFWNE_stub);
+	LIB_FUNC("OJjm-QOIHlI", LibC::OJjm_QOIHlI_stub);
+	LIB_FUNC("Vla-Z+eXlxo", LibC::Vla_ZeXlxo_stub);
+	LIB_FUNC("gigoVHZvVPE", LibC::gigoVHZvVPE_stub);
+	LIB_FUNC("mfHdJTIvhuo", LibC::mfHdJTIvhuo_stub);
+	LIB_FUNC("-hn1tcVHq5Q", LibC::hn1tcVHq5Q_stub);
+	LIB_FUNC("W6SiVSiCDtI", LibC::W6SiVSiCDtI_stub);
+	LIB_FUNC("kHg45qPC6f0", LibC::kHg45qPC6f0_stub);
+	}
 
 } // namespace Libs
