@@ -335,7 +335,17 @@ and others. Cycle 0141ar (NOP RAGE entry) is still needed to bypass RAGE entirel
 Multiple virtual calls fail with the same root cause. Fixing the vtable would require implementing
 the missing PLT entries GTA V calls into, which is significantly more work than the current bypass.
 
-**Conclusion:** Cycles 0141ar + 0141au + 0141av form the new stable baseline. GTA V completes main()
+**Conclusion:** Cycles 0141ar + 0141au + 0141av form the new stable baseline.
+
+**3-run verification (2026-08-09):**
+- Run 1: 10.3s, exit code 0, all 5 GTA V patches fire
+- Run 2: 9.4s, exit code 0, all 5 patches fire
+- Run 3: 9.6s, exit code 0, all 5 patches fire
+- Average: 9.8s (consistent with cycle 0141ar alone)
+- "done!" event fires consistently
+- GTA V completes main() lifecycle cleanly
+
+ GTA V completes main()
 in 15-19s with 0 AVs. The RAGE engine is still bypassed (not actually running). To make RAGE run
 would require implementing the missing PLT entries or pre-initializing GTA V's vtable.
 stable baseline.
@@ -418,7 +428,8 @@ block was restored from git HEAD. Re-verified GTA V completes main() lifecycle i
 - All 5 GTA V patches fire correctly
 
 This confirms the cycle 0141ar state is the stable baseline.
-### Cycle 0141at investigation (2026-08-09 - cycle 0141at also failed)
+
+### Cycle 0141at investigation (2026-08-09 - cycle 0141at also failed)
 
 **Context:** During this iteration, an attempt was made to bypass the AV-causing
 function at vaddr 0x902813560 (file_off 0x2813560) instead of NOPping the RAGE entry.
