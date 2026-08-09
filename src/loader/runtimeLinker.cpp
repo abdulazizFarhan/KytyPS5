@@ -1603,6 +1603,31 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 				LOGF("Patch PLT 0x24: %" PRIu64 " sites\n", static_cast<uint64_t>(plt24_count));
 			}
 		}
+	// Cycle 0141q: GTA V main -> init call NOP patch
+	// GTA V's main at 0x294850 calls init function at 0x28c8cd0.
+	// The init function makes 38 PLT calls that all return 0 (kyty stubs),
+	// causing init to fail with AVs. We NOP out the call so main returns
+	// immediately, allowing GTA V's launcher cleanup to run cleanly.
+	{
+		const std::string init_program_name = Common::PathToString(program->file_name);
+		if (init_program_name.find("gtav") != std::string::npos) {
+			constexpr uint8_t INIT_CALL[5] = {0xe8, 0x34, 0x44, 0x63, 0x02};  // call 0x28c8cd0
+			constexpr uint8_t NOP5[5] = {0x90, 0x90, 0x90, 0x90, 0x90};
+			auto* init_start = reinterpret_cast<uint8_t*>(address);
+			auto* init_end = init_start + size - 5;
+			size_t init_count = 0;
+			for (auto* ptr = init_start; ptr <= init_end; ptr++) {
+				if (memcmp(ptr, INIT_CALL, 5) == 0) {
+					memcpy(ptr, NOP5, 5);
+					init_count++;
+				}
+			}
+			if (init_count > 0) {
+				LOGF("Patch GTA V main->init call: %" PRIu64 " sites\n", static_cast<uint64_t>(init_count));
+			}
+		}
+	}
+
 	}
 }
 
