@@ -4786,6 +4786,12 @@ void GraphicsInitJmpTablesUcIndirect() {
 		cp->GetUcfg()->SetGeControl(r);
 	};
 
+	g_hw_uc_indirect_func[Pm4::GE_PC_ALLOC] = [](KYTY_HW_UC_INDIRECT_ARGS) {
+		(void)cp;
+		(void)cmd_offset;
+		(void)value;
+	};
+
 	g_hw_uc_indirect_func[Pm4::GE_USER_VGPR_EN] = [](KYTY_HW_UC_INDIRECT_ARGS) {
 		HW::GeUserVgprEn r;
 		r.vgpr1 = KYTY_PM4_GET(value, GE_USER_VGPR_EN, EN_USER_VGPR1) != 0;
