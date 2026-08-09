@@ -441,6 +441,8 @@ GTA V's post-loop code at 0x902937ef calls PLT 0x4 first, which clobbers RAX.
 - **Cycle 0141o**: Narrowed big-skip range from 0x10000000000 to 0xA0000000 - eliminates big-skip recursion (0 big-skips in tests)
 - **Cycle 0141p**: Analyzed GTA V's init function - identified 38 PLT calls (most-called: PLT 0x27 x12, PLT 0x09 x5, PLT 0x0c x5)
 - **Cycle 0141q**: NOPed GTA V's main->init call - skips 38 failed PLT calls for cleaner exit (1 site patched)
+- **Cycle 0141r**: Analyzed GTA V's PS5 SDK dependencies - 217 imports across 24 libraries (Agc_v1 has 111 imports - graphics blocker)
+- **Cycle 0141s**: Test flow analysis - GTA V RIP never reaches launcher directly, traverses ~17.5MB of M1W2 sentinel area before cycle 0134 catches it (test takes 2 min due to fast-skip traversal)
 
 ## Cycle 0141 (2026-08-08) — M1W2 v1.7 GTA V PLT 0xf8 patch
 
