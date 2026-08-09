@@ -1505,9 +1505,7 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 	// (cmp eax, 0x8002000d). We search the segment for this unique pattern and patch
 	// the 5 bytes before it.
 	{
-		const std::string program_name = Common::PathToString(program->file_name);
-		if (program_name.find("gtav") != std::string::npos) {
-			constexpr uint8_t  MOV_EAX[5] = {0xb8, 0x0d, 0x00, 0x02, 0x80};
+					constexpr uint8_t  MOV_EAX[5] = {0xb8, 0x0d, 0x00, 0x02, 0x80};
 			constexpr uint8_t  CMP_EAX[5] = {0x3d, 0x0d, 0x00, 0x02, 0x80};
 			auto* plt_start = reinterpret_cast<uint8_t*>(address);
 			auto* plt_end   = plt_start + size - 5;
@@ -1525,7 +1523,6 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 				}
 			}
 			LOGF("Patch PLT 0xf8: %" PRIu64 " sites\n", static_cast<uint64_t>(plt_patch_count));
-		}
 	}
 		// M1W2 v1.7 cycle 0141g: GTA V's PLT 0x24 patch
 	// GTA V's main body calls PLT 0x24 (file offset 0x308e390) ~29 times.
@@ -1537,9 +1534,7 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 	// include path is taken. Pattern after the call: 85 c0 0f 84 (test eax, eax;
 	// je near) or 85 c0 74 (test eax, eax; je short).
 	{
-		const std::string plt24_program_name = Common::PathToString(program->file_name);
-		if (plt24_program_name.find("gtav") != std::string::npos) {
-			constexpr uint8_t MOV_EAX_1[5] = {0xb8, 0x01, 0x00, 0x00, 0x00};
+					constexpr uint8_t MOV_EAX_1[5] = {0xb8, 0x01, 0x00, 0x00, 0x00};
 			constexpr uint8_t TEST_JE_NEAR[4] = {0x85, 0xc0, 0x0f, 0x84};
 			constexpr uint8_t TEST_JE_SHORT[3] = {0x85, 0xc0, 0x74};
 			size_t plt24_count = 0;
@@ -1569,16 +1564,13 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 			if (plt24_count > 0) {
 				LOGF("Patch PLT 0x24: %" PRIu64 " sites\n", static_cast<uint64_t>(plt24_count));
 			}
-		}
 	// Cycle 0141q: GTA V main -> init call NOP patch
 	// GTA V's main at 0x294850 calls init function at 0x28c8cd0.
 	// The init function makes 38 PLT calls that all return 0 (kyty stubs),
 	// causing init to fail with AVs. We NOP out the call so main returns
 	// immediately, allowing GTA V's launcher cleanup to run cleanly.
 	{
-		const std::string init_program_name = Common::PathToString(program->file_name);
-		if (init_program_name.find("gtav") != std::string::npos) {
-			constexpr uint8_t INIT_CALL[5] = {0xe8, 0x34, 0x44, 0x63, 0x02};  // call 0x28c8cd0
+					constexpr uint8_t INIT_CALL[5] = {0xe8, 0x34, 0x44, 0x63, 0x02};  // call 0x28c8cd0
 			constexpr uint8_t NOP5[5] = {0x90, 0x90, 0x90, 0x90, 0x90};
 			auto* init_start = reinterpret_cast<uint8_t*>(address);
 			auto* init_end = init_start + size - 5;
@@ -1592,7 +1584,6 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 			if (init_count > 0) {
 				LOGF("Patch GTA V main->init call: %" PRIu64 " sites\n", static_cast<uint64_t>(init_count));
 			}
-		}
 	}
 
 	// Cycle 0141al: GTA V launcher_init backward loop NOP patch
@@ -1604,9 +1595,7 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 	// backward loop (lea + jmp + nop + 28-byte loop body) so launcher_init
 	// returns immediately, allowing launcher_cont to run main() and exit.
 	{
-		const std::string al_program_name = Common::PathToString(program->file_name);
-		if (al_program_name.find("gtav") != std::string::npos) {
-			// Pattern at file_off 0x18e95 (vaddr 0x90018e95):
+					// Pattern at file_off 0x18e95 (vaddr 0x90018e95):
 			// 48 8d 1d 7c cf 92 03 eb 06 66 90 48 83 c3 f8 48 8b 03 48 85 c0 74 f4 48 83 f8 ff 74 04 ff d0 eb ea
 			constexpr uint8_t LAUNCHER_LOOP[33] = {
 				0x48, 0x8d, 0x1d, 0x7c, 0xcf, 0x92, 0x03, 0xeb, 0x06, 0x66, 0x90,
@@ -1618,19 +1607,20 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 				0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90,
 				0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90
 			};
-			// GTA V is loaded with vaddr 0x90000000 base, so file_off = vaddr - 0x90000000
-			const uint64_t launcher_file_off = 0x18e95ULL;
-			// GTA V SELF segment 1: file_off 0x18e50 -> vaddr 0x0, so
-			// file_off 0x18e95 -> vaddr 0x45 (offset within segment)
-			const uint64_t launcher_vaddr = address + (launcher_file_off - 0x18e50ULL);
-			if (launcher_vaddr >= address && launcher_vaddr + 33 <= address + size) {
-				auto* launcher_ptr = reinterpret_cast<uint8_t*>(launcher_vaddr);
+			// BUGFIX (cycle 0141am): GTA V's launcher_init backward loop is at
+			// SELF file_off 0x18e95, but the first PT_LOAD segment starts at
+			// SELF file_off 0x18e50 (not 0x0). So the segment-relative offset
+			// is 0x45 (= 0x18e95 - 0x18e50). PatchProgram receives the
+			// segment's base memory address, so we use 0x45 as the offset.
+			const uint64_t launcher_file_off = 0x45ULL;
+			if (launcher_file_off + 33 <= size) {
+				auto* launcher_ptr = reinterpret_cast<uint8_t*>(address) + launcher_file_off;
 if (memcmp(launcher_ptr, LAUNCHER_LOOP, 33) == 0) {
 					memcpy(launcher_ptr, NOP33, 33);
-					LOGF("Patch GTA V launcher_init backward loop at 0x%" PRIx64 " (33 NOPs)\n", launcher_vaddr);
+					LOGF("Patch GTA V launcher_init backward loop at 0x%" PRIx64 " (33 NOPs)\n",
+					     reinterpret_cast<uint64_t>(launcher_ptr));
 				}
 			}
-		}
 	}
 
 	}
