@@ -1109,6 +1109,48 @@ GTA V's mapped memory.
 AI-assisted disclosure: Yes, AI-assisted.
 
 
+## Cycle 0141p (2026-08-09) — GTA V init function PLT analysis
+
+### Investigation
+Decoded GTA V's init function at file offset 0x28c8cd0 to identify all
+PLT calls it makes. This is the function called by GTA V's main to do
+actual game initialization.
+
+### PLT calls found (38 total in function)
+Most-called PLT entries:
+- PLT 0x27: 12 calls (likely sceKernelGetModuleList or similar enumeration)
+- PLT 0x09: 5 calls (possibly sceKernelAllocateDirectMemory)
+- PLT 0x0c: 5 calls (possibly sceKernelReserveVirtualRange)
+- PLT 0x0a: 3 calls (possibly sceKernelMapDirectMemory)
+- PLT 0x24: 2 calls (we have a patch that makes this return 1)
+- Others: PLT 0xe4, 0xe5, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xeb, 0xec, 0xed, 0xee, 0xf4
+
+### Why GTA V doesn't progress further
+GTA V's main init function makes 38 PLT calls. All of them go to kyty's
+stub functions which return 0. This causes the init function to fail
+systematically:
+1. Init calls PLT 0x09 - returns 0 (no allocation)
+2. Init uses returned value as a pointer - AV
+3. M1W2 v1.4 patches the AV site (writes NOPs)
+4. Init continues to next PLT call
+5. Same pattern repeats
+
+After 6 AV sites are patched, GTA V's RIP gets to invalid memory area.
+The current test exits cleanly with no ucrtbase crash.
+
+### What would make GTA V progress further
+To make GTA V progress past init, we would need to:
+1. Implement at least some of the most-called PLT functions (0x09, 0x0a, 0x0c, 0x27)
+2. Each function needs actual PS5 behavior emulation
+3. This is a substantial effort - not feasible in single cycle
+
+### Conclusion
+GTA V's launcher is fully exercised. The next blocker is implementation
+of PS5 system functions that GTA V's init function depends on.
+
+AI-assisted disclosure: Yes, AI-assisted.
+
+
 ## Cycle 0129-0130 (2026-08-08) — M1W2 v1.7 late-sentinel threshold discovery
 
 ### Investigation (cycle 0129)
