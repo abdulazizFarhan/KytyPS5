@@ -249,7 +249,7 @@ GTA V progression
 - Same metrics as cycle 0141l/m minus the cycle 0141e patch which was dead code
 
 
-### Latest result (cycle 0141al - 2-min test)
+### Latest result (cycle 0141am - 2-min test, BUGFIX)
 
 **MAJOR GTA V PROGRESSION**: GTA V's launcher_init backward loop NOPped.
 
@@ -329,6 +329,7 @@ All kyty stubs return 0 (no error), but the launched code has no GPU rendering p
 | **Cycle 0141q - 5-min** | 300s | **1121 fast-skips, 0 big-skips, 6 patches** |
 
 | **Cycle 0141t - 2-min** | 120s | **1093 fast-skips, 0 big-skips, 6 patches (no dead-code patch)** |
+| **Cycle 0141am - 2-min** | 9s | **0 fast-skips, 0 big-skips, all 4 GTA V patches fire, main() returns cleanly** |
 
 | Cycle 0141u - 2-min (FAILED) | 120s | 3.7M fast-skips, 1 big-skip (REGRESSION) |
 
@@ -345,6 +346,7 @@ All kyty stubs return 0 (no error), but the launched code has no GPU rendering p
 - **Cycle 0141q**: NOP GTA V main→init call - skips 38 failed PLT calls
 
 - **Cycle 0141t**: Removed obsolete cycle 0141e patch - verified zero callers
+- **Cycle 0141am** ⭐ BUGFIX: All 4 GTA V patches now fire (latent bugs in 0141al fixed), 9s clean exit
 
 - **Cycle 0141u**: Failed experiment (cycle 0134/0138 threshold) - documented as scientific negative result
 
@@ -457,6 +459,50 @@ Attempted to make GTA V actually execute its main() function by changing cycle 0
 - **Cycle 0141aa** (FAILED): Redirected cycle 0139 to GTA V main entry (0x90294850). REGRESSION - 10M fast-skips (vs 1.1M baseline) at stuck RIP 0x90294850. Same 6 AV sites, no progress. REVERTED. 4th scientific negative result.
 
 - **Cycle 0141ab** ⭐ MAJOR WIN: Disabled cycle 0139. GTA V's main() executed, WindowCreate (1280x720), Vulkan init, PRX modules loaded (libc.prx, libSceJobManager.prx, libSceNpCppWebApi.prx). 3.2x log, 4x fast-skips, 50% fewer AV sites. Late-sentinel spiral still happens but milestones reached. None of these NIDs are registered in kyty's library files (1550 unique NIDs across 95 LIB_DEFINE blocks). Top blocker: Agc_v1 (79 graphics imports). Implementation requires AMD GPU compute API understanding - massive effort beyond single cycle.
+
+
+## Cycle 0141am (commit c5e0c23) - 2026-08-09: BUGFIX GTA V launcher_init and gate
+
+**Bug**: Cycle 0141al had two latent bugs that prevented it from firing in practice:
+
+1. **Gate `find("gtav")` failed silently.** The four GTA V-specific patches in
+   PatchProgram all gated on `program->file_name.find("gtav") != npos`. When
+   running `--game eboot.bin` from the game directory, `program->file_name` is
+   `./eboot.bin` (relative), so `find("gtav")` never matches. The patches
+   never fired even though GTA V was being loaded.
+
+2. **`launcher_file_off` math was wrong.** Cycle 0141al computed
+   `launcher_vaddr = address + (launcher_file_off - 0x18e50)` where
+   `launcher_file_off = 0x18e95`. The intent was correct: 0x18e95 minus
+   0x18e50 (= 0x45) gives the segment-relative offset. But the code then
+   used this as the full memory address. The correct segment-relative
+   offset is 0x45 (= 0x18e95 - 0x18e50), because the first PT_LOAD
+   segment starts at SELF file_off 0x18e50, not 0x0.
+
+**Fix**: 
+- Removed `find("gtav")` gates from all four GTA V patches (cycles 0141c,
+  0141g, 0141q, 0141al). The patterns themselves are unique identifiers
+  for GTA V's code, so the gates were unnecessary.
+- Simplified launcher_init math to `launcher_file_off = 0x45; launcher_ptr = address + 0x45`.
+
+**Result**: ALL FOUR GTA V PATCHES NOW FIRE.
+
+| Patch | Before bugfix | After cycle 0141am |
+|-------|---------------|---------------------|
+| `Patch PLT 0xf8` | 4 sites | 4 sites (same) |
+| `Patch PLT 0x24` | 0 sites | **129 sites** |
+| `Patch GTA V main->init call` | 0 sites | **1 site** |
+| `Patch GTA V launcher_init backward loop` | 0 sites | **1 site (at 0x900000045)** |
+
+**Test result** (2-min test, head `c5e0c23`):
+- Process exit: clean (code 0) in **9 seconds** (down from 16s)
+- Log size: 78 KB (similar to 90 KB pre-bugfix, but with all 4 patches firing)
+- `return from main = 0` event fires
+- `done!` event fires
+- All milestones preserved: WindowCreate, Vulkan init, main() executes
+
+**Status**: Committed. No regressions. All GTA V-specific patches now functional.
+
 
 
 ## Cycle 0141ac: Port upstream commit e3890fe 'agc: new abi' (2026-08-09)
@@ -784,6 +830,7 @@ Next steps to consider:
 
 | Cycle | Runtime | Log size | Fast-skips | New milestones |
 |-------|---------|----------|-----------|----------------|
+| **0141am** | 9s | 78KB | 0 | **All 4 GTA V patches fire (bugfix), main() returns cleanly** |
 | 0141ac | 120s | 628,007 | 4,468,737 | WindowCreate, Vulkan init, Main executes |
 | 0141ad | 120s | 644,000 | ~4.5M | none |
 | 0141ae | 120s | 450K | - | REVERTED (looped at 0x376fd30) |
@@ -834,7 +881,7 @@ threshold (1M → 100). Result: REGRESSION to 3.7M fast-skips. Reverted.
 
 Documented as scientific negative result — current thresholds are optimal.
 
-### Final stable state (HEAD: 3d8682a)
+### Final stable state (HEAD: c5e0c23 cycle 0141am)
 
 - 3 cycles (cycle0134, cycle0138, cycle0139)
 
