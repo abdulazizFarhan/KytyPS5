@@ -1640,6 +1640,28 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 		}
 	}
 
+	// Cycle 0141aw: NOP GTA V's RAGE setup function entry at 0x902813560 with ret.
+	// The function at vaddr 0x902813560 (file_off 0x2813560) is the RAGE setup function
+	// that has multiple AVs due to NULL vtable. Patching the entry with ret makes the
+	// function return immediately when called from any of its 3 callers:
+	//   - 0x90027b59a (hash table lookup)
+	//   - 0x900becd04 (syscall wrapper)
+	//   - 0x902813444 (recursive call)
+	// With cycle 0141ar active, this function is normally not called from RAGE entry.
+	// But this provides a safety net if other code paths reach it.
+	{
+		constexpr uint8_t RAGE_SETUP_PROLOGUE[4] = { 0x05, 0xbb, 0x02, 0x65 };
+		const uint64_t rage_setup_off = 0x2813560ULL;
+		if (rage_setup_off + 1 <= size) {
+			auto* setup_ptr = reinterpret_cast<uint8_t*>(address) + rage_setup_off;
+			if (memcmp(setup_ptr, RAGE_SETUP_PROLOGUE, 4) == 0) {
+				setup_ptr[0] = 0xc3;  // ret - return immediately
+				LOGF("Cycle 0141aw: Patch GTA V RAGE setup function entry at 0x%" PRIx64 " (ret)\n",
+				     reinterpret_cast<uint64_t>(setup_ptr));
+			}
+		}
+	}
+
 	// Cycle 0141au: DEBUG - dump runtime bytes at GTA V key addresses
 	// This is a debug-only cycle that logs the actual decrypted bytes at known GTA V
 	// addresses so we can decode the RAGE entry call chain. No patches applied.
