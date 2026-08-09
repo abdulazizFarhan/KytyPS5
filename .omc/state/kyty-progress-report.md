@@ -1120,6 +1120,31 @@ Comparing this report (cycle 0141v) with the previous report (cycle 0141u):
 
 - `.omc/state/kyty-progress-report.md` (multiple commits, this compaction)
 
+### Next steps identified (post-cycle 0141ap analysis, 2026-08-09)
+
+**Bottleneck analysis (verified):**
+- GTA V's main() returns immediately after 4 helper calls (PLT 6, 7, init, 0xef)
+- init() makes 13 PLT calls, mostly to libc_v1 NIDs that don't have kyty implementations
+- 15 unique libc_v1 NIDs are called during libc.prx loading
+- Most are standard C library functions (read/write/open/etc.)
+
+**Implementation targets (ranked by value):**
+1. **15 libc_v1 NIDs** - simplest wins; many are trivial wrappers around 
+   standard C library functions. Implementing them would let init() complete.
+2. **2 ulobjmgr_v1 NIDs** (PLT 4 BG26hBGiNlw, PLT 6 Smf+fUNblPc) - small surface area
+3. **Agc_v1 (79 imports)** - too big for a single cycle; await upstream implementations
+
+**Strategy:**
+- Stay at cycle 0141ap (skip init()) as stable baseline
+- Implement libc_v1 NIDs in src/libs/libC.cpp one at a time
+- Each implementation: add `LIB_STUB_DEFINE` + `LIB_DEFINE` entries
+- Test with GTA V (should let init() complete once enough are implemented)
+- Enable cycle 0141q (un-NOP main→init) once libc_v1 is complete enough
+
+**Confirmed safe to skip:**
+- GTA V's confirm failure assertion at 0x9028b0eb7 (already NOPped in cycle 0141aq, reverted - but didn't help)
+- GTA V's launcher_init backward loop (cycle 0141al already NOPs it)
+
 ### Archive
 
 Detailed chronological cycle log (cycles 0103-0141u) archived to:
