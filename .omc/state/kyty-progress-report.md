@@ -344,11 +344,39 @@ All kyty stubs return 0 (no error), but the launched code has no GPU rendering p
 
 - **Cycle 0141v**: This report - compacted, big-picture overview added, historical detail archived.
 
+### Cycle 0141aa (2026-08-09) — Failed experiment: redirect cycle 0139 to GTA V main entry
+
+Attempted to make GTA V actually execute its main() function by changing cycle 0139's redirect target from launcher continuation (0x900000089) to GTA V's main entry (0x90294850).
+
+**Hypothesis**: GTA V's main contains 14 PLT calls (all return 0 via stubs) and calls init() (NOPed by cycle 0141q). Main would execute with PLT calls returning 0 and exit cleanly.
+
+**Result**: REGRESSION
+- Log size: 693,466 bytes (3.5x larger)
+- Fast-skips: 10,607,617 (10x MORE than baseline of ~1.1M)
+- 9,231 fast-skips at exactly 0x90294850 (89% of total)
+- GTA V's RIP got STUCK in infinite loop at GTA V's main entry
+- Test still runs for 2-min timeout but GTA V makes no progress
+- Same 6 AV sites patched (3 GTA V + 3 ucrtbase)
+
+**Root cause analysis**:
+- GTA V's main entry at 0x90294850 has an Execute AV
+- Each fast-skip advances RIP by 16 bytes
+- But the AV keeps firing at 0x90294850 (or near it)
+- Suggests GTA V's code section may have permission/protection issues
+- OR GTA V's RIP is in some loop that returns to 0x90294850
+- The 10M fast-skips at the same address is highly anomalous
+
+**Conclusion**: REVERTED. Cycle 0139 target restored to 0x900000089.
+- This is the 4th scientific negative result (alongside cycles 0141u, 0141x, +64 byte advance)
+- Documented as failed experiment for future reference
+
 - **Cycle 0141x**: Failed experiment (+64 byte fast-skip) - REGRESSION to 5.8M fast-skips. Cycle 0136 threshold (fast_skip_count > 1M) couples to AV rate. Reverted.
 
 - **Cycle 0141y**: Reserve 2MB system area in PhysicalMemory - AllocateDirectMemory now returns phys_addr=0x200000 (was 0). Fixes underlying issue but loop function AVs persist (separate root cause - PLT 0xef returns NULL).
 
-- **Cycle 0141z**: NID analysis - GTA V has 154 unresolved PS5 SDK imports across 24 libraries. None of these NIDs are registered in kyty's library files (1550 unique NIDs across 95 LIB_DEFINE blocks). Top blocker: Agc_v1 (79 graphics imports). Implementation requires AMD GPU compute API understanding - massive effort beyond single cycle.
+- **Cycle 0141z**: NID analysis - GTA V has 154 unresolved PS5 SDK imports across 24 libraries.
+
+- **Cycle 0141aa** (FAILED): Redirected cycle 0139 to GTA V main entry (0x90294850). REGRESSION - 10M fast-skips (vs 1.1M baseline) at stuck RIP 0x90294850. Same 6 AV sites, no progress. REVERTED. 4th scientific negative result. None of these NIDs are registered in kyty's library files (1550 unique NIDs across 95 LIB_DEFINE blocks). Top blocker: Agc_v1 (79 graphics imports). Implementation requires AMD GPU compute API understanding - massive effort beyond single cycle.
 
 ## Session summary (cycles 0141n-0141w, 2026-08-09)
 
@@ -382,6 +410,7 @@ All kyty stubs return 0 (no error), but the launched code has no GPU rendering p
 - 0141x: Failed +64 byte fast-skip experiment
 - 0141y: Reserve 2MB system area fix (AllocateDirectMemory returns 0x200000)
 - 0141z: NID analysis documents GTA V's 154 unresolved PS5 SDK imports
+- 0141aa: FAILED experiment - redirect cycle 0139 to main caused infinite loop (REVERTED)
 
 ### Failed experiment (cycle 0141u)
 
