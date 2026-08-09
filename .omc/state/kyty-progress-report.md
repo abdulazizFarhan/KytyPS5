@@ -337,6 +337,10 @@ the missing PLT entries GTA V calls into, which is significantly more work than 
 
 **Conclusion:** Cycles 0141ar + 0141au + 0141av form the new stable baseline.
 
+**Cycle 0141ay (2026-08-09)**: Added `zr094EQ39Ww` libc_v1 stub function in `src/libs/libC.cpp`. Returns 0 (same as PLT fallback). GTA V behavior unchanged - 9.2s average runtime (3-run), all 5 GTA V patches + cycle 0141aw safety net fire, "done!" event fires, exit code 0. The stub is a "best effort" implementation that documents our awareness of the NID and provides a safe default behavior.
+
+**Cycle 0141aw (parallel agent)**: Patch at vaddr 0x902813560 with pattern `{0x05, 0xbb, 0x02, 0x65}` (4 bytes) matches the actual decrypted runtime bytes at that address. Replaces first byte (0x05 = "add eax, imm32" opcode) with 0xc3 (ret). Acts as safety net if RAGE entry ever calls 0x902813560 (it doesn't in current state due to cycle 0141ar). With cycle 0141ar active, this is a no-op safety net.
+
 **3-run verification (2026-08-09):**
 - Run 1: 10.3s, exit code 0, all 5 GTA V patches fire
 - Run 2: 9.4s, exit code 0, all 5 patches fire
