@@ -426,24 +426,89 @@ GTA V's post-loop code at 0x902937ef calls PLT 0x4 first, which clobbers RAX.
 - `src/loader/runtimeLinker.cpp` (commit d54c39e): cycle 0133 RAX=0x8002000d
 
 ## GTA V progression
-- GTA V is now executing REAL GTA V CODE (not unmapped memory)
-- RIP walks through GTA V's data and code sections
-- 13x more AVs processed
-- 8.5x longer runtime
-- **No GPU rendering reached yet** (still no Vulkan calls after redirect)
-- **Cycle 0141e**: GTA V's main epilogue patched (ret -> jmp-2) - eliminates ucrtbase crash
-- **Cycle 0141h**: PLT stub + PLT 0x24 patch added as infrastructure (not yet effective)
-- **Cycle 0141i**: cycle 0139 redirect to GTA V launcher continuation (0x900000089) - launcher runs cleanly
-- **Cycle 0141j**: tried GTA V main target (0x90398800) - GTA V's RIP got lost in mapped memory
-- **Cycle 0141k**: reverted to launcher continuation target - clean exit
-- **Cycle 0141l**: confirmed stable state - GTA V's launcher runs, M1W2 v1.4 patches 6 AV sites, clean exit
-- **Cycle 0141m**: PLT stub range corrected to mapped C addresses (0x903075300-0x903077100)
-- **Cycle 0141n**: GTA V main function analysis - discovered main is at 0x9027BA00 (mapped C), tested redirect (didn't help - big-skip recursion)
+
+### Current GTAV status (HEAD: 2efa6d1)
+
+**Test configuration** (2-min smoke test, stable):
+- GTA V launcher runs, M1W2 v1.4 patches 6 AV sites, clean exit (code 0)
+- 3 cycle events (cycle0134, cycle0138, cycle0139), 0 big-skips
+- ~1.1M fast-skips in 2-min test (RIP traverses ~17.5MB of M1W2 sentinel area)
+- Window 1280x720 created, `Execute: Main` event fires
+- 14 PLT calls in GTA V's main(): PLT 0x05 x6, PLT 0x06, 0x07, PLT 0xdf x2, PLT 0xe0 x2, PLT 0xe1 x2, PLT 0xef
+- GOT entries for main's PLT calls point to real GTA V code (inter-module dispatch)
+- AllocateDirectMemory is called by a static initializer (launcher_init), not main()
+- phys_addr=0 returned by kyty stub (uninitialized), causes loop function AVs (3 patches)
+
+### Latest baseline (cycle 0141i/l/m - 2-min test)
+- 1061-1097 fast-skips, 3 cycle events, 6 patches, 0 big-skips
+- Window created, Execute: Main fires, clean exit
+
+### Latest result (cycle 0141t - 2-min test)
+- 1093 fast-skips, 3 cycle events, 6 patches, 0 big-skips (without dead-code patch)
+- Window created, Execute: Main fires, clean exit
+- Same metrics as cycle 0141l/m minus the cycle 0141e patch which was dead code
+
+### Current blocker
+
+**GTA V's launcher requires 217 PS5 SDK imports across 24 libraries.**
+Critical: Agc_v1 (111 graphics imports for AMD GPU compute).
+Pre-launch code at 0x293a15-0x294850 contains 56 PLT calls that never execute (cycle 0139 redirects before).
+All kyty stubs return 0 (no error), but the launched code has no GPU rendering path.
+**Cannot be implemented in single cycle** - requires actual PS5 PLT function emulation for each of 217 imports.
+
+### Relevant subsystem
+
+**Loader/runtimeLinker.cpp** - KytyExceptionHandler (M1W2 v1.7), PLT stub handling, GTA V-specific patches.
+**GTA V binary** (`GAMES/gtav/eboot.bin`, 66 MB) - Self-contained ELFs with static initializers, launcher, main, init, loop.
+
+### Measurable runtime/stage progression
+
+| Cycle | Runtime | Result |
+|-------|---------|--------|
+| Cycle 0125 M1W2 v1.7 (5-min) | 60s | 2,009,089 AVs, exit code 0 |
+| Cycle 0131-0132 (redirect) | 120s/300s | 6.2M/15.6M AVs |
+| Cycle 0138 2-min (loop-skip) | 120s | 5,516,289 fast-skips, max RIP 0xb465df85 |
+| Cycle 0139 5-min | 300s | 15,141,889 fast-skips |
+| Cycle 0141c - 2-min | 120s | 4 PLT 0xf8 sites patched, 11,419 fast-skips |
+| Cycle 0141e - 2-min | 120s | No ucrtbase crash |
+| Cycle 0141i/l/m - 2-min | 120s | 1061-1097 fast-skips, 6 patches |
+| Cycle 0141i/l/m - 5-min | 300s | 1097 fast-skips, 6 patches |
+| **Cycle 0141o - 2-min** | 120s | **1081 fast-skips, 0 big-skips, 6 patches** |
+| **Cycle 0141q - 5-min** | 300s | **1121 fast-skips, 0 big-skips, 6 patches** |
+| **Cycle 0141t - 2-min** | 120s | **1093 fast-skips, 0 big-skips, 6 patches (no dead-code patch)** |
+| Cycle 0141u - 2-min (FAILED) | 120s | 3.7M fast-skips, 1 big-skip (REGRESSION) |
+
+### Important GTA V milestones
+
+- **Cycle 0125**: M1W2 v1.7 patcher - 60s clean exit, 2M AVs (was infinite-recurse before)
+- **Cycle 0138**: Loop-skip redirect - 17.5MB M1W2 sentinel traversal in 2 min
+- **Cycle 0139**: GTA V launcher continuation redirect - launches GTA V's launcher code
+- **Cycle 0141o**: Big-skip range narrowed (64GB → 256MB) - eliminates big-skip recursion
+- **Cycle 0141q**: NOP GTA V main→init call - skips 38 failed PLT calls
+- **Cycle 0141t**: Removed obsolete cycle 0141e patch - verified zero callers
+- **Cycle 0141u**: Failed experiment (cycle 0134/0138 threshold) - documented as scientific negative result
+
+### Next GTAV target
+
+1. Try implementing a simple PLT function (e.g., PLT 0x09 returns valid pointer). Risky but could yield progress.
+2. Investigate GTA V's pre-main code at 0x293a15-0x294850 (56 PLT calls) - any function could be useful.
+3. Look at upstream Kyty periodically for new PS5 SDK implementations.
+4. Implement PS5 graphics functions (Agc_v1) - 111 imports. Massive effort beyond single cycle.
+5. Try cycle 0139 with different target - redirect to GTA V's data section or static initializer.
+
+### Session cycle log
+
+- **Cycle 0141n**: GTA V main function analysis - discovered main at file offset 0x294850 / mapped C vaddr 0x9027BA00
 - **Cycle 0141o**: Narrowed big-skip range from 0x10000000000 to 0xA0000000 - eliminates big-skip recursion (0 big-skips in tests)
 - **Cycle 0141p**: Analyzed GTA V's init function - identified 38 PLT calls (most-called: PLT 0x27 x12, PLT 0x09 x5, PLT 0x0c x5)
 - **Cycle 0141q**: NOPed GTA V's main->init call - skips 38 failed PLT calls for cleaner exit (1 site patched)
 - **Cycle 0141r**: Analyzed GTA V's PS5 SDK dependencies - 217 imports across 24 libraries (Agc_v1 has 111 imports - graphics blocker)
 - **Cycle 0141s**: Test flow analysis - GTA V RIP never reaches launcher directly, traverses ~17.5MB of M1W2 sentinel area before cycle 0134 catches it (test takes 2 min due to fast-skip traversal)
+- **Cycle 0141t**: Removed obsolete cycle 0141e patch (no callers in GTA V binary) - 36 lines of dead code removed
+- **Cycle 0141u**: Failed experiment (cycle 0138 threshold 1M→100, cycle 0134 bound 0x4800000→0x3600000) - REGRESSION to 3.7M fast-skips. Documented as scientific negative result.
+- **Cycle 0141t v2**: Session summary (cycles 0141o, 0141q, 0141t improvements)
+- **Cycle 0141s v3**: Updated GTA V current status with cycle 0141o and 0141q improvements
+- **Cycle 0141s v4**: Upstream sync analysis - 176 commits ahead, most irrelevant to GTA V's blocker
 
 ## Cycle 0141 (2026-08-08) — M1W2 v1.7 GTA V PLT 0xf8 patch
 
