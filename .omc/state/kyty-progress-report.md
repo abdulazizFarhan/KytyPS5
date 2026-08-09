@@ -461,6 +461,65 @@ Attempted to make GTA V actually execute its main() function by changing cycle 0
 - **Cycle 0141ab** ⭐ MAJOR WIN: Disabled cycle 0139. GTA V's main() executed, WindowCreate (1280x720), Vulkan init, PRX modules loaded (libc.prx, libSceJobManager.prx, libSceNpCppWebApi.prx). 3.2x log, 4x fast-skips, 50% fewer AV sites. Late-sentinel spiral still happens but milestones reached. None of these NIDs are registered in kyty's library files (1550 unique NIDs across 95 LIB_DEFINE blocks). Top blocker: Agc_v1 (79 graphics imports). Implementation requires AMD GPU compute API understanding - massive effort beyond single cycle.
 
 
+## Latest result (cycle 0141an - 2-min test, **MAJOR WIN**)
+
+**GTA V's `init()` is now running!** disabled cycle 0141q which NOPped GTA V's
+main->init call. With 302b579 applied (unresolved stubs return clean 0), init()
+now actually executes its 13 PLT calls and most of them succeed.
+
+- **Runtime**: 120+ seconds (was 15s) — **8x longer**
+- **Log size**: 444,177 bytes (was 90KB) — **5x more activity**
+- **Fast-skips**: 2,627,000+ (late-sentinel loop, was 65,106)
+- **GTA V patches fire**: 4 (PLT 0xf8 x4, PLT 0x24 x1, main->init DISABLED, launcher_init backward loop)
+- **AGC references**: 268 (unresolved Agc_v1 stubs relocated to return 0)
+- **Vulkan references**: 47-49 (Vulkan init, extensions queried)
+- **WindowCreate**: succeeds (1280x720)
+- **3 PRX modules** loaded: libc.prx, libSceJobManager.prx, libSceNpCppWebApi.prx
+- **8 semaphores created** (init() runs properly)
+
+### What changed
+
+Cycle 0141q was NOPping GTA V's main->init call (0x294897 calling 0x28c8cd0) because
+init() makes 38 PLT calls that all returned 0 from kyty stubs, causing AVs. With
+newer kyty improvements (302b579 zero unresolved FP returns, plus more Pthread
+functions implemented), most of init()'s PLT calls now succeed.
+
+### GTA V's init() PLT calls (re-analyzed)
+
+| PLT | NID | Function | Status |
+|-----|-----|----------|--------|
+| 9 | 8zLSfEfW5AU | sceCoredumpRegisterCoredumpHandler | IMPLEMENTED |
+| 10 | zr094EQ39Ww | (unknown) | returns 0 (302b579) |
+| 228 | smWEktiyyG0 | PthreadMutexattrDestroy | IMPLEMENTED |
+| 230 | nsYoNRywwNg | PthreadAttrInit | IMPLEMENTED |
+| 231 | aI+OeCz8xrQ | PthreadSelf | IMPLEMENTED |
+| 232 | 62KCwEMmzcM | PthreadAttrDestroy | IMPLEMENTED |
+| 233 | -Wreprtu0Qs | PthreadAttrSetdetachstate | IMPLEMENTED |
+| 234 | eXbUSpEaTsA | PthreadAttrSetinheritsched | IMPLEMENTED |
+| 235 | 4+h9EzwKF4I | PthreadAttrSetschedpolicy | IMPLEMENTED |
+| 236 | 3qxgM4ezETA | PthreadAttrSetaffinity | IMPLEMENTED |
+| 237 | UTXzJbWhhTE | PthreadAttrSetstacksize | IMPLEMENTED |
+| 238 | El+cQ20DynU | PthreadAttrSetguardsize | IMPLEMENTED |
+| 950 | w5fcCG+t31g | ResolveFilepathsWithPrefixToIdsAndFileSizes | IMPLEMENTED (libAmpr) |
+
+### New blocker: late-sentinel infinite loop at 0xa78xxxxx
+
+After init() runs, GTA V's thread starts executing. RIP walks through 0x4000030
+to 0xa7aea5af in 0x1000 (4KB) increments. This is "M1W2 v1.7 late-sentinel" mode
+- fast-skipping through 2.6M iteration of unmapped memory.
+
+### Next steps
+
+1. Investigate GTA V's post-init code path - what is the thread trying to do?
+2. Possibly implement a stub PLT call that advances GTA V's actual game logic
+3. Look at cycle 0141ao to break the late-sentinel loop
+
+### Files changed
+
+- `src/loader/runtimeLinker.cpp` (cycle 0141q block disabled, comment-only)
+- `.omc/state/kyty-progress-report.md` (this entry)
+
+
 ## Cycle 0141am (commit c5e0c23) - 2026-08-09: BUGFIX GTA V launcher_init and gate
 
 **Bug**: Cycle 0141al had two latent bugs that prevented it from firing in practice:
