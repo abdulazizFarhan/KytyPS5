@@ -1379,3 +1379,37 @@ This requires actual PS5 behavior emulation for each function, which is far beyo
 - `src/loader/runtimeLinker.cpp` (cycle 0141t: remove dead-code patch)
 - `.omc/state/kyty-progress-report.md` (multiple documentation updates)
 
+
+## Cycle 0141u (2026-08-09) — Failed experiment: try to reduce fast-skips
+**Hypothesis**: Lower cycle 0134 bound + lower cycle 0138 threshold could reduce
+the ~1.1M fast-skips needed to traverse the M1W2 sentinel area.
+
+**Test**:
+- Cycle 0134 lower bound: 0x4800000 -> 0x3600000 (catch RIP at sentinel entry)
+- Cycle 0138 threshold: 1M -> 100 (allow early loop-skip)
+
+**Result (REGRESSION)**:
+- Cycle 0134 fires at count=1 (RIP=0x376fd30, immediately)
+- Cycle 0138 didn't fire because RIP walked through GTA V code at count < 100
+- Cycle 0139 didn't fire because condition never met
+- Cycle 0136 big-skip fired at count=1000001 (RIP=0x911d5bdf)
+- **3.7M fast-skips** (UP from 1.1M) - WORSE
+- **3 patches** (down from 6) - different behavior
+- **Log size 578KB** (up from 200KB) - more chaos
+- Test exit code 0 but runtime was less productive
+
+**Conclusion**: The current cycle 0134 lower bound (0x4800000) and cycle 0138
+threshold (1M) are optimal. Lowering them causes regression because:
+1. Cycle 0134 fires too early when fast_skip_count is low
+2. GTA V's RIP walks through GTA V's code without the cycle 0138/0139 redirect chain
+3. Eventually hits cycle 0136 big-skip instead
+4. Net result: more fast-skips, less progress
+
+**Reverted**: All changes rolled back, stable state restored (HEAD: c60db7a).
+
+### Lessons learned
+- The 1M fast-skip threshold is critical for GTA V's redirect chain to work properly
+- GTA V's RIP needs to be deep in sentinel area before cycle 0134 should fire
+- The cycle 0136 big-skip is a fallback, not a primary mechanism
+- Current configuration is stable and should not be modified
+
