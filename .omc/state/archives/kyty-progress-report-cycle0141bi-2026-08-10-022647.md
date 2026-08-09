@@ -1,3 +1,10 @@
+# Archived Progress Report - Cycle 0141bi (2026-08-10-022647)
+
+This is an archive of kyty-progress-report.md at the time of cycle 0141bi completion.
+The current progress report is at .omc/state/kyty-progress-report.md.
+
+---
+
 
 
 **⚠️ CURRENT STATE (2026-08-10)**: GTA V exits cleanly in **9.7 seconds** with **0 frames rendered**. Cycle 0141ar (RAGE Main Thread NOP) is REQUIRED to prevent GTA V from crashing in RAGE init's NULL global pointer dereference. The 9.7s runtime is **not progress** - it's the same 9s milestone achieved with faster relocation. Real rendering progress requires implementing Agc_v1 GPU compute APIs (79 NIDs, multi-week effort).
@@ -297,13 +304,13 @@ Investigation of GTA V's PS5 SDK imports via test log analysis. Found 154 unreso
 
 GTA V progression
 
-### Current GTAV status (HEAD: 9666b56)
+### Current GTAV status (HEAD: d73bde6)
 
 **Test configuration** (5-min smoke test, BREAKTHROUGH):
 
 - GTA V completes full main() lifecycle, status 0 exit (clean)
 - Runtime: 10-19s (varies with library cache state)
-- 6 GTA V patches fire: launcher_init NOP, init() lets run, confirm failure NOP x2, RAGE entry NOP + ret, RAGE setup function ret, RAGE virtual call NOP
+- 5 GTA V patches fire: launcher_init NOP, init() lets run, confirm failure NOP x2, RAGE entry NOP + ret
 - 0 Access Violations (cycle 0141ar bypasses RAGE entry, no AVs reach M1W2 handler)
 - 0 M1W2 v1.4 patches (cycle 0141ar prevents the AV loop)
 - 268 PS5 NID fallbacks (164 Graphics5 + 52 Json2 + 25 Graphics5Driver + 18 libc + 9 other)
@@ -347,7 +354,7 @@ cycle 0141ar is the only stable baseline.
 
 - GTA V completes full main() lifecycle with status 0 (clean exit)
 - Runtime: 10-19s (varies with library cache state: 10-17s cached, 19s new)
-- 6 GTA V patches fire: launcher_init NOP, init() lets run, confirm failure NOP x2, RAGE entry NOP + ret, RAGE setup function ret, RAGE virtual call NOP
+- 5 GTA V patches fire: launcher_init NOP, init() lets run, confirm failure NOP x2, RAGE entry NOP + ret
 - 268 PS5 NID fallbacks logged (164 Graphics5 + 52 Json2 + 25 Graphics5Driver + 18 libc + 9 other)
 - 0 Access Violations
 - 0 M1W2 v1.4 patches (RAGE entry bypassed - no AVs reach M1W2 handler)
@@ -504,7 +511,7 @@ stable baseline.
 
 - GTA V completes full main() lifecycle with status 0 (clean exit)
 - Runtime: 15-100s (varies with library cache state: 15s cached, 50s partial, 75-100s cold)
-- 6 GTA V patches fire: launcher_init NOP, init() lets run, confirm failure NOP x2, RAGE entry NOP + ret, RAGE setup function ret, RAGE virtual call NOP
+- 5 GTA V patches fire: launcher_init NOP, init() lets run, confirm failure NOP x2, RAGE entry NOP + ret
 - 268 PS5 NID fallbacks logged (164 Graphics5 + 52 Json2 + 25 Graphics5Driver + 18 libc + 9 other)
 - 0 Access Violations
 - All 10 RAGE thread lifecycle events fire: thread create, allocate, mmap, keymap, mutex init x16, [RAGE] Main Thread, PthreadJoin

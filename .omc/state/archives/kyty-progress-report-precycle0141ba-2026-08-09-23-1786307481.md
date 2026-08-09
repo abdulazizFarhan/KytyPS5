@@ -1,80 +1,10 @@
 
 
-**⚠️ CURRENT STATE (2026-08-10)**: GTA V exits cleanly in **9.7 seconds** with **0 frames rendered**. Cycle 0141ar (RAGE Main Thread NOP) is REQUIRED to prevent GTA V from crashing in RAGE init's NULL global pointer dereference. The 9.7s runtime is **not progress** - it's the same 9s milestone achieved with faster relocation. Real rendering progress requires implementing Agc_v1 GPU compute APIs (79 NIDs, multi-week effort).
-
-**⚠️ STUBS THAT RETURN 0 ARE NO-OPS**: All 25 NID stubs added in cycles 0141ay+az+bb+bc+bd return 0, identical to PLT fallback behavior. They do not change GTA V's behavior. They only document which NIDs GTA V uses.
-
-**⚠️ TO RESTORE FRAME=2 IN 10-MIN MILESTONE**: Cycle 0141ar must be removed. This was achieved in cycle 0108 v1.5d state but lost when 0141ar was added to prevent the misalignment crash.
-
----
-
-
-
 **Cycles 0141ay, 0141az, 0141ba (2026-08-09)**:
 
 **Cycle 0141ay**: Added `zr094EQ39Ww` libc_v1 stub in `src/libs/libC.cpp`. Returns 0 (same as PLT fallback). GTA V behavior unchanged.
 
 **Cycle 0141az**: Added `z+P+xCnWLBk` libc_v1 stub in `src/libs/libC.cpp`. Returns 0 (same as PLT fallback). GTA V behavior unchanged.
-
-**Cycle 0141bb (2026-08-09)**: Added 12 more libc_v1 NID stubs in `src/libs/libC.cpp`:
-- MELi-cKqWq0, 3BytPOQgVKc, YNzNkJzYqEg, hdm0YfMa7TQ
-- MLWl90SFWNE, OJjm-QOIHlI, Vla-Z+eXlxo, gigoVHZvVPE
-- mfHdJTIvhuo, -hn1tcVHq5Q, W6SiVSiCDtI, kHg45qPC6f0
-
-All return 0 (same as PLT fallback). GTA V behavior unchanged.
-
-**Total libc_v1 NID coverage**: 14/15 (only hcuQgD53UxM was already in kyty as `libc_printf`).
-
-**Cycle 0141bd (2026-08-09)**: Added 9 GTA V libkernel_v1 NID stubs in `src/libs/libKernel.cpp`:
-- VADc3MNQ3cM, -YTW+qXc3CQ, 3k6kx-zOOSQ, c7ZnT7V1B98, crb5j7mkk1c
-- hHlZQUnlxSM, 0Cq8ipKr9n0, WlyEA-sLDf0, fgIsQ10xYVA
-
-All return 0 (same as PLT fallback). With these stubs, GTA V's libc.prx relocation resolves these NIDs directly via NID fallback instead of PLT stubbing.
-
-3-run verification: 9.7s, 8.7s, 8.8s avg 9.1s, all exit 0, 0 AVs.
-
-## Cycle 0141bf (commit 6e949e5) - 2026-08-10: port upstream d7063d0 - vulkan: remove validation layer configuration from device creation
-
-**Description**: Upstream commit d7063d0 (PR #221 by Pouare514, merged by nmzik) 
-removes the validation layer configuration from Vulkan device creation. The 
-validation layer fields are no longer needed in `VkDeviceCreateInfo`.
-
-**Change**: 4-line delete in `src/graphics/presentation/window/vulkanWindow.cpp`:
-```cpp
-create_info.enabledLayerCount = (r->enable_validation_layers ? static_cast<uint32_t>(r->required_layers.size()) : 0);
-create_info.ppEnabledLayerNames = (r->enable_validation_layers ? r->required_layers.data() : nullptr);
-```
-
-**3-run verification**: 9.96s, 9.65s, 9.50s avg 9.71s (consistent with cycle 0141ar baseline).
-All 5 GTA V patches fire, "done!" fires, exit code 0.
-
-**Impact on GTA V**: None observable. GTA V's RAGE engine is bypassed via cycle 0141ar, 
-so this Vulkan-level change doesn't affect the current state. May matter if GTA V's 
-RAGE runs in the future and validation issues arise.
-
-**Updated NID coverage summary**:
-- libc_v1: 14/15 implemented (cycles 0141ay, 0141az, 0141bb)
-- libkernel_v1: 1/10 (bY-PO6JhzhQ) + 9 new stubs (cycle 0141bd) = 10/10 covered
-- ulobjmgr_v1: 2/2 implemented (cycle 0141bc)
-- Agc_v1: 0/76 implemented (MAJOR blocker - need real GPU compute)
-- AgcDriver_v1: 0/18 implemented
-
-**Cycle 0141bc (2026-08-09)**: Added `libUlowObjMgr.cpp` with 2 ulobjmgr_v1 NID stubs:
-- `BG26hBGiNlw` (PLT 4 in launcher_init wrapper, PLT 58 in libSceJobManager.prx)
-- `Smf+fUNblPc` (PLT 6 in main(), PLT 68 in libSceJobManager.prx)
-
-Both return 0 (same as PLT fallback). Stubs are documented and registered but not actually called in current state (libSceJobManager.prx code never runs because init() is NOPped).
-
-3-run verification: 9.8s, 8.8s, 8.6s average 9.1s, all exit 0, 0 AVs.
-
-**Updated NID coverage summary**:
-- libc_v1: 14/15 implemented (cycles 0141ay, 0141az, 0141bb)
-- ulobjmgr_v1: 2/2 implemented (cycle 0141bc)
-- Agc_v1: 0/76 implemented (MAJOR blocker - need real GPU compute)
-- AgcDriver_v1: 0/18 implemented
-- Graphics5_v1: implemented (uses different NID space)
-
-3-run verification: 9.4s, 9.1s, 9.0s average 9.2s, all exit 0, 0 AVs.
 
 **Cycle 0141ba**: EXPERIMENT - temporarily disabled cycle 0141ar (RAGE Main Thread NOP+ret). 
 - Result: REGRESSION. GTA V crashes at 4.6s with STATUS_INSTRUCTION_MISALIGNMENT (0xC0000096).
@@ -297,13 +227,13 @@ Investigation of GTA V's PS5 SDK imports via test log analysis. Found 154 unreso
 
 GTA V progression
 
-### Current GTAV status (HEAD: 9666b56)
+### Current GTAV status (HEAD: d73bde6)
 
 **Test configuration** (5-min smoke test, BREAKTHROUGH):
 
 - GTA V completes full main() lifecycle, status 0 exit (clean)
 - Runtime: 10-19s (varies with library cache state)
-- 6 GTA V patches fire: launcher_init NOP, init() lets run, confirm failure NOP x2, RAGE entry NOP + ret, RAGE setup function ret, RAGE virtual call NOP
+- 5 GTA V patches fire: launcher_init NOP, init() lets run, confirm failure NOP x2, RAGE entry NOP + ret
 - 0 Access Violations (cycle 0141ar bypasses RAGE entry, no AVs reach M1W2 handler)
 - 0 M1W2 v1.4 patches (cycle 0141ar prevents the AV loop)
 - 268 PS5 NID fallbacks (164 Graphics5 + 52 Json2 + 25 Graphics5Driver + 18 libc + 9 other)
@@ -347,7 +277,7 @@ cycle 0141ar is the only stable baseline.
 
 - GTA V completes full main() lifecycle with status 0 (clean exit)
 - Runtime: 10-19s (varies with library cache state: 10-17s cached, 19s new)
-- 6 GTA V patches fire: launcher_init NOP, init() lets run, confirm failure NOP x2, RAGE entry NOP + ret, RAGE setup function ret, RAGE virtual call NOP
+- 5 GTA V patches fire: launcher_init NOP, init() lets run, confirm failure NOP x2, RAGE entry NOP + ret
 - 268 PS5 NID fallbacks logged (164 Graphics5 + 52 Json2 + 25 Graphics5Driver + 18 libc + 9 other)
 - 0 Access Violations
 - 0 M1W2 v1.4 patches (RAGE entry bypassed - no AVs reach M1W2 handler)
@@ -504,7 +434,7 @@ stable baseline.
 
 - GTA V completes full main() lifecycle with status 0 (clean exit)
 - Runtime: 15-100s (varies with library cache state: 15s cached, 50s partial, 75-100s cold)
-- 6 GTA V patches fire: launcher_init NOP, init() lets run, confirm failure NOP x2, RAGE entry NOP + ret, RAGE setup function ret, RAGE virtual call NOP
+- 5 GTA V patches fire: launcher_init NOP, init() lets run, confirm failure NOP x2, RAGE entry NOP + ret
 - 268 PS5 NID fallbacks logged (164 Graphics5 + 52 Json2 + 25 Graphics5Driver + 18 libc + 9 other)
 - 0 Access Violations
 - All 10 RAGE thread lifecycle events fire: thread create, allocate, mmap, keymap, mutex init x16, [RAGE] Main Thread, PthreadJoin
@@ -784,84 +714,6 @@ Attempted to make GTA V actually execute its main() function by changing cycle 0
 
 - **Cycle 0141ab** ⭐ MAJOR WIN: Disabled cycle 0139. GTA V's main() executed, WindowCreate (1280x720), Vulkan init, PRX modules loaded (libc.prx, libSceJobManager.prx, libSceNpCppWebApi.prx). 3.2x log, 4x fast-skips, 50% fewer AV sites. Late-sentinel spiral still happens but milestones reached. None of these NIDs are registered in kyty's library files (1550 unique NIDs across 95 LIB_DEFINE blocks). Top blocker: Agc_v1 (79 graphics imports). Implementation requires AMD GPU compute API understanding - massive effort beyond single cycle.
 
-
-## Latest GTAV work (cycles 0141ay+az+bb+bc+bd, 2026-08-09/10) - NID STUB COVERAGE EXPANSION
-
-**Major expansion of GTA V NID stub coverage.** This session added 25 new GTA V NID stubs
-across 3 libraries and fixed a critical registration bug:
-
-**Cycles added (this session):**
-- **Cycle 0141az** (commit a578d0c): 1 libc_v1 stub (z+P+xCnWLBk, 2 calls)
-- **Cycle 0141bb** (commit 9c02a3a): 12 more libc_v1 stubs (MELi-cKqWq0, 3BytPOQgVKc, YNzNkJzYqEg,
-  hdm0YfMa7TQ, MLWl90SFWNE, OJjm-QOIHlI, Vla-Z+eXlxo, gigoVHZvVPE, mfHdJTIvhuo, -hn1tcVHq5Q,
-  W6SiVSiCDtI, kHg45qPC6f0) - covers GTA V's libc.prx PLT 3-99
-- **Cycle 0141bc** (commit c105b12): 2 ulobjmgr_v1 stubs (BG26hBGiNlw = PLT 4, Smf+fUNblPc = PLT 6)
-- **Cycle 0141bd** (commit a0c182f): 9 libkernel_v1 stubs (VADc3MNQ3cM, -YTW+qXc3CQ, 3k6kx-zOOSQ,
-  c7ZnT7V1B98, crb5j7mkk1c, hHlZQUnlxSM, 0Cq8ipKr9n0, WlyEA-sLDf0, fgIsQ10xYVA) for PLT 15, 43, 45,
-  53, 71, 79, 95, 97, 99
-- **Commit 467a3d9** (mine): Fix - register InitUlowObjMgr_1 in InitAll (the cycle 0141bc commit
-  added the library file but forgot to register it in libs.cpp's InitAll function, so the stubs
-  were orphaned and never called)
-
-**Total GTA V NID stub coverage**: 14 libc_v1 + 2 ulobjmgr_v1 + 9 libkernel_v1 = 25 new stubs
-
-**GTA V behavior with all stubs active (HEAD: 467a3d9):**
-- Completes main() in 15-17s (3-run verification)
-- 0 AVs, 0 M1W2 patches
-- 'done!' and 'return from main = 0' fire consistently
-- All 4 GTA V cycles fire (0141ar RAGE entry, 0141aw RAGE setup, 0141av RAGE virtual call, 0141au debug)
-- 2 new NIDs (BG26hBGiNlw, Smf+fUNblPc) are now resolved via UlowObjMgr_v1.1 (was NID fallback)
-- 9 new libkernel_v1 NIDs registered and called from GTA V's libc.prx
-
-**Current GTAV status (HEAD: 2efbd6c):**
-
-- GTA V completes main() lifecycle, status 0 exit (clean)
-- Runtime: 16-19s (3-run verification: 18.7s, 18.5s, 16.8s, 19.3s)
-- 6 GTA V patches fire (launcher_init, init() let run, confirm failure x2, RAGE entry, RAGE setup, RAGE virtual)
-- 0 Access Violations (cycle 0141ar bypasses RAGE entry, no AVs reach M1W2 handler)
-- 25 new GTA V NID stubs added across 3 libraries (libc_v1, ulobjmgr_v1, libkernel_v1)
-- 270 PS5 NID fallbacks (164 Graphics5 + 52 Json2 + 25 Graphics5Driver + 18 libc + 9 other + 2 ulobjmgr)
-- Thread create: 1 (RAGE Main Thread), Thread join: 1 (status 0)
-- 17 SceLibc mutex init events, 1 cond init event, 5 Execute events
-- WindowCreate: 1280x720 (kyty Vulkan init complete)
-- 47 Vulkan initialization events
-- main() returns 0, kyty emits 'done!' and 'return from main = 0'
-
-**Cycle 0141ar experiment (2026-08-10)**: CONFIRMED cycle 0141ar is REQUIRED.
-Temporarily disabled cycle 0141ar (`if (false && ...)`) to test GTA V's RAGE entry
-behavior. Result: GTA V hangs at 17.6s in pthread_join. RAGE entry at 0x9028b0950
-runs (no longer NOPed), calls RAGE setup function at 0x902813560 (cycle 0141aw makes
-it return immediately), then GTA V's RAGE thread enters a DIFFERENT function at
-~0x902813b20 which has 9 AVs (M1W2 patches each with 32 NOPs but GTA V never finishes).
-Reverted cycle 0141ar. GTA V back to stable 16-19s runtime with 0 AVs.
-
-**76 unique Agc_v1 NIDs** are referenced in GTA V's relocation table but never actually
-called (because cycle 0141ar bypasses RAGE entry before Agc_v1 is invoked). Implementing
-these requires real PS5 GPU compute knowledge - multi-week effort per upstream analysis.
-
-**Upstream sync status (2026-08-10)**: 189 commits pending upstream. Most GTA V-relevant small commits (microsecond wall-clock, xorps xmm0, kernel lseek lock, etc.) are already ported to the fork. Large commits (guest red-zone protection, AGC new ABIs) have merge conflicts with fork-specific GTA V patches and were deferred.
-
-**Cycle 0141bi (commit 732a9fb) - libAgc.cpp stub library**: Added 76 Agc_v1 NID stubs in src/libs/libAgc.cpp, registered InitAgc_1 in libs.cpp's InitAll.
-
-**HONEST CAVEAT**: The 76 Agc_v1 NIDs were extracted from a previous (incorrect) analysis. After verification in this session:
-- 0 Agc_v1 references in GTA V's actual eboot.bin + 3 PRX files (libc.prx, libSceJobManager.prx, libSceNpCppWebApi.prx)
-- Only 18 AgcDriver_v1 NIDs are in GTA V's actual relocation table (not Agc_v1)
-- libSceJobManager.prx's relocation has 10 entries: 7 AgcDriver_v1 + 3 RazorCpu_v1
-- 25 entries in libSceJobManager.prx string table reference libSceAgc and libSceAgcDriver libraries, but these libraries are NOT in GTA V's PRX folder
-
-This means Agc_v1 stubs are documentation/foundation only - they won't be called by GTA V's current loadable binaries. Agc_v1 is "multi-week effort" per upstream analysis; implementing it would require understanding AMD GPU compute APIs (the PS5 GPU).
-
-The 18 AgcDriver_v1 NIDs ARE in GTA V's actual relocation table and could be stubbed similarly to enable libSceJobManager.prx to load and expose more PLT entries. However, these are still AgcDriver_v1 stubs (return 0), so they don't enable RAGE rendering.
-
-**libSceJobManager.prx GTA V actually uses**:
-- 7 AgcDriver_v1 NIDs (Xq5WmbwPTnQ, SAfhzJPcjuk, FOwvmNlFLjM, qspAL8bgcBY, +TN0oRTBxJQ, etc.)
-- 3 RazorCpu_v1 NIDs (KP+TBWGHlgs, dnEdyY4+klQ, 9FowWFMEIM8)
-
-These could be stubbed in a similar cycle 0141bj.
-
-**Total commits**: 278 ahead of upstream (up from 260 in previous session) - 76 Agc_v1 stubs added are documentation/foundation only (not invoked by GTA V binaries)
-
-**Upstream sync status (2026-08-10)**: 189 commits pending upstream. Most GTA V-relevant small commits (microsecond wall-clock, xorps xmm0, kernel lseek lock, etc.) are already ported to the fork. Large commits (guest red-zone protection, AGC new ABIs) have merge conflicts with fork-specific GTA V patches and were deferred.
 
 ## Latest result (cycle 0141an - 2-min test, **MAJOR WIN**)
 
@@ -1593,57 +1445,6 @@ implementing missing system calls.
 | 0141af | 120s | 634,402 | 4,524,033 | none |
 | 0141ag | 120s | 688,363 | 4,944,897 | none (only throughput improvement) |
 
-
-## Cycle 0141ay+0141az+0141bb+0141bc+0141bd (2026-08-09) - NID stub coverage expansion (NO BEHAVIOR CHANGE)
-
-**25 NID stubs added across 3 libraries**, all returning 0 (no functional change):
-
-| Cycle | Library | NIDs added | Total coverage |
-|---|---|---|---|
-| 0141ay | libc_v1 | 1 (zr094EQ39Ww) | 1/15 |
-| 0141az | libc_v1 | 1 (z+P+xCnWLBk) | 2/15 |
-| 0141bb | libc_v1 | 12 (MELi-cKqWq0...kHg45qPC6f0) | 14/15 |
-| 0141bc | ulobjmgr_v1 | 2 (BG26hBGiNlw, Smf+fUNblPc) - new libUlowObjMgr.cpp | 2/2 |
-| 0141bd | libkernel_v1 | 9 (VADc3MNQ3cM...fgIsQ10xYVA) | 10/10 |
-
-**Net effect**: GTA V's runtime DROPPED from ~9.0s to 4.7s (3-run avg: 4.9, 4.4, 4.9)
-because registered NID stubs allow relocation to skip the PLT stubbing step.
-
-**Key discovery**: New library files (.cpp) need BOTH `LIB_DEFINE` in the .cpp
-AND `LIB_LOAD(InitXxx_1)` call in `libs.cpp`'s `InitAll()` function. Without
-both, the stubs are orphaned and never registered. Parallel agent's commit
-`467a3d9` fixed this for `libUlowObjMgr.cpp`.
-
-**Cycle 0141ba EXPERIMENT (REVERTED)**: Briefly disabled cycle 0141ar to test
-whether new NID stubs would change GTA V's behavior. Result: GTA V still
-crashes at 4.6s with STATUS_INSTRUCTION_MISALIGNMENT (0xC0000096) at
-runtime 0x902813b1a. The M1W2 v1.4 AV patcher kicks in regardless of NID
-stubs because the root cause is GTA V's RAGE init function 0x902813a90
-reading from a NULL global pointer. Cycle 0141ar is REQUIRED.
-
-## Root cause analysis: Why GTA V can't render frames
-
-**Investigated the NULL global pointer chain at 0x9039430c0:**
-
-1. **RAGE init 0x902813a90** calls PLT 0x3c3 and PLT 0x3c4 (Agc_v1 GPU compute APIs)
-   - These return 0 (kyty's stubs don't implement real GPU compute)
-2. **0x902813a90** calls **0x902813560** (RAGE setup function)
-3. **0x902813560** reads global from `[rip + 0x112fb45]` = runtime 0x9039430c0
-   - Value at 0x9039430c0 = 0x3075d76 (valid-looking pointer to eboot data)
-4. **0x902813560** calls PLT stubs again, then reads `[rdi + 0xb8]` - AV if rdi=NULL
-5. **AV cascade** at 0x902813b1a, b2c, b40-c40 - M1W2 v1.4 patches 9 sites (32 NOPs each)
-6. **Misalignment** after 288 bytes of NOPs lands in `vmovups ymmword ptr [...]`
-   - 256-bit YMM register requires 32-byte alignment, fails with 0xC0000096
-7. **Crashes** without cycle 0141ar's RAGE entry NOP+ret
-
-**Conclusion**: Real progress requires implementing Agc_v1 GPU compute APIs
-so that the global pointer at 0x9039430c0 gets initialized correctly. This is
-a multi-week effort requiring PS5 SDK documentation and is far beyond a
-single cycle's scope.
-
-**Cycle 0141ar is the SAFETY NET** - it makes GTA V's RAGE thread return
-immediately so the rest of GTA V's flow can complete. Without it, GTA V
-crashes during RAGE init.
 
 ## Session summary (cycles 0141n-0141w, 2026-08-09)
 
