@@ -327,6 +327,38 @@ block was restored from git HEAD. Re-verified GTA V completes main() lifecycle i
 - All 5 GTA V patches fire correctly
 
 This confirms the cycle 0141ar state is the stable baseline.
+### Cycle 0141at investigation (2026-08-09 - cycle 0141at also failed)
+
+**Context:** During this iteration, an attempt was made to bypass the AV-causing
+function at vaddr 0x902813560 (file_off 0x2813560) instead of NOPping the RAGE entry.
+Cycle 0141ar was temporarily DISABLED, and cycle 0141at was added to patch the function
+entry with NOP NOP ret.
+
+**Result: GTA V still hangs.**
+
+**Detailed findings:**
+
+- Cycle 0141at patch fires correctly at vaddr 0x902813560 (file_off 0x2813560)
+- But GTA V's RAGE thread still AVs at 0x902813b1a+ (inside the same 1466-byte function)
+- The patched function at 0x902813560 is NOT called by RAGE entry path
+- GTA V's RAGE entry calls a DIFFERENT code path that reaches 0x902813b1a directly
+- First AV instruction at 0x902813b1a is `add [rax], al` where rax=0 (NULL pointer write)
+- This happens after `movzx eax, byte [r13 + 0xb3]` reads 0 from uninitialized data
+- M1W2 v1.4 patches 10+ AV sites at 0x902813b20, 0x902813b40, 0x902813b60, etc.
+- But GTA V keeps iterating in the same AV loop (no actual progress)
+- GTA V hangs at 20s with 9 M1W2 patches fire, no completion
+
+**Root cause:** GTA V's RAGE entry (0x9028b0950) calls into a PLT function which
+internally calls a function that reaches 0x902813b1a. The function at 0x902813560 is a
+different code path that RAGE entry doesn't take.
+
+**Conclusion:** Cycle 0141ar (NOP RAGE entry) remains the only stable baseline.
+Both cycle 0141as (wrong offset) and cycle 0141at (correct offset, wrong function)
+DO NOT work.
+
+**Action:** Cycle 0141ar restored, cycle 0141at removed. Verified GTA V completes
+main() in 19.142s with 0 AVs after revert.
+
 
 ### Verification after parallel-agent revert (2026-08-09)
 
