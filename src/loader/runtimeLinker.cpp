@@ -1640,6 +1640,58 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 		}
 	}
 
+	// Cycle 0141au: DEBUG - dump runtime bytes at GTA V key addresses
+	// This is a debug-only cycle that logs the actual decrypted bytes at known GTA V
+	// addresses so we can decode the RAGE entry call chain. No patches applied.
+	{
+		// RAGE Main Thread entry (vaddr 0x9028b0950, file_off 0x28b0950)
+		const uint64_t rage_entry_off = 0x28b0950ULL;
+		if (rage_entry_off + 142 <= size) {
+			auto* ptr = reinterpret_cast<uint8_t*>(address) + rage_entry_off;
+			LOGF("[cycle 0141au] RAGE entry bytes at 0x%" PRIx64 ":\n", reinterpret_cast<uint64_t>(ptr));
+			for (uint32_t i = 0; i < 142; i += 16) {
+				LOGF("  %03x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+			     i, ptr[i+0], ptr[i+1], ptr[i+2], ptr[i+3], ptr[i+4], ptr[i+5], ptr[i+6], ptr[i+7],
+			     ptr[i+8], ptr[i+9], ptr[i+10], ptr[i+11], ptr[i+12], ptr[i+13], ptr[i+14], ptr[i+15]);
+			}
+		}
+		// RAGE setup function (vaddr 0x902813560, file_off 0x2813560)
+		const uint64_t rage_setup_off = 0x2813560ULL;
+		if (rage_setup_off + 32 <= size) {
+			auto* ptr2 = reinterpret_cast<uint8_t*>(address) + rage_setup_off;
+			LOGF("[cycle 0141au] RAGE setup func entry at 0x%" PRIx64 ":\n", reinterpret_cast<uint64_t>(ptr2));
+			for (uint32_t i = 0; i < 32; i += 16) {
+				LOGF("  %03x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+			     i, ptr2[i+0], ptr2[i+1], ptr2[i+2], ptr2[i+3], ptr2[i+4], ptr2[i+5], ptr2[i+6], ptr2[i+7],
+			     ptr2[i+8], ptr2[i+9], ptr2[i+10], ptr2[i+11], ptr2[i+12], ptr2[i+13], ptr2[i+14], ptr2[i+15]);
+			}
+		}
+	}
+
+	// Cycle 0141av: NOP GTA V's RAGE setup virtual call at 0x902813b29.
+	// Root cause: GTA V's RAGE setup function at 0x902813b1a does:
+	//   0x902813b1a: mov rax, [rdi]
+	//   0x902813b1d: mov esi, 0x128
+	//   0x902813b22: mov edx, 0x10
+	//   0x902813b27: xor ecx, ecx
+	//   0x902813b29: call [rax + 0x48]  <-- AV when rax = 0 (NULL vtable)
+	// Patching this with 3 NOPs skips the virtual call. NOTE: cycle 0141av alone is
+	// not sufficient - the function has follow-up AVs at 0x902813b2c (mov [rax], 0x12)
+	// and others. Cycle 0141ar (RAGE entry NOP) is still needed to bypass RAGE.
+	// File_off: 0x902813b29 - 0x900000000 = 0x2813b29.
+	{
+		constexpr uint8_t VIRTUAL_CALL[3] = { 0xff, 0x50, 0x48 };
+		const uint64_t av_inst_off = 0x2813b29ULL;
+		if (av_inst_off + 3 <= size) {
+			auto* vc_ptr = reinterpret_cast<uint8_t*>(address) + av_inst_off;
+			if (memcmp(vc_ptr, VIRTUAL_CALL, 3) == 0) {
+				memset(vc_ptr, 0x90, 3);  // NOP the virtual call
+				LOGF("Cycle 0141av: Patch GTA V RAGE virtual call at 0x%" PRIx64 " (3 NOPs)\n",
+				     reinterpret_cast<uint64_t>(vc_ptr));
+			}
+		}
+	}
+
 	// Cycle 0141aq: NOP GTA V's "confirm failure" assertion call sites
 	// GTA V's RAGE engine crashes with "confirm failure" assertion at vaddr 0x9028b0eb7.
 	// The call chain is: main() at 0x90027ba00 -> 0x9028afe80 (syscall loop)
