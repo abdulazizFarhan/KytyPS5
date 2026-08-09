@@ -248,6 +248,42 @@ GTA V progression
 
 - Same metrics as cycle 0141l/m minus the cycle 0141e patch which was dead code
 
+
+### Latest result (cycle 0141al - 2-min test)
+
+**MAJOR GTA V PROGRESSION**: GTA V's launcher_init backward loop NOPped.
+
+- 65,106 fast-skips, 0 cycle events, 1 patch (launcher_init), 0 big-skips
+
+- Process exit: CLEAN (code 0) in 16 seconds
+
+- **GTA V's main() EXECUTED** (was previously blocked by launcher_init loop)
+
+- `return from main = 0` event fires
+
+- `done!` event fires (host cleanup completes)
+
+- Log size: 90 KB (down from 525 KB - much less noise)
+
+**Technical:**
+
+- GTA V's launcher_init at 0x18e60 has a forward loop (skipped because limit is 0)
+  and a backward loop iterating over "function pointers" at 0x3abe18 (which are
+  actually code bytes interpreted as qwords).
+
+- The loop never exits because [rbx] is never NULL/-1. Each invalid call
+  AV-faults, causing thousands of AVs.
+
+- Patch NOPs 33 bytes at vaddr 0x900000045 (the backward loop body + lea +
+  jmp + nop sled). The SELF segment 1 maps file_off 0x18e50 to vaddr 0x0,
+  so file_off 0x18e95 maps to vaddr 0x45 (offset within segment).
+
+- After the patch, launcher_init returns immediately, allowing launcher_cont
+  to call init_env, atexit x2, main(), catchReturnFromMain, exit.
+
+- GTA V's main() runs (via cycle 0141q's NOP, the init() call is also skipped)
+  and returns 0.
+
 ### Current blocker
 
 **GTA V's launcher requires 217 PS5 SDK imports across 24 libraries.**
