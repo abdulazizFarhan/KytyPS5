@@ -593,6 +593,33 @@ because GTA V's RIP is still in the late-sentinel loop before any GPU DMA happen
 
 **Status**: Committed. No GTA V regression. No new GTA V progress. Clean upstream port.
 
+
+## Cycle 0141ah (commit f608c6f) - 2026-08-09: port upstream c11fc96 'pad: accept system remote-control port'
+
+**Upstream commit**: c11fc96 'pad: accept system remote-control port' (nmzik, 2026-08-09)
+
+**Files modified**:
+- `src/libs/controller.cpp`: added `PadOpenArgsAreValid` helper function, refactored `PadOpen` and `PadGetHandle` to use it. Now supports system remote-control port (user_id=0xff, type=16).
+
+**Adaptations**: None, clean port.
+
+**Test result** (2-min test):
+| Metric | cycle 0141ag | cycle 0141ah | Delta |
+|--------|-------------|-------------|-------|
+| Log size | 688,363 | 719,478 | +31,115 (+4.5%) |
+| Fast-skips | 4,944,897 | 5,216,257 | +271,360 (+5.5%) |
+| Late-sentinel total | 4,383,000 | 4,610,000 | +227,000 (+5.2%) |
+| Max RIP | 0xa3d77615 | 0xa40eb705 | +0x37c0f0 further |
+| Milestones | WindowCreate, Vulkan, Main | same | no change |
+
+**Analysis**: Cycle 0141ah adds support for system remote-control port in
+PadOpen/PadGetHandle. GTA V doesn't reach this code path yet, but the change
+might help when GTA V's input system eventually initializes. Log shows steady
+throughput improvement.
+
+**Status**: Committed. No GTA V regression. No new GTA V progress. Clean upstream port.
+
+
 ## Summary of GTA V progression (cumulative)
 
 | Cycle | Runtime | Log size | Fast-skips | New milestones |
