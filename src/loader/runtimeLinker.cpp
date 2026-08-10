@@ -1608,6 +1608,22 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 			}
 		}
 	}
+// Cycle 0141de: Dump RAGE AV sites in decrypted memory
+	// When GTAV_RAGE_ENABLE=1, RAGE hits AVs at file_off 0x2813f05+
+	// This cycle dumps those AV sites to understand what RAGE is doing
+	{
+		const uint64_t av_site1_off = 0x2813f00ULL;  // Near first AV
+		const uint64_t av_site1_size = 64;
+		if (av_site1_off + av_site1_size <= size) {
+			auto* ptr1 = reinterpret_cast<uint8_t*>(address) + av_site1_off;
+			LOGF("Cycle 0141de: RAGE AV site bytes at file_off 0x%" PRIx64 " (decrypted):\n", av_site1_off);
+			for (uint32_t j = 0; j < av_site1_size; j += 16) {
+				LOGF("  %03x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+				     j, ptr1[j+0], ptr1[j+1], ptr1[j+2], ptr1[j+3], ptr1[j+4], ptr1[j+5], ptr1[j+6], ptr1[j+7],
+				     ptr1[j+8], ptr1[j+9], ptr1[j+10], ptr1[j+11], ptr1[j+12], ptr1[j+13], ptr1[j+14], ptr1[j+15]);
+			}
+		}
+	}
 	// Cycle 0141ao: RE-ENABLE cycle 0141al (launcher_init backward loop NOP) AND keep
 	// cycle 0141q disabled (let init() run). Cycle 0141an had both disabled, causing GTA V
 	// to enter launcher_init's broken backward loop and then get stuck in fast-skip loop.
@@ -1674,7 +1690,7 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 			rage_enable = (env != nullptr && env[0] == '1') ? 1 : 0;
 			if (rage_enable != 0) {
 				LOGF("Cycle 0141dc: GTAV_RAGE_ENABLE=1 -> cycles 0141ar+0141by DISABLED, RAGE will ACTUALLY RUN\n");
-				LOGF("Cycle 0141dd: GTAV_RAGE_ENABLE=1 -> extended RAGE NOP range 0x2813b1a-0x2813f00 (1138 NOPs total)\n");
+				LOGF("Cycle 0141dd: GTAV_RAGE_ENABLE=1 -> extended RAGE NOP range 0x2813b1a-0x2814100 (1502 NOPs total)\n");
 			}
 		}
 		if (rage_enable == 1) {
@@ -1682,7 +1698,7 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 			// Cycle 0141dd: But extend the RAGE setup NOP range to cover AV sites
 			// found at 0x2813e80+ when RAGE actually runs.
 			constexpr uint64_t rage_setup_ext_start = 0x2813b1aULL;
-			constexpr uint64_t rage_setup_ext_end   = 0x2813f00ULL;  // Extended range
+			constexpr uint64_t rage_setup_ext_end   = 0x2814100ULL;  // Extended range
 			if (rage_setup_ext_end <= size) {
 				auto* ext_ptr = reinterpret_cast<uint8_t*>(address) + rage_setup_ext_start;
 				memset(ext_ptr, 0x90, rage_setup_ext_end - rage_setup_ext_start);
