@@ -2869,6 +2869,7 @@ LIB_DEFINE(InitCoredump_1) {
 
 	LIB_FUNC("8zLSfEfW5AU", Coredump::sceCoredumpRegisterCoredumpHandler);
 	LIB_FUNC("fFkhOgztiCA", Coredump::sceCoredumpUnregisterCoredumpHandler);
+	LIB_FUNC("Dbbkj6YHWdo", Coredump::sceCoredumpRegisterCoredumpHandler);  // GTA V Coredump_v1 (same as 8zLSfEfW5AU)
 }
 
 LIB_DEFINE(InitLibKernel_1_FS) {

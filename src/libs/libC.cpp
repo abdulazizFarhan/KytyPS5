@@ -745,6 +745,7 @@ void RunThreadAtexitDestructors() {
 LIB_DEFINE(InitLibcInternalExt_1) {
 	LIB_FUNC("NWtTN10cJzE", LibcInternalExt::LibcHeapGetTraceInfo);
 	LIB_FUNC("qBS714-Jr3g", LibcInternalExt::LibcInternalExtCxaThreadAtexit);
+	LIB_FUNC("EHsF2i9FXPM", LibcInternalExt::LibcHeapGetTraceInfo);  // GTA V LibcInternalExt_v1
 }
 
 } // namespace LibcInternalExt
