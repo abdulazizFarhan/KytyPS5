@@ -2112,7 +2112,75 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 				}
 			}
 		}
+	}// Cycle 0141ef: Dump GTA V main's first 256 bytes (file_off 0x294850-0x294950)
+	// Main is called by launcher; this shows the initial setup before pthread_create.
+	{
+		static bool dumped = false;
+		if (!dumped) {
+			dumped = true;
+			std::string program_name = Common::PathToString(program->file_name);
+			if (program_name.find("eboot.bin") != std::string::npos) {
+				const uint64_t main_off = 0x294850ULL;
+				if (main_off + 256ULL <= size) {
+					auto* ptr = reinterpret_cast<uint8_t*>(address) + main_off;
+					LOGF("Cycle 0141ef: GTA V main entry at file_off 0x%" PRIx64 " (vaddr 0x%" PRIx64 "):\n", main_off, main_off + 0x900000000ULL);
+					for (uint32_t j = 0; j < 256; j += 16) {
+						LOGF("  %03x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+						     j, ptr[j+0], ptr[j+1], ptr[j+2], ptr[j+3], ptr[j+4], ptr[j+5], ptr[j+6], ptr[j+7],
+						     ptr[j+8], ptr[j+9], ptr[j+10], ptr[j+11], ptr[j+12], ptr[j+13], ptr[j+14], ptr[j+15]);
+					}
+				}
+			}
+		}
+	}// Cycle 0141eg: Find function entry in GTA V main range (0x294850-0x294950)
+	{
+		static bool dumped = false;
+		if (!dumped) {
+			dumped = true;
+			std::string program_name = Common::PathToString(program->file_name);
+			if (program_name.find("eboot.bin") != std::string::npos) {
+				for (int64_t off = 0x294850LL; off < 0x294a00LL; ++off) {
+					if (off + 4 > (int64_t)size) break;
+					uint8_t* p = reinterpret_cast<uint8_t*>(address) + off;
+					if (p[0] == 0x55 && p[1] == 0x48 && p[2] == 0x89 && p[3] == 0xe5) {
+						LOGF("Cycle 0141eg: Main-range function entry at file_off 0x%" PRIx64 " (delta=%" PRId64 ")\n", off, off - 0x294850LL);
+					}
+				}
+			}
+		}
+	}// Cycle 0141eh: Wider search for function entries in GTA V main range
+	{
+		static bool dumped = false;
+		if (!dumped) {
+			dumped = true;
+			std::string program_name = Common::PathToString(program->file_name);
+			if (program_name.find("eboot.bin") != std::string::npos) {
+				// Search for any standard function pattern in main range
+				uint64_t start = 0x294800ULL;
+				uint64_t end = 0x295000ULL;
+				int found = 0;
+				for (uint64_t off = start; off < end && off + 4 < size; ++off) {
+					uint8_t* p = reinterpret_cast<uint8_t*>(address) + off;
+					if ((p[0] == 0x55 && p[1] == 0x48 && p[2] == 0x89 && p[3] == 0xe5) ||  // push rbp
+					    (p[0] == 0x48 && p[1] == 0x89 && p[2] == 0x5c && p[3] == 0x24)) {    // mov [rsp+X], rbx
+						LOGF("Cycle 0141eh: Function-like entry at file_off 0x%" PRIx64 ": %02x %02x %02x %02x\n",
+						     off, p[0], p[1], p[2], p[3]);
+						found++;
+						if (found >= 10) break;
+					}
+				}
+				if (found == 0) {
+					LOGF("Cycle 0141eh: No standard function entries in main range 0x294800-0x295000\n");
+				}
+			}
+		}
 	}
+
+	
+
+	
+
+	
 
 	
 
