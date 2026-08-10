@@ -1840,6 +1840,31 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 		}
 	}
 
+	// Cycle 0141ck: DEBUG - dump GTA V launcher code areas
+	// Shows the launcher code (binary start) and code after main returns.
+	{
+		struct DumpRange { uint64_t file_off; uint32_t len; const char* label; };
+		const DumpRange ranges[] = {
+			{0x0000ULL, 256, "GTA V launcher binary entry area (file_off 0x0-0x100)"},
+			{0x0100ULL, 256, "GTA V launcher code area (file_off 0x100-0x200)"},
+			{0x29e300ULL, 256, "After GTA V main return (file_off 0x29e300-0x29e400)"},
+			{0x29e400ULL, 256, "Post-main code (file_off 0x29e400-0x29e500)"},
+			{0x29f000ULL, 256, "Later post-main (file_off 0x29f000-0x29f100)"},
+		};
+		for (const auto& r : ranges) {
+			if (r.file_off + r.len <= size) {
+				auto* ptr = reinterpret_cast<uint8_t*>(address) + r.file_off;
+				LOGF("[cycle 0141ck] %s at 0x%" PRIx64 ":\n", r.label, reinterpret_cast<uint64_t>(ptr));
+				for (uint32_t i = 0; i < r.len; i += 16) {
+					LOGF("  %03x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+				     i, ptr[i+0], ptr[i+1], ptr[i+2], ptr[i+3], ptr[i+4], ptr[i+5], ptr[i+6], ptr[i+7],
+				     ptr[i+8], ptr[i+9], ptr[i+10], ptr[i+11], ptr[i+12], ptr[i+13], ptr[i+14], ptr[i+15]);
+				}
+			}
+		}
+	}
+
+
 
 
 
