@@ -2332,7 +2332,35 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 				}
 			}
 		}
-	}// Cycle 0141eu: Dump vtable at vaddr 0x9037f1ec0 (loaded by PLT 0x789 target)
+	}// Cycle 0141ev: Patch PLT 0x789 to return 0 immediately
+	// PLT 0x789 at file_off 0x3078f30 normally does jmp [rip+0x8b31aa] which AVs
+	// because GOT at 0x392c0e0 is past segment 0. Replace with xor eax,eax; ret
+	// so PLT 0x789 calls succeed (return 0) without AVing.
+	{
+		static bool patched = false;
+		if (!patched) {
+			patched = true;
+			std::string program_name = Common::PathToString(program->file_name);
+			if (program_name.find("eboot.bin") != std::string::npos) {
+				const uint64_t plt_789_off = 0x3078f30ULL;
+				if (plt_789_off + 6 <= size) {
+					auto* ptr = reinterpret_cast<uint8_t*>(address) + plt_789_off;
+					// Save original for logging
+					uint8_t orig[6];
+					memcpy(orig, ptr, 6);
+					// Write xor eax, eax (31 c0) + ret (c3) + nop (90) + nop (90) + nop (90)
+					ptr[0] = 0x31; ptr[1] = 0xc0; ptr[2] = 0xc3;
+					ptr[3] = 0x90; ptr[4] = 0x90; ptr[5] = 0x90;
+					LOGF("Cycle 0141ev: Patched PLT 0x789 at file_off 0x3078f30 to xor eax,eax; ret; nop;nop;nop\n");
+					LOGF("Cycle 0141ev: Original: %02x %02x %02x %02x %02x %02x\n",
+					     orig[0], orig[1], orig[2], orig[3], orig[4], orig[5]);
+					LOGF("Cycle 0141ev: Now returns 0 immediately, no GOT AV\n");
+				}
+			}
+		}
+	}
+
+	// Cycle 0141eu: Dump vtable at vaddr 0x9037f1ec0 (loaded by PLT 0x789 target)
 	// The function at 0x90bbc0e0 does: lea rax, [rip+0x2c45dce] -> vaddr 0x9037f1ec0
 	// Then stores vtable to rdi. Dump first 0x100 bytes (16 vtable entries) to see
 	// what virtual methods GTA V is dispatching to.
