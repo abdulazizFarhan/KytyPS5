@@ -2688,17 +2688,6 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 					}
 				}
 			}
-			// Cycle 0141fy: NOP call rax at vaddr_offset 0x41 (ff d0)
-			{
-				const uint64_t call_off = 0x41ULL;
-				if (call_off + 2 <= size) {
-					auto* ip = reinterpret_cast<uint8_t*>(address) + call_off;
-					if (ip[0] == 0xff && ip[1] == 0xd0) {
-						ip[0] = 0x90; ip[1] = 0x90;
-						LOGF("Cycle 0141fy: NOP call rax at 0x%" PRIx64 "\n", call_off);
-					}
-				}
-			}
 			// Cycle 0141ga: DEBUG dump PLT region 0x3078000-0x307c000
 			{
 				const uint64_t plt_dump_off = 0x3078000ULL;
@@ -2738,6 +2727,22 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 			}
 		}
 	}
+
+	// Cycle 0141fy: NOP launcher_init call rax at vaddr_offset 0x41 (ff d0)
+	// This patch ALWAYS applies (regardless of rage_enable) because launcher_init
+	// runs even when RAGE is disabled. Without this patch, the call rax causes
+	// a Write AV that triggers fast-skip loop in the launcher_init path.
+	{
+		const uint64_t call_off = 0x41ULL;
+		if (call_off + 2 <= size) {
+			auto* ip = reinterpret_cast<uint8_t*>(address) + call_off;
+			if (ip[0] == 0xff && ip[1] == 0xd0) {
+				ip[0] = 0x90; ip[1] = 0x90;
+				LOGF("Cycle 0141fy: NOP call rax at 0x%" PRIx64 "\n", call_off);
+			}
+		}
+	}
+
 
 
 
