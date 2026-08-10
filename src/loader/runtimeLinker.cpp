@@ -2174,7 +2174,23 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 				}
 			}
 		}
+	}// Cycle 0141ei: Try to detect if GTA V's main actually executes by checking RIP
+	// The launcher calls wrapper at 0x90027b991. Add a hook: when RIP = 0x90027b991,
+	// GTA V's main has started executing. We can check this indirectly by logging the
+	// "m1w2 illegal instruction" hits (which include AVs on unmapped memory).
+	{
+		static bool logged = false;
+		if (!logged) {
+			logged = true;
+			std::string program_name = Common::PathToString(program->file_name);
+			if (program_name.find("eboot.bin") != std::string::npos) {
+				LOGF("Cycle 0141ei: GTA V launcher calls wrapper at vaddr 0x90027b991 (file_off 0x27b991)\n");
+				LOGF("Cycle 0141ei: If main runs at this vaddr, GTA V's main has unconventional entry\n");
+			}
+		}
 	}
+
+	
 
 	
 
