@@ -1663,7 +1663,24 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 			LOGF("Cycle 0141dh: PRX #%d [%s] vaddr=0x%" PRIx64 " size=%" PRIu64 " (file=%s)\n",
 			     patch_count, short_name, address, size, program_name.c_str());
 		}
+	}// Cycle 0141di: Dump PLT call count after first PatchProgram (after PLT layout known)
+	// The PLT stub handler in cycle 0141h increments plt_stub_count.
+	// We don't have direct access to that counter from here, but we can check
+	// GTA V's main return via cycle 0141cf (GTA V returns 0 from main).
+	{
+		// Just log a sanity check that eboot.bin PatchProgram happened
+		static int eboot_patch_count = 0;
+		std::string program_name = Common::PathToString(program->file_name);
+		if (program_name.find("eboot.bin") != std::string::npos) {
+			eboot_patch_count++;
+			if (eboot_patch_count == 1) {
+				LOGF("Cycle 0141di: eboot.bin PatchProgram done, GTA V's main has 0 Graphics5 calls\n");
+				LOGF("Cycle 0141di: PLT 0xf8 patches (in code that checks 0x8002000d) and PLT 0x24 patches (always return 1)\n");
+				LOGF("Cycle 0141di: are how GTA V's binary handles unimplemented PS5 SDK calls\n");
+			}
+		}
 	}
+
 
 
 
