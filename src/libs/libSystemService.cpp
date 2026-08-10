@@ -573,6 +573,8 @@ LIB_DEFINE(InitSystemService_1) {
 	LIB_FUNC("Q3utJvma4Mo", SystemService::SystemServiceSetNoticeScreenSkipFlag);
 	LIB_FUNC("XbbJC3E+L5M", SystemService::SystemServicePowerTick);
 	LIB_FUNC("3s8cHiCBKBE", SystemService::SystemServiceReportAbnormalTermination);
+	LIB_FUNC("m5CYKX20wfg", SystemService::SystemServiceHideSplashScreen);  // GTA V SystemService_v1
+	LIB_FUNC("uaieF+glFPs", SystemService::SystemServiceHideSplashScreen);
 	SystemGesture::InitSystemGesture_1(s);
 }
 

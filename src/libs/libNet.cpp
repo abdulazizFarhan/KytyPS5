@@ -214,6 +214,9 @@ LIB_DEFINE(InitNet_1_Net) {
 	LIB_FUNC("iWQWrwiSt8A", LibNet::NetHtons);
 	LIB_FUNC("pQGpHYopAIY", LibNet::NetNtohl);
 	LIB_FUNC("Rbvt+5Y2iEw", LibNet::NetNtohs);
+	LIB_FUNC("beRjXBn-z+o", LibNet::NetGetsockname);  // GTA V Net_v1
+	LIB_FUNC("9wO9XrMsNhc", LibNet::NetGetSockInfo);
+	LIB_FUNC("kJlYH5uMAWI", LibNet::NetGetsockname);
 }
 
 } // namespace LibNet
@@ -1412,6 +1415,8 @@ LIB_DEFINE(InitNet_1_NpManager) {
 	LIB_FUNC("eQH7nWPcAgc", NpManager::NpGetState);
 	LIB_FUNC("e-ZuhGEoeC4", NpManager::NpGetNpReachabilityState);
 	LIB_FUNC("Oad3rvY-NJQ", NpManager::NpHasSignedUp);
+	LIB_FUNC("P6piso307SE", NpManager::NpHasSignedUp);  // GTA V NpManager_v1
+	LIB_FUNC("-Rjp3-YViXc", NpManager::NpHasSignedUp);
 }
 
 } // namespace LibNpManager

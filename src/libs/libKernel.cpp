@@ -2028,6 +2028,8 @@ LIB_DEFINE(InitLibKernel_1_Posix) {
 	LIB_FUNC("4n51s0zEf0c", Posix::inet_pton);
 	LIB_FUNC("5jRCs2axtr4", Posix::inet_ntop);
 	LIB_FUNC("cfwBSQyr5Ys", cfwBSQyr5Ys);
+	LIB_FUNC("TUuiYS2kE8s", Posix::flock);  // GTA V Posix_v1
+	LIB_FUNC("TXFFFiNldU8", Posix::flock);
 }
 
 } // namespace Posix
