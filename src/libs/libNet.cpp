@@ -1558,6 +1558,11 @@ LIB_DEFINE(InitNet_1_NpEntitlementAccess) {
 	LIB_FUNC("TFyU+KFBv54",
 	         LibNpEntitlementAccess::NpEntitlementAccessGetAddcontEntitlementInfoList);
 	LIB_FUNC("xddD23+8TfQ", LibNpEntitlementAccess::NpEntitlementAccessGetAddcontEntitlementInfo);
+	LIB_FUNC("IQtb-TaIjSM", LibNpEntitlementAccess::NpEntitlementAccessInitialize);  // GTA V NpEntitlementAccess_v1
+	LIB_FUNC("eOxGbG3sPb0", LibNpEntitlementAccess::NpEntitlementAccessInitialize);
+	LIB_FUNC("69u+XqsoNd0", LibNpEntitlementAccess::NpEntitlementAccessInitialize);
+	LIB_FUNC("HFcQl9TMcFQ", LibNpEntitlementAccess::NpEntitlementAccessInitialize);
+	LIB_FUNC("Z0eQj8m7XA8", LibNpEntitlementAccess::NpEntitlementAccessInitialize);
 }
 
 } // namespace LibNpEntitlementAccess
@@ -3539,6 +3544,10 @@ LIB_DEFINE(InitNet_1_NpWebApi2) {
 	LIB_FUNC("fY3QqeNkF8k", LibNpWebApi2::NpWebApi2PushEventRegisterCallback);
 	LIB_FUNC("3Tt9zL3tkoc", LibNpWebApi2::NpWebApi2CheckTimeout);
 	LIB_FUNC("bEvXpcEk200", LibNpWebApi2::NpWebApi2Terminate);
+	LIB_FUNC("NNVf18SlbT8", LibNpWebApi2::NpWebApi2Initialize);  // GTA V NpWebApi2_v1
+	LIB_FUNC("AAj9X+4aGYA", LibNpWebApi2::NpWebApi2Initialize);
+	LIB_FUNC("KJdPcOGmK58", LibNpWebApi2::NpWebApi2Initialize);
+	LIB_FUNC("hOnIlcGrO6g", LibNpWebApi2::NpWebApi2Initialize);
 }
 
 } // namespace LibNpWebApi2

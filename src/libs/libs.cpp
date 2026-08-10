@@ -288,6 +288,41 @@ LIB_DEFINE(InitTextToSpeech2_1);
 LIB_DEFINE(InitUlowObjMgr_1);
 
 
+namespace LibNpCommerce {
+
+
+
+LIB_DEFINE(InitNpCommerce_1);
+
+
+
+} // namespace LibNpCommerce
+
+
+
+namespace LibNpUtility {
+
+
+
+LIB_DEFINE(InitNpUtility_1);
+
+
+
+} // namespace LibNpUtility
+
+
+
+namespace LibVideoRecordingP {
+
+
+
+LIB_DEFINE(InitVideoRecordingP_1);
+
+
+
+} // namespace LibVideoRecordingP
+
+
 
 LIB_DEFINE(InitUserService_1);
 
@@ -448,7 +483,10 @@ void InitAll(Loader::SymbolDatabase* s) {
 
 
 
+	LIB_LOAD(LibNpCommerce::InitNpCommerce_1);
+	LIB_LOAD(LibNpUtility::InitNpUtility_1);
 	LIB_LOAD(InitVideoOut_1);
+	LIB_LOAD(LibVideoRecordingP::InitVideoRecordingP_1);
 
 
 
@@ -1103,6 +1141,435 @@ LIB_DEFINE(InitTextToSpeech2_1) {
 
 
 
+
+
+
+
+
+
+namespace LibNpCommerce {
+
+
+LIB_VERSION("NpCommerce", 1, "NpCommerce", 1, 1);
+
+
+namespace NpCommerce {
+
+
+static int KYTY_SYSV_ABI NpCommerceCreateRequest() {
+
+
+	PRINT_NAME();
+
+
+
+
+	return OK;
+
+
+}
+
+
+static int KYTY_SYSV_ABI NpCommerceAbortRequest() {
+
+
+	PRINT_NAME();
+
+
+
+
+	return OK;
+
+
+}
+
+
+static int KYTY_SYSV_ABI NpCommerceDeleteRequest() {
+
+
+	PRINT_NAME();
+
+
+
+
+	return OK;
+
+
+}
+
+
+static int KYTY_SYSV_ABI NpCommerceGetProductInfo() {
+
+
+	PRINT_NAME();
+
+
+
+
+	return OK;
+
+
+}
+
+
+static int KYTY_SYSV_ABI NpCommerceGetProductInfoList() {
+
+
+	PRINT_NAME();
+
+
+
+
+	return OK;
+
+
+}
+
+
+static int KYTY_SYSV_ABI NpCommerceGetCategoryInfo() {
+
+
+	PRINT_NAME();
+
+
+
+
+	return OK;
+
+
+}
+
+
+static int KYTY_SYSV_ABI NpCommerceGetCategoryInfoList() {
+
+
+	PRINT_NAME();
+
+
+
+
+	return OK;
+
+
+}
+
+
+} // namespace NpCommerce
+
+
+
+LIB_DEFINE(InitNpCommerce_1) {
+
+
+	LIB_FUNC("LR5cwFMMCVE", NpCommerce::NpCommerceCreateRequest);
+
+
+	LIB_FUNC("r42bWcQbtZY", NpCommerce::NpCommerceAbortRequest);
+
+
+	LIB_FUNC("0aR2aWmQal4", NpCommerce::NpCommerceDeleteRequest);
+
+
+	LIB_FUNC("m-I92Ab50W8", NpCommerce::NpCommerceGetProductInfo);
+
+
+	LIB_FUNC("DfSCDRA3EjY", NpCommerce::NpCommerceGetProductInfoList);
+
+
+	LIB_FUNC("DHmwsa6S8Tc", NpCommerce::NpCommerceGetCategoryInfo);
+
+
+	LIB_FUNC("dsqCVsNM0Zg", NpCommerce::NpCommerceGetCategoryInfoList);
+
+
+}
+
+
+} // namespace LibNpCommerce
+
+
+
+namespace LibNpUtility {
+
+
+LIB_VERSION("NpUtility", 1, "NpUtility", 1, 1);
+
+
+namespace NpUtility {
+
+
+static int KYTY_SYSV_ABI NpUtilityInitialize() {
+
+
+	PRINT_NAME();
+
+
+
+
+	return OK;
+
+
+}
+
+
+static int KYTY_SYSV_ABI NpUtilityTerminate() {
+
+
+	PRINT_NAME();
+
+
+
+
+	return OK;
+
+
+}
+
+
+static int KYTY_SYSV_ABI NpUtilityGetNpTitleId() {
+
+
+	PRINT_NAME();
+
+
+
+
+	return OK;
+
+
+}
+
+
+static int KYTY_SYSV_ABI NpUtilityGetServiceName() {
+
+
+	PRINT_NAME();
+
+
+
+
+	return OK;
+
+
+}
+
+
+static int KYTY_SYSV_ABI NpUtilityGetSystemLanguage() {
+
+
+	PRINT_NAME();
+
+
+
+
+	return OK;
+
+
+}
+
+
+} // namespace NpUtility
+
+
+
+LIB_DEFINE(InitNpUtility_1) {
+
+
+	LIB_FUNC("kvdMF48mB3Y", NpUtility::NpUtilityInitialize);
+
+
+	LIB_FUNC("pLr1fEQS1z8", NpUtility::NpUtilityTerminate);
+
+
+	LIB_FUNC("hqzi1IHdQQQ", NpUtility::NpUtilityGetNpTitleId);
+
+
+	LIB_FUNC("mA0zsbqm+kA", NpUtility::NpUtilityGetServiceName);
+
+
+	LIB_FUNC("BYIZGKm6bO4", NpUtility::NpUtilityGetSystemLanguage);
+
+
+}
+
+
+} // namespace LibNpUtility
+
+
+
+namespace LibVideoRecordingP {
+
+
+LIB_VERSION("VideoRecordingP", 1, "VideoRecordingP", 1, 1);
+
+
+namespace VideoRecordingP {
+
+
+static int KYTY_SYSV_ABI VideoRecordingPInitialize() {
+
+
+	PRINT_NAME();
+
+
+
+
+	return OK;
+
+
+}
+
+
+static int KYTY_SYSV_ABI VideoRecordingPTerminate() {
+
+
+	PRINT_NAME();
+
+
+
+
+	return OK;
+
+
+}
+
+
+static int KYTY_SYSV_ABI VideoRecordingPStart() {
+
+
+	PRINT_NAME();
+
+
+
+
+	return OK;
+
+
+}
+
+
+static int KYTY_SYSV_ABI VideoRecordingPStop() {
+
+
+	PRINT_NAME();
+
+
+
+
+	return OK;
+
+
+}
+
+
+static int KYTY_SYSV_ABI VideoRecordingPGetStatus() {
+
+
+	PRINT_NAME();
+
+
+
+
+	return OK;
+
+
+}
+
+
+static int KYTY_SYSV_ABI VideoRecordingPGetInfo() {
+
+
+	PRINT_NAME();
+
+
+
+
+	return OK;
+
+
+}
+
+
+static int KYTY_SYSV_ABI VideoRecordingPGetData() {
+
+
+	PRINT_NAME();
+
+
+
+
+	return OK;
+
+
+}
+
+
+static int KYTY_SYSV_ABI VideoRecordingPSetCallbacks() {
+
+
+	PRINT_NAME();
+
+
+
+
+	return OK;
+
+
+}
+
+
+static int KYTY_SYSV_ABI VideoRecordingPGetResolution() {
+
+
+	PRINT_NAME();
+
+
+
+
+	return OK;
+
+
+}
+
+
+} // namespace VideoRecordingP
+
+
+
+LIB_DEFINE(InitVideoRecordingP_1) {
+
+
+	LIB_FUNC("fZJQzFK4Gv4", VideoRecordingP::VideoRecordingPInitialize);
+
+
+	LIB_FUNC("sA6+5XdbqMA", VideoRecordingP::VideoRecordingPTerminate);
+
+
+	LIB_FUNC("Fc8qxlKINYQ", VideoRecordingP::VideoRecordingPStart);
+
+
+	LIB_FUNC("ZvWzS2wTIMc", VideoRecordingP::VideoRecordingPStop);
+
+
+	LIB_FUNC("iQS6DUtLybE", VideoRecordingP::VideoRecordingPGetStatus);
+
+
+	LIB_FUNC("7QoTYzVuzto", VideoRecordingP::VideoRecordingPGetInfo);
+
+
+	LIB_FUNC("tWoe9IlGAhs", VideoRecordingP::VideoRecordingPGetData);
+
+
+	LIB_FUNC("OOFxrMY+mfI", VideoRecordingP::VideoRecordingPSetCallbacks);
+
+
+	LIB_FUNC("KHvkPQJDMLk", VideoRecordingP::VideoRecordingPGetResolution);
+
+
+}
+
+
+} // namespace LibVideoRecordingP
 
 
 
