@@ -2641,7 +2641,7 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 				     rage_setup_ext_start, rage_setup_ext_end,
 				     static_cast<unsigned long long>(rage_setup_ext_end - rage_setup_ext_start));
 			}
-																																	// Cycle 0141fv: NOP the indirect call at vaddr_offset 0x2a5613c (ff 50 50 = call [rax+0x50])
+																																							// Cycle 0141fv: NOP the indirect call at vaddr_offset 0x2a5613c (ff 50 50 = call [rax+0x50])
 			// This call goes through a vtable and likely triggers the AV chain leading to fast-skip loop
 			{
 				const uint64_t ind_call_off = 0x2a5613cULL;
