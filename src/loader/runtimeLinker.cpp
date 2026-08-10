@@ -2624,7 +2624,7 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 			rage_enable = (env != nullptr && env[0] == '0') ? 0 : 1;  // Cycle 0141ff: DEFAULT = 1 (window shown!)
 			if (rage_enable != 0) {
 				LOGF("Cycle 0141dc: GTAV_RAGE_ENABLE=1 -> cycles 0141ar+0141by DISABLED, RAGE will ACTUALLY RUN\n");
-				LOGF("Cycle 0141dd: GTAV_RAGE_ENABLE=1 -> extended RAGE NOP range 0x2813b1a-0x2814580 (2600 NOPs total)\n");
+				LOGF("Cycle 0141dd: GTAV_RAGE_ENABLE=1 -> extended RAGE NOP range 0x2813b1a-0x2814500 (2520 NOPs total)\n");
 			}
 		}
 		if (rage_enable == 1) {
@@ -2632,7 +2632,7 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 			// Cycle 0141dd: But extend the RAGE setup NOP range to cover AV sites
 			// found at 0x2813e80+ when RAGE actually runs.
 			constexpr uint64_t rage_setup_ext_start = 0x2813b1aULL;
-			constexpr uint64_t rage_setup_ext_end   = 0x2814580ULL;  // Cycle 0141fe: trying 2600 NOPs  // Extended range
+			constexpr uint64_t rage_setup_ext_end   = 0x2814500ULL;  // Cycle 0141fc: SWEET SPOT 2520 NOPs - window shown!  // Extended range
 			if (rage_setup_ext_end <= size) {
 				auto* ext_ptr = reinterpret_cast<uint8_t*>(address) + rage_setup_ext_start;
 				memset(ext_ptr, 0x90, rage_setup_ext_end - rage_setup_ext_start);
