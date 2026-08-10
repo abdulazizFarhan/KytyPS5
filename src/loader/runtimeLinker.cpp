@@ -1736,7 +1736,35 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 			LOGF("Cycle 0141dl: PRX %s segment #%d loaded at 0x%" PRIx64 " size=%" PRIu64 "\n",
 			     short_name.c_str(), segment_count[short_name], address, size);
 		}
+	}// Cycle 0141dm: Dump memory at GTA V's main's last call targets
+	// GTA V's main last call function at 0x90575580 calls/jumps to addresses past segment 0:
+	//   - call 0x90825390 (rel32 from 0x90575598)
+	//   - jmp 0x908255a0 (rel32 from 0x905755ba)
+	// These addresses are PAST segment 0 (0x307C000). But GTA V doesn't AV.
+	// This cycle dumps those areas to understand what is mapped there.
+	{
+		static bool dumped = false;
+		if (!dumped) {
+			dumped = true;
+			// Try to read past segment 0 - might fail but let's try
+			const uint64_t mystery_offsets[] = {0x825390ULL, 0x8255a0ULL, 0x575580ULL};
+			for (int i = 0; i < 3; i++) {
+				uint64_t off = mystery_offsets[i];
+				if (off + 32 <= size) {
+					auto* ptr = reinterpret_cast<uint8_t*>(address) + off;
+					LOGF("Cycle 0141dm: byte at file_off 0x%" PRIx64 " (vaddr 0x%" PRIx64 "):\n", off, off + 0x900000000ULL);
+					for (uint32_t j = 0; j < 32; j += 16) {
+						LOGF("  %03x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+						     j, ptr[j+0], ptr[j+1], ptr[j+2], ptr[j+3], ptr[j+4], ptr[j+5], ptr[j+6], ptr[j+7],
+						     ptr[j+8], ptr[j+9], ptr[j+10], ptr[j+11], ptr[j+12], ptr[j+13], ptr[j+14], ptr[j+15]);
+					}
+				} else {
+					LOGF("Cycle 0141dm: offset 0x%" PRIx64 " is PAST segment 0 end (0x%" PRIx64 ")\n", off, size);
+				}
+			}
+		}
 	}
+
 
 
 
