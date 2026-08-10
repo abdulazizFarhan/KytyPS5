@@ -2677,9 +2677,18 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 					}
 				}
 			}
+			// Cycle 0141gd: NOP real call at 0x2a56398 (e8 c3 2a 62 00 -> 0x2c78e60)
+			{
+				const uint64_t real_call_off = 0x2a56398ULL;
+				if (real_call_off + 5 <= size) {
+					auto* rp = reinterpret_cast<uint8_t*>(address) + real_call_off;
+					if (rp[0] == 0xe8) {
+						memset(rp, 0x90, 5);
+						LOGF("Cycle 0141gd: NOP real call at 0x%" PRIx64 "\n", real_call_off);
+					}
+				}
+			}
 			// Cycle 0141fy: NOP call rax at vaddr_offset 0x41 (ff d0)
-			// The launcher_init has an UNPATCHED call rax at vaddr_offset 0x41 (file_off 0x41)
-			// This is causing the first Write AV (NULL deref in callee)
 			{
 				const uint64_t call_off = 0x41ULL;
 				if (call_off + 2 <= size) {
@@ -2687,6 +2696,19 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 					if (ip[0] == 0xff && ip[1] == 0xd0) {
 						ip[0] = 0x90; ip[1] = 0x90;
 						LOGF("Cycle 0141fy: NOP call rax at 0x%" PRIx64 "\n", call_off);
+					}
+				}
+			}
+			// Cycle 0141ga: DEBUG dump PLT region 0x3078000-0x307c000
+			{
+				const uint64_t plt_dump_off = 0x3078000ULL;
+				if (plt_dump_off + 0x400 <= size) {
+					auto* ap = reinterpret_cast<uint8_t*>(address) + plt_dump_off;
+					LOGF("Cycle 0141ga DEBUG: PLT bytes at 0x%" PRIx64 ":\n", plt_dump_off);
+					for (uint32_t j = 0; j < 0x400; j += 16) {
+						LOGF("  %03x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+						     j + 0x8000, ap[j+0], ap[j+1], ap[j+2], ap[j+3], ap[j+4], ap[j+5], ap[j+6], ap[j+7],
+						     ap[j+8], ap[j+9], ap[j+10], ap[j+11], ap[j+12], ap[j+13], ap[j+14], ap[j+15]);
 					}
 				}
 			}
