@@ -822,7 +822,8 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 						ctx->Rax = 0;
 						return true;
 					}
-// Cycle 0141x: advance RIP by 64 bytes (4x faster) in sentinel area
+// 
+					// Cycle 0141x: advance RIP by 64 bytes (4x faster) in sentinel area
 					// Safe because sentinel area is 18MB of unmapped memory
 					ctx->Rip = fault_ip + 64ULL;
 					ctx->Rax = 0;
