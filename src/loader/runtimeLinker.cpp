@@ -642,7 +642,13 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 		// while initializing its heap structures).
 		const bool     is_heap_read = info->access_violation_type == Common::HostException::AccessViolationType::Read &&
 		                              av_addr != g_invalid_memory && av_addr < 0x40000000ULL;
-		if (is_exe_av || is_lo_write || is_high_sentinel || is_invalid_read || is_heap_read) {
+		// Cycle 0141cb: Also catch Read AVs at high sentinel addresses (like 0xffffffffffffff89).
+		// Worms (and similar games) hit this when dereferencing NULL + small offset, producing
+		// sign-extended addresses like 0xffffffffffffff89. The v1.6 high_sentinel_exe catches
+		// Execute AVs at these but not Read AVs. Add a parallel condition for Read.
+		const bool     is_high_sentinel_read = info->access_violation_type == Common::HostException::AccessViolationType::Read &&
+		                                       av_addr != g_invalid_memory && av_addr > 0xFFFF000000000000ULL;
+		if (is_exe_av || is_lo_write || is_high_sentinel || is_invalid_read || is_heap_read || is_high_sentinel_read) {
 #if KYTY_PLATFORM == KYTY_PLATFORM_WINDOWS
 			// Prefer CONTEXT.Rip from native_context (more reliable than
 			// ExceptionAddress for these PS5 binary faults).
