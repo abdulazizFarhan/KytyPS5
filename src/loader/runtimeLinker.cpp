@@ -2666,6 +2666,17 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 					}
 				}
 			}
+			// Cycle 0141fx: NOP indirect call at 0x2a56323 (ff 50 08 = call [rax+0x8])
+			{
+				const uint64_t ind_call_off3 = 0x2a56323ULL;
+				if (ind_call_off3 + 3 <= size) {
+					auto* ip = reinterpret_cast<uint8_t*>(address) + ind_call_off3;
+					if (ip[0] == 0xff && ip[1] == 0x50 && ip[2] == 0x08) {
+						ip[0] = 0x90; ip[1] = 0x90; ip[2] = 0x90;
+						LOGF("Cycle 0141fx: NOP indirect call at 0x%" PRIx64 "\n", ind_call_off3);
+					}
+				}
+			}
 		} else if (rage_disable == 0) {
 			// Default: cycle 0141ar narrow NOP+ret
 			const uint64_t rage_entry_file_off = 0x28b0950ULL;
