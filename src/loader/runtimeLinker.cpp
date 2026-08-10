@@ -1766,6 +1766,34 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 		}
 	}
 
+	// Cycle 0141ce: DEBUG - dump GTA V's main loop range bytes (decrypted)
+	// Shows what GTA V's main loops look like and where the function entry actually is.
+	{
+		// GTA V main loop range start (vaddr 0x90293760, file_off 0x293760)
+		const uint64_t loop_start_off = 0x293760ULL;
+		if (loop_start_off + 96 <= size) {
+			auto* ptr = reinterpret_cast<uint8_t*>(address) + loop_start_off;
+			LOGF("[cycle 0141ce] GTA V main loop start bytes at 0x%" PRIx64 ":\n", reinterpret_cast<uint64_t>(ptr));
+			for (uint32_t i = 0; i < 96; i += 16) {
+				LOGF("  %03x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+			     i, ptr[i+0], ptr[i+1], ptr[i+2], ptr[i+3], ptr[i+4], ptr[i+5], ptr[i+6], ptr[i+7],
+			     ptr[i+8], ptr[i+9], ptr[i+10], ptr[i+11], ptr[i+12], ptr[i+13], ptr[i+14], ptr[i+15]);
+			}
+		}
+		// GTA V main loop range end (vaddr 0x902939ff, file_off 0x2939ff)
+		const uint64_t loop_end_off = 0x2939ffULL;
+		if (loop_end_off + 32 <= size) {
+			auto* ptr2 = reinterpret_cast<uint8_t*>(address) + loop_end_off;
+			LOGF("[cycle 0141ce] GTA V main loop end bytes at 0x%" PRIx64 ":\n", reinterpret_cast<uint64_t>(ptr2));
+			for (uint32_t i = 0; i < 32; i += 16) {
+				LOGF("  %03x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+			     i, ptr2[i+0], ptr2[i+1], ptr2[i+2], ptr2[i+3], ptr2[i+4], ptr2[i+5], ptr2[i+6], ptr2[i+7],
+			     ptr2[i+8], ptr2[i+9], ptr2[i+10], ptr2[i+11], ptr2[i+12], ptr2[i+13], ptr2[i+14], ptr2[i+15]);
+			}
+		}
+	}
+
+
 
 	// Cycle 0141av: NOP GTA V's RAGE setup virtual call at 0x902813b29.
 	// Root cause: GTA V's RAGE setup function at 0x902813b1a does:
