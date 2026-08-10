@@ -2228,9 +2228,9 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 			dumped = true;
 			std::string program_name = Common::PathToString(program->file_name);
 			if (program_name.find("eboot.bin") != std::string::npos) {
-				LOGF("Cycle 0141ek: PLT 0x789 vaddr 0x903078f30 IS WITHIN GTA V segment 0 (size=0x307c000) - call target is real GTA V function at vaddr 0x90bbc0e0\n");
-				LOGF("Cycle 0141ek: GTA V's main calls this 6+ times - calls go to real GTA V function via PLT/GOT (jmp [rip+0x8b31aa] -> GOT 0x90bbc0e0)\n");
-				LOGF("Cycle 0141ek: PLT/GOT resolution is correct - GTA V's main REACHES these calls (verified via cycle 0141et)\n");
+				LOGF("Cycle 0141ek: PLT 0x789 vaddr 0x903078f30 is in PLT area (file_off 0x3078f30, within segment 0) but its GOT entry is past segment 0\n");
+				LOGF("Cycle 0141ek: GTA V's RAGE code calls this 5+ times (file_off 0x294991-0x2952cd) but GOT lookup AVs (GOT at 0x392c0e0 past segment 0)\n");
+				LOGF("Cycle 0141ek: In default mode GTA V's main does NOT reach these calls (RAGE NOPped). With RAGE_ENABLE, RAGE calls them but GOT AVs.\n");
 			}
 		}
 	}// Cycle 0141eq: Verify if any data exists at PLT 0x789 vaddr 0x903078f30 area
@@ -2280,24 +2280,34 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 				}
 			}
 		}
-	}// Cycle 0141es: Dump GOT entry for PLT 0x789 (at vaddr 0x90bbc0e0)
-	// PLT 0x789 jmps to [rip+0x8b31aa] -> vaddr 0x90bbc0e0
-	// This GOT entry should contain the address of the actual function
+	}// Cycle 0141es: Dump GOT entry for PLT 0x789 (CORRECTED calculation)
+	// PLT 0x789 at file_off 0x3078f30: ff 25 aa 31 8b 00 = jmp [rip+0x008b31aa]
+	// RIP after instruction = 0x3078f30 + 6 = 0x3078f36
+	// GOT target = 0x3078f36 + 0x008b31aa = 0x392c0e0
+	// So actual GOT is at file_off 0x392c0e0 (vaddr 0x90392c0e0)
+	// This is PAST segment 0 (size 0x307c000), so the GOT is unmapped
+	// GTA V AVs when accessing it, kyty fast-skips 16 bytes
+	// CYCLE 0141es CORRECTION: previous 0xbbc0e0 was a calculation error
 	{
 		static bool dumped = false;
 		if (!dumped) {
 			dumped = true;
 			std::string program_name = Common::PathToString(program->file_name);
 			if (program_name.find("eboot.bin") != std::string::npos) {
-				const uint64_t got_off = 0xbbc0e0ULL;
-				if (got_off + 0x20ULL <= size) {
+				const uint64_t got_off = 0x392c0e0ULL;  // CORRECTED
+				LOGF("Cycle 0141es: PLT 0x789 GOT at file_off 0x392c0e0 (vaddr 0x90392c0e0) - CORRECTED\n");
+				LOGF("Cycle 0141es: Segment size 0x%" PRIx64 ", GOT off 0x%" PRIx64 "\n", size, got_off);
+				if (got_off + 0x10ULL <= size) {
 					auto* ptr = reinterpret_cast<uint8_t*>(address) + got_off;
-					LOGF("Cycle 0141es: PLT 0x789 GOT entry at file_off 0xbbc0e0 (vaddr 0x90bbc0e0):\n");
-					for (uint32_t j = 0; j < 0x20ULL; j += 8) {
+					LOGF("Cycle 0141es: GOT IS within segment 0, dumping:\n");
+					for (uint32_t j = 0; j < 0x10ULL; j += 8) {
 						uint64_t val = 0;
 						for (int k = 0; k < 8; k++) val |= (uint64_t)ptr[j+k] << (k*8);
 						LOGF("  %07x: %016" PRIx64 "\n", j + got_off, val);
 					}
+				} else {
+					LOGF("Cycle 0141es: GOT is PAST segment 0 - GTA V AVs when loading from here\n");
+					LOGF("Cycle 0141es: kyty fast-skip advances RIP 16 bytes past the failing load\n");
 				}
 			}
 		}
@@ -2322,7 +2332,39 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 				}
 			}
 		}
+	}// Cycle 0141eu: Dump vtable at vaddr 0x9037f1ec0 (loaded by PLT 0x789 target)
+	// The function at 0x90bbc0e0 does: lea rax, [rip+0x2c45dce] -> vaddr 0x9037f1ec0
+	// Then stores vtable to rdi. Dump first 0x100 bytes (16 vtable entries) to see
+	// what virtual methods GTA V is dispatching to.
+	// CYCLE 0141eu UPDATE: vtable_off 0x37f1ec0 > segment size 0x307c000 -> PAST SEGMENT
+	// GTA V's function AVs when loading the vtable - this is why it fails
+	{
+		static bool dumped = false;
+		if (!dumped) {
+			dumped = true;
+			std::string program_name = Common::PathToString(program->file_name);
+			if (program_name.find("eboot.bin") != std::string::npos) {
+				const uint64_t vtable_off = 0x37f1ec0ULL;
+				LOGF("Cycle 0141eu: VTable target vaddr 0x9037f1ec0 (file_off 0x37f1ec0)\n");
+				LOGF("Cycle 0141eu: Segment 0 size=0x%" PRIx64 ", vtable_off=0x%" PRIx64 "\n", size, vtable_off);
+				if (vtable_off + 0x100ULL <= size) {
+					auto* ptr = reinterpret_cast<uint8_t*>(address) + vtable_off;
+					LOGF("Cycle 0141eu: VTable IS within segment 0, dumping:\n");
+					for (uint32_t j = 0; j < 0x100ULL; j += 8) {
+						uint64_t val = 0;
+						for (int k = 0; k < 8; k++) val |= (uint64_t)ptr[j+k] << (k*8);
+						LOGF("  [%02u] vtable[%u] = 0x%016" PRIx64 " (file_off 0x%" PRIx64 ")\n",
+						     j/8, j/8, val, val - 0x900000000ULL);
+					}
+				} else {
+					LOGF("Cycle 0141eu: VTable is PAST segment 0 - GTA V AVs when loading it\n");
+					LOGF("Cycle 0141eu: kyty fast-skip advances RIP 16 bytes past the failing load\n");
+				}
+			}
+		}
 	}
+
+	
 
 	
 
