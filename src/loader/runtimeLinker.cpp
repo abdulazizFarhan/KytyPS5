@@ -2358,7 +2358,59 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 				}
 			}
 		}
+	}// Cycle 0141ew: Dump PLT 0x1e (vaddr 0x9030754e0) - another heavy PLT in main range
+	// From cycle 0141ej: 1 call to vaddr 0x9030754e0 in main range
+	// PLT 0x1e at file_off 0x30754e0
+	{
+		static bool dumped = false;
+		if (!dumped) {
+			dumped = true;
+			std::string program_name = Common::PathToString(program->file_name);
+			if (program_name.find("eboot.bin") != std::string::npos) {
+				const uint64_t plt_1e_off = 0x30754e0ULL;
+				if (plt_1e_off + 0x10ULL <= size) {
+					auto* ptr = reinterpret_cast<uint8_t*>(address) + plt_1e_off;
+					LOGF("Cycle 0141ew: PLT 0x1e bytes at file_off 0x30754e0 (vaddr 0x9030754e0):\n");
+					for (uint32_t j = 0; j < 0x10ULL; j += 16) {
+						LOGF("  %07x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+						     j + plt_1e_off, ptr[j+0], ptr[j+1], ptr[j+2], ptr[j+3], ptr[j+4], ptr[j+5], ptr[j+6], ptr[j+7],
+						     ptr[j+8], ptr[j+9], ptr[j+10], ptr[j+11], ptr[j+12], ptr[j+13], ptr[j+14], ptr[j+15]);
+					}
+					// Calculate GOT target
+					uint32_t rip_off = (uint32_t)ptr[2] | ((uint32_t)ptr[3] << 8) | ((uint32_t)ptr[4] << 16) | ((uint32_t)ptr[5] << 24);
+					uint64_t got_off = plt_1e_off + 6 + (int32_t)rip_off;
+					LOGF("Cycle 0141ew: PLT 0x1e GOT at file_off 0x%" PRIx64 " (vaddr 0x%" PRIx64 ")\n",
+					     got_off, got_off + 0x900000000ULL);
+					LOGF("Cycle 0141ew: GOT %s segment 0\n", (got_off + 8 <= size) ? "IS within" : "is PAST");
+				}
+			}
+		}
+	}// Cycle 0141ex: Patch PLT 0x1e to return 0 (avoids GOT AV at 0x392a3b8 past segment 0)
+	// Similar to cycle 0141ev but for PLT 0x1e (1 call in main range)
+	{
+		static bool patched = false;
+		if (!patched) {
+			patched = true;
+			std::string program_name = Common::PathToString(program->file_name);
+			if (program_name.find("eboot.bin") != std::string::npos) {
+				const uint64_t plt_1e_off = 0x30754e0ULL;
+				if (plt_1e_off + 6 <= size) {
+					auto* ptr = reinterpret_cast<uint8_t*>(address) + plt_1e_off;
+					uint8_t orig[6];
+					memcpy(orig, ptr, 6);
+					ptr[0] = 0x31; ptr[1] = 0xc0; ptr[2] = 0xc3;
+					ptr[3] = 0x90; ptr[4] = 0x90; ptr[5] = 0x90;
+					LOGF("Cycle 0141ex: Patched PLT 0x1e at file_off 0x30754e0 to xor eax,eax; ret; nop;nop;nop\n");
+					LOGF("Cycle 0141ex: Original: %02x %02x %02x %02x %02x %02x\n",
+					     orig[0], orig[1], orig[2], orig[3], orig[4], orig[5]);
+				}
+			}
+		}
 	}
+
+	
+
+	
 
 	// Cycle 0141eu: Dump vtable at vaddr 0x9037f1ec0 (loaded by PLT 0x789 target)
 	// The function at 0x90bbc0e0 does: lea rax, [rip+0x2c45dce] -> vaddr 0x9037f1ec0
