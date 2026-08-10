@@ -2248,7 +2248,27 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 				     reinterpret_cast<uint64_t>(ptr));
 			}
 		}
+	}// Cycle 0141em: Dump exact bytes around launcher ud2 area (file_off 0x40-0x70)
+	{
+		static bool dumped = false;
+		if (!dumped) {
+			dumped = true;
+			std::string program_name = Common::PathToString(program->file_name);
+			if (program_name.find("eboot.bin") != std::string::npos) {
+				if (0x80ULL <= size) {
+					auto* ptr = reinterpret_cast<uint8_t*>(address) + 0x40ULL;
+					LOGF("Cycle 0141em: launcher bytes at file_off 0x40-0x80:\n");
+					for (uint32_t j = 0; j < 0x40ULL; j += 16) {
+						LOGF("  %03x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+						     j + 0x40, ptr[j+0], ptr[j+1], ptr[j+2], ptr[j+3], ptr[j+4], ptr[j+5], ptr[j+6], ptr[j+7],
+						     ptr[j+8], ptr[j+9], ptr[j+10], ptr[j+11], ptr[j+12], ptr[j+13], ptr[j+14], ptr[j+15]);
+					}
+				}
+			}
+		}
 	}
+
+	
 
 	
 
