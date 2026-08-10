@@ -1825,6 +1825,22 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 		}
 	}
 
+	// Cycle 0141ci: DEBUG - dump GTA V's main's last call target at 0x90575580
+	// This is the function GTA V's main calls just before returning to the launcher.
+	{
+		const uint64_t last_call_off = 0x575580ULL;
+		if (last_call_off + 128 <= size) {
+			auto* ptr = reinterpret_cast<uint8_t*>(address) + last_call_off;
+			LOGF("[cycle 0141ci] GTA V main last call target at 0x%" PRIx64 ":\n", reinterpret_cast<uint64_t>(ptr));
+			for (uint32_t i = 0; i < 128; i += 16) {
+				LOGF("  %03x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+			     i, ptr[i+0], ptr[i+1], ptr[i+2], ptr[i+3], ptr[i+4], ptr[i+5], ptr[i+6], ptr[i+7],
+			     ptr[i+8], ptr[i+9], ptr[i+10], ptr[i+11], ptr[i+12], ptr[i+13], ptr[i+14], ptr[i+15]);
+			}
+		}
+	}
+
+
 
 
 
