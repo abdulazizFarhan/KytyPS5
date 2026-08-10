@@ -2641,6 +2641,31 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 				     rage_setup_ext_start, rage_setup_ext_end,
 				     static_cast<unsigned long long>(rage_setup_ext_end - rage_setup_ext_start));
 			}
+			// Cycle 0141fv: NOP the indirect call at vaddr_offset 0x2a5613c (ff 50 50 = call [rax+0x50])
+			// This call goes through a vtable and likely triggers the AV chain leading to fast-skip loop
+			{
+				const uint64_t ind_call_off = 0x2a5613cULL;
+				if (ind_call_off + 3 <= size) {
+					auto* ip = reinterpret_cast<uint8_t*>(address) + ind_call_off;
+					if (ip[0] == 0xff && ip[1] == 0x50 && ip[2] == 0x50) {
+						ip[0] = 0x90; ip[1] = 0x90; ip[2] = 0x90;
+						LOGF("Cycle 0141fv: NOP indirect call at 0x%" PRIx64 "\n", ind_call_off);
+					}
+				}
+			}
+			// Cycle 0141fw: NOP the indirect call at vaddr_offset 0x2a561b8 (ff e0 = call rax)
+			{
+				const uint64_t ind_call_off2 = 0x2a561b8ULL;
+				if (ind_call_off2 + 2 <= size) {
+					auto* ip = reinterpret_cast<uint8_t*>(address) + ind_call_off2;
+					if (ip[0] == 0xff && ip[1] == 0xe0) {
+						ip[0] = 0x90; ip[1] = 0x90;
+						LOGF("Cycle 0141fw: NOP call rax at 0x%" PRIx64 "\n", ind_call_off2);
+					} else {
+						LOGF("Cycle 0141fw DEBUG: bytes are %02x %02x (not ff e0)\n", ip[0], ip[1]);
+					}
+				}
+			}
 		} else if (rage_disable == 0) {
 			// Default: cycle 0141ar narrow NOP+ret
 			const uint64_t rage_entry_file_off = 0x28b0950ULL;
