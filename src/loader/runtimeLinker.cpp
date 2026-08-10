@@ -2640,7 +2640,8 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 				LOGF("Cycle 0141dd: Extended RAGE setup NOP range 0x%" PRIx64 "-0x%" PRIx64 " (%llu NOPs)\n",
 				     rage_setup_ext_start, rage_setup_ext_end,
 				     static_cast<unsigned long long>(rage_setup_ext_end - rage_setup_ext_start));
-			}		} else if (rage_disable == 0) {
+			}
+		} else if (rage_disable == 0) {
 			// Default: cycle 0141ar narrow NOP+ret
 			const uint64_t rage_entry_file_off = 0x28b0950ULL;
 			if (rage_entry_file_off + 15 <= size) {
