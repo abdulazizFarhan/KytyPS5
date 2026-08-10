@@ -1634,7 +1634,21 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 				}
 			}
 		}
+	}// Cycle 0141dg: libSceNpCppWebApi (largest PRX, 7.8MB) PatchProgram counter
+	// GTA V's main has 1 call into libSceNpCppWebApi. Track PatchProgram invocations.
+	// This PRX is the largest in GTA V's memory map - it may contain game logic.
+	{
+		static int npcpp_count = 0;
+		std::string program_name = Common::PathToString(program->file_name);
+		if (program_name.find("libSceNpCppWebApi") != std::string::npos) {
+			npcpp_count++;
+			if (npcpp_count == 1) {
+				LOGF("Cycle 0141dg: libSceNpCppWebApi PatchProgram called (segment 0x%" PRIx64 " size=%" PRIu64 ")\n",
+				     address, size);
+			}
+		}
 	}
+
 
 	// Cycle 0141ao: RE-ENABLE cycle 0141al (launcher_init backward loop NOP) AND keep
 	// cycle 0141q disabled (let init() run). Cycle 0141an had both disabled, causing GTA V
