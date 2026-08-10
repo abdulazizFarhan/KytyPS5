@@ -2677,6 +2677,19 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 					}
 				}
 			}
+			// Cycle 0141fy: NOP call rax at vaddr_offset 0x41 (ff d0)
+			// The launcher_init has an UNPATCHED call rax at vaddr_offset 0x41 (file_off 0x41)
+			// This is causing the first Write AV (NULL deref in callee)
+			{
+				const uint64_t call_off = 0x41ULL;
+				if (call_off + 2 <= size) {
+					auto* ip = reinterpret_cast<uint8_t*>(address) + call_off;
+					if (ip[0] == 0xff && ip[1] == 0xd0) {
+						ip[0] = 0x90; ip[1] = 0x90;
+						LOGF("Cycle 0141fy: NOP call rax at 0x%" PRIx64 "\n", call_off);
+					}
+				}
+			}
 		} else if (rage_disable == 0) {
 			// Default: cycle 0141ar narrow NOP+ret
 			const uint64_t rage_entry_file_off = 0x28b0950ULL;
