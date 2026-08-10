@@ -24,7 +24,14 @@ LIB_VERSION("ImeDialog", 1, "ImeDialog", 1, 1);
 namespace ImeDialog = Dialog::ImeDialog;
 
 LIB_DEFINE(InitDialog_1_ImeDialog) {
+	LIB_FUNC("CRD+jSErEJQ", ImeDialog::ImeDialogGetPanelSizeExtended);
 	LIB_FUNC("IADmD4tScBY", ImeDialog::ImeDialogGetStatus);
+	LIB_FUNC("gyTyVn+bXMw", ImeDialog::ImeDialogTerm);
+	LIB_FUNC("x01jxu+vxlc", ImeDialog::ImeDialogGetResult);
+	LIB_FUNC("wqsJvRXwl58", ImeDialog::ImeDialogGetPanelSize);
+	LIB_FUNC("NUeBrN7hzf0", ImeDialog::ImeDialogInit);
+	LIB_FUNC("oBmw4xrmfKs", ImeDialog::ImeDialogAbort);
+	LIB_FUNC("8jqzzPioYl8", ImeDialog::ImeDialogGetPanelPositionAndForm);
 }
 
 } // namespace LibImeDialog
@@ -141,6 +148,47 @@ LIB_DEFINE(InitDialog_1_ErrorDialog) {
 
 } // namespace LibErrorDialog
 
+
+namespace LibPlayerInvitationDialog {
+
+LIB_VERSION("PlayerInvitationDialog", 1, "PlayerInvitationDialog", 1, 1);
+
+namespace PlayerInvitationDialog = Dialog::PlayerInvitationDialog;
+
+LIB_DEFINE(InitDialog_1_PlayerInvitationDialog) {
+	LIB_FUNC("kFhuwHrIUqs", PlayerInvitationDialog::PlayerInvitationDialogAbort);
+	LIB_FUNC("gDm5a6GSE94", PlayerInvitationDialog::PlayerInvitationDialogGetResult);
+}
+
+} // namespace LibPlayerInvitationDialog
+
+namespace LibPlayerSelectionDialog {
+
+LIB_VERSION("PlayerSelectionDialog", 1, "PlayerSelectionDialog", 1, 1);
+
+namespace PlayerSelectionDialog = Dialog::PlayerSelectionDialog;
+
+LIB_DEFINE(InitDialog_1_PlayerSelectionDialog) {
+	LIB_FUNC("CgdJ1PkIsE4", PlayerSelectionDialog::PlayerSelectionDialogAbort);
+}
+
+} // namespace LibPlayerSelectionDialog
+
+namespace LibWebBrowserDialog {
+
+LIB_VERSION("WebBrowserDialog", 1, "WebBrowserDialog", 1, 1);
+
+namespace WebBrowserDialog = Dialog::WebBrowserDialog;
+
+LIB_DEFINE(InitDialog_1_WebBrowserDialog) {
+	LIB_FUNC("h1dR-t5ISgg", WebBrowserDialog::WebBrowserDialogInitialize);
+	LIB_FUNC("vCaW0fgVQmc", WebBrowserDialog::WebBrowserDialogOpen);
+	LIB_FUNC("PSK+Eik919Q", WebBrowserDialog::WebBrowserDialogAbort);
+	LIB_FUNC("FraP7debcdg", WebBrowserDialog::WebBrowserDialogTerminate);
+}
+
+} // namespace LibWebBrowserDialog
+
 LIB_DEFINE(InitDialog_1) {
 	LibCommonDialog::InitDialog_1_CommonDialog(s);
 	LibImeDialog::InitDialog_1_ImeDialog(s);
@@ -150,6 +198,9 @@ LIB_DEFINE(InitDialog_1) {
 	LibSaveDataDialogNative::InitDialog_1_SaveDataDialogNative(s);
 	LibMsgDialog::InitDialog_1_MsgDialog(s);
 	LibErrorDialog::InitDialog_1_ErrorDialog(s);
+	LibPlayerInvitationDialog::InitDialog_1_PlayerInvitationDialog(s);
+	LibPlayerSelectionDialog::InitDialog_1_PlayerSelectionDialog(s);
+	LibWebBrowserDialog::InitDialog_1_WebBrowserDialog(s);
 }
 
 } // namespace Libs

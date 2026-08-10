@@ -14,6 +14,14 @@ int KYTY_SYSV_ABI CommonDialogInitialize();
 
 namespace ImeDialog {
 
+int KYTY_SYSV_ABI ImeDialogInit(const void* param, const void* extended);
+int KYTY_SYSV_ABI ImeDialogTerm();
+int KYTY_SYSV_ABI ImeDialogAbort();
+int KYTY_SYSV_ABI ImeDialogGetResult(void* result);
+int KYTY_SYSV_ABI ImeDialogGetPanelSize(const void* param, uint32_t* width, uint32_t* height);
+int KYTY_SYSV_ABI ImeDialogGetPanelSizeExtended(const void* param, const void* extended, uint32_t* width, uint32_t* height);
+int KYTY_SYSV_ABI ImeDialogGetPanelPositionAndForm(void* form);
+
 int KYTY_SYSV_ABI ImeDialogGetStatus();
 
 } // namespace ImeDialog
@@ -83,6 +91,35 @@ int KYTY_SYSV_ABI ErrorDialogUpdateStatus();
 int KYTY_SYSV_ABI ErrorDialogGetStatus();
 
 } // namespace ErrorDialog
+
+namespace PlayerInvitationDialog {
+
+int KYTY_SYSV_ABI PlayerInvitationDialogAbort();
+int KYTY_SYSV_ABI PlayerInvitationDialogGetResult(void* result);
+
+} // namespace PlayerInvitationDialog
+
+namespace PlayerSelectionDialog {
+
+int KYTY_SYSV_ABI PlayerSelectionDialogAbort();
+int KYTY_SYSV_ABI PlayerSelectionDialogGetResult(void* result);
+
+} // namespace PlayerSelectionDialog
+
+namespace WebBrowserDialog {
+
+int KYTY_SYSV_ABI WebBrowserDialogAbort();
+int KYTY_SYSV_ABI WebBrowserDialogClose();
+int KYTY_SYSV_ABI WebBrowserDialogGetEvent(void* event);
+int KYTY_SYSV_ABI WebBrowserDialogGetResult(void* result);
+int KYTY_SYSV_ABI WebBrowserDialogGetStatus();
+int KYTY_SYSV_ABI WebBrowserDialogInitialize();
+int KYTY_SYSV_ABI WebBrowserDialogOpen(const void* param, const void* extended);
+int KYTY_SYSV_ABI WebBrowserDialogSetAllowClose(bool allow);
+int KYTY_SYSV_ABI WebBrowserDialogTerminate();
+int KYTY_SYSV_ABI WebBrowserDialogUpdateStatus();
+
+} // namespace WebBrowserDialog
 
 } // namespace Libs::Dialog
 
