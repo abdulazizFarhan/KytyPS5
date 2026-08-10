@@ -1640,7 +1640,7 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 		}
 	}
 
-	// Cycle 0141ar: NOP GTA V's RAGE Main Thread entry function
+	// // Cycle 0141ar/bx/by/dc: NOP GTA V's RAGE Main Thread entry function
 	// GTA V's RAGE Main Thread is stuck in an AV loop at 0x902813a90-0x902813c20.
 	// To unblock GTA V's main thread (which is in PthreadJoin), NOP the RAGE entry
 	// function so it returns immediately. GTA V's main thread will see RAGE "finish"
@@ -1656,7 +1656,11 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 		// NOP range (cycle 0141by) so GTA V's RAGE Main Thread entry function is mostly
 		// empty and returns naturally without triggering NULL vtable AVs.
 		// Set GTAV_RAGE_DISABLE=1 for experimentation; default (0) keeps GTA V stable.
+		// Cycle 0141dc: New env var GTAV_RAGE_ENABLE. When set to 1, BOTH 0141ar and 0141by
+		// are disabled so RAGE actually runs. With our 79 GPU compute APIs now real, RAGE
+		// might be able to do something useful (or crash differently).
 		static int rage_disable = -1;
+		static int rage_enable  = -1;
 		if (rage_disable < 0) {
 			const char* env = getenv("GTAV_RAGE_DISABLE");
 			rage_disable = (env != nullptr && env[0] == '1') ? 1 : 0;
@@ -1664,7 +1668,17 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 				LOGF("Cycle 0141bx: GTAV_RAGE_DISABLE=1 -> cycle 0141ar DISABLED, cycle 0141by wider NOP ACTIVE\n");
 			}
 		}
-		if (rage_disable == 0) {
+		if (rage_enable < 0) {
+			const char* env = getenv("GTAV_RAGE_ENABLE");
+			rage_enable = (env != nullptr && env[0] == '1') ? 1 : 0;
+			if (rage_enable != 0) {
+				LOGF("Cycle 0141dc: GTAV_RAGE_ENABLE=1 -> cycles 0141ar+0141by DISABLED, RAGE will ACTUALLY RUN\n");
+			}
+		}
+		if (rage_enable == 1) {
+			// Cycle 0141dc: RAGE runs! No patching of RAGE entry function.
+			LOGF("Cycle 0141dc: RAGE Main Thread entry NOT PATCHED - letting RAGE run\n");
+		} else if (rage_disable == 0) {
 			// Default: cycle 0141ar narrow NOP+ret
 			const uint64_t rage_entry_file_off = 0x28b0950ULL;
 			if (rage_entry_file_off + 15 <= size) {
@@ -1693,6 +1707,7 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 			}
 		}
 	}
+
 
 // Cycle 0141aw: NOP GTA V's RAGE setup function entry at 0x902813560 with ret.
 	// The function at vaddr 0x902813560 (file_off 0x2813560) is the RAGE setup function
