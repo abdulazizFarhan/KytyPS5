@@ -1640,7 +1640,7 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 		}
 	}
 
-	// // Cycle 0141ar/bx/by/dc: NOP GTA V's RAGE Main Thread entry function
+	// // // Cycle 0141ar/bx/by/dc/dd: NOP GTA V's RAGE Main Thread entry function
 	// GTA V's RAGE Main Thread is stuck in an AV loop at 0x902813a90-0x902813c20.
 	// To unblock GTA V's main thread (which is in PthreadJoin), NOP the RAGE entry
 	// function so it returns immediately. GTA V's main thread will see RAGE "finish"
@@ -1657,8 +1657,9 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 		// empty and returns naturally without triggering NULL vtable AVs.
 		// Set GTAV_RAGE_DISABLE=1 for experimentation; default (0) keeps GTA V stable.
 		// Cycle 0141dc: New env var GTAV_RAGE_ENABLE. When set to 1, BOTH 0141ar and 0141by
-		// are disabled so RAGE actually runs. With our 79 GPU compute APIs now real, RAGE
-		// might be able to do something useful (or crash differently).
+		// are disabled so RAGE actually runs.
+		// Cycle 0141dd: When GTAV_RAGE_ENABLE=1, also extend the RAGE setup NOP range
+		// to 0x2813b1a-0x2813f00 (additional 144 bytes for AV sites found at 0x2813e80+).
 		static int rage_disable = -1;
 		static int rage_enable  = -1;
 		if (rage_disable < 0) {
@@ -1673,11 +1674,22 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 			rage_enable = (env != nullptr && env[0] == '1') ? 1 : 0;
 			if (rage_enable != 0) {
 				LOGF("Cycle 0141dc: GTAV_RAGE_ENABLE=1 -> cycles 0141ar+0141by DISABLED, RAGE will ACTUALLY RUN\n");
+				LOGF("Cycle 0141dd: GTAV_RAGE_ENABLE=1 -> extended RAGE NOP range 0x2813b1a-0x2813f00 (1138 NOPs total)\n");
 			}
 		}
 		if (rage_enable == 1) {
 			// Cycle 0141dc: RAGE runs! No patching of RAGE entry function.
-			LOGF("Cycle 0141dc: RAGE Main Thread entry NOT PATCHED - letting RAGE run\n");
+			// Cycle 0141dd: But extend the RAGE setup NOP range to cover AV sites
+			// found at 0x2813e80+ when RAGE actually runs.
+			constexpr uint64_t rage_setup_ext_start = 0x2813b1aULL;
+			constexpr uint64_t rage_setup_ext_end   = 0x2813f00ULL;  // Extended range
+			if (rage_setup_ext_end <= size) {
+				auto* ext_ptr = reinterpret_cast<uint8_t*>(address) + rage_setup_ext_start;
+				memset(ext_ptr, 0x90, rage_setup_ext_end - rage_setup_ext_start);
+				LOGF("Cycle 0141dd: Extended RAGE setup NOP range 0x%" PRIx64 "-0x%" PRIx64 " (%llu NOPs)\n",
+				     rage_setup_ext_start, rage_setup_ext_end,
+				     static_cast<unsigned long long>(rage_setup_ext_end - rage_setup_ext_start));
+			}
 		} else if (rage_disable == 0) {
 			// Default: cycle 0141ar narrow NOP+ret
 			const uint64_t rage_entry_file_off = 0x28b0950ULL;
@@ -1692,21 +1704,19 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 			}
 		} else {
 			// Cycle 0141by: Wider NOP when GTAV_RAGE_DISABLE=1.
-			// NOP the first 1024 bytes of the RAGE Main Thread entry function so
-			// GTA V's RIP jumps past the NULL vtable AV cluster in <16 iterations.
-			// GTA V's RAGE Main Thread returns naturally after the NOPs.
 			constexpr uint64_t rage_entry_wide_start = 0x28b0950ULL;
 			constexpr uint64_t rage_entry_wide_end   = 0x28b0d50ULL;  // 1024 bytes
 			if (rage_entry_wide_end <= size) {
 				auto* wide_ptr = reinterpret_cast<uint8_t*>(address) + rage_entry_wide_start;
 				memset(wide_ptr, 0x90, rage_entry_wide_end - rage_entry_wide_start);
-				wide_ptr[rage_entry_wide_end - rage_entry_wide_start] = 0xc3;  // ret at end
+				wide_ptr[rage_entry_wide_end - rage_entry_wide_start] = 0xc3;
 				LOGF("Cycle 0141by: Wide NOP RAGE Main Thread entry 0x%" PRIx64 "-0x%" PRIx64 " (%llu NOPs + ret)\n",
 				     rage_entry_wide_start, rage_entry_wide_end,
 				     static_cast<unsigned long long>(rage_entry_wide_end - rage_entry_wide_start));
 			}
 		}
 	}
+
 
 
 // Cycle 0141aw: NOP GTA V's RAGE setup function entry at 0x902813560 with ret.
