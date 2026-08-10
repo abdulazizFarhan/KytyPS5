@@ -1962,6 +1962,65 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 
 
 
+	// // // Cycle 0141dx (FIXED): NOP launcher_init forward loop's broken cmp instruction.
+// launcher_init at file_off 0x10 has forward loop cmp at file_off 0x1e-0x24
+// 7 bytes (48 3b 1d 53 a2 92 03) reading from [rip+0x392a253] = 0x90392a278.
+// This address is PAST segment 0. kyty handles the read as 0, so rbx (0x90000006a)
+// is always >= 0, and the loop exits immediately. We NOP the cmp + jae (9 bytes)
+// at file_off 0x1e-0x26 so the loop actually runs.
+	{
+		constexpr uint8_t CMP_PATTERN[7] = {0x48, 0x3b, 0x1d, 0x53, 0xa2, 0x92, 0x03};
+		const uint64_t cmp_file_off = 0x1eULL;
+		if (cmp_file_off + 9 <= size) {
+			auto* ptr = reinterpret_cast<uint8_t*>(address) + cmp_file_off;
+			if (memcmp(ptr, CMP_PATTERN, 7) == 0) {
+				for (uint32_t j = 0; j < 9; ++j) {
+					ptr[j] = 0x90;
+				}
+				LOGF("Cycle 0141dx: NOP launcher_init forward loop cmp+jae at 0x%" PRIx64 " (9 bytes)\n",
+				     reinterpret_cast<uint64_t>(ptr));
+			}
+		}
+	}// Cycle 0141dy: Debug dump launcher_init bytes at file_off 0x0e
+	{
+		static bool dumped = false;
+		if (!dumped) {
+			dumped = true;
+			std::string program_name = Common::PathToString(program->file_name);
+			if (program_name.find("eboot.bin") != std::string::npos) {
+				if (0x18ULL <= size) {
+					auto* ptr = reinterpret_cast<uint8_t*>(address) + 0x07ULL;
+					LOGF("Cycle 0141dy: launcher_init bytes at file_off 0x07-0x17:\n");
+					for (uint32_t j = 0; j < 0x11; ++j) {
+						LOGF("  %02x: %02x\n", j + 0x07, ptr[j]);
+					}
+				}
+			}
+		}
+	}// Cycle 0141dz: Dump correct launcher_init bytes from file_off 0x10
+	{
+		static bool dumped = false;
+		if (!dumped) {
+			dumped = true;
+			std::string program_name = Common::PathToString(program->file_name);
+			if (program_name.find("eboot.bin") != std::string::npos) {
+				if (0x80ULL <= size) {
+					auto* ptr = reinterpret_cast<uint8_t*>(address) + 0x10ULL;
+					LOGF("Cycle 0141dz: launcher_init full bytes at file_off 0x10-0x7f:\n");
+					for (uint32_t j = 0; j < 0x70ULL; j += 16) {
+						LOGF("  %03x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+						     j + 0x10, ptr[j+0], ptr[j+1], ptr[j+2], ptr[j+3], ptr[j+4], ptr[j+5], ptr[j+6], ptr[j+7],
+						     ptr[j+8], ptr[j+9], ptr[j+10], ptr[j+11], ptr[j+12], ptr[j+13], ptr[j+14], ptr[j+15]);
+					}
+				}
+			}
+		}
+	}
+
+	
+
+	
+
 	// Cycle 0141ao: RE-ENABLE cycle 0141al (launcher_init backward loop NOP) AND keep
 	// cycle 0141q disabled (let init() run). Cycle 0141an had both disabled, causing GTA V
 	// to enter launcher_init's broken backward loop and then get stuck in fast-skip loop.
