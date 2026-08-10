@@ -1763,7 +1763,27 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 				}
 			}
 		}
+	}// Cycle 0141dn: Dump GTA V's launcher after main returns
+	// GTA V's main returns to vaddr 0x9000000b8 (file_off 0xb8).
+	// This is right after the launcher called main(). Dump bytes here
+	// to understand what GTA V's launcher does after main completes.
+	{
+		static bool dumped = false;
+		if (!dumped) {
+			dumped = true;
+			const uint64_t launcher_off = 0xb8ULL;
+			if (launcher_off + 64 <= size) {
+				auto* ptr = reinterpret_cast<uint8_t*>(address) + launcher_off;
+				LOGF("Cycle 0141dn: GTA V launcher after-main-return bytes at file_off 0x%" PRIx64 " (vaddr 0x%" PRIx64 "):\n", launcher_off, launcher_off + 0x900000000ULL);
+				for (uint32_t j = 0; j < 64; j += 16) {
+					LOGF("  %03x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+					     j, ptr[j+0], ptr[j+1], ptr[j+2], ptr[j+3], ptr[j+4], ptr[j+5], ptr[j+6], ptr[j+7],
+					     ptr[j+8], ptr[j+9], ptr[j+10], ptr[j+11], ptr[j+12], ptr[j+13], ptr[j+14], ptr[j+15]);
+				}
+			}
+		}
 	}
+
 
 
 
