@@ -1747,6 +1747,24 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 	}
 
 
+
+	// Cycle 0141br: Preemptively NOP the RAGE setup function body at file_off 0x2813b1a-0x2813c21.
+	// This complements cycle 0141av (which only NOPed the virtual call at 0x902813b29).
+	// The function has additional Write AVs at NULL vtable offsets: 0x902813b2c, 0x902813b40,
+	// 0x902813b60, 0x902813b80, 0x902813ba0, 0x902813bc0, 0x902813be0, 0x902813c00, 0x902813c20.
+	// The AV handler's 32-byte patches are aligned to next 0x20 boundary AFTER each AV,
+	// so the very first AV at 0x902813b1a is never patched. Preemptive NOP prevents the AV cascade.
+	{
+		constexpr uint64_t rage_func_start = 0x2813b1aULL;
+		constexpr uint64_t rage_func_end   = 0x2813c21ULL;  // exclusive
+		if (rage_func_end <= size) {
+			auto* func_ptr = reinterpret_cast<uint8_t*>(address) + rage_func_start;
+			memset(func_ptr, 0x90, rage_func_end - rage_func_start);
+			LOGF("Cycle 0141br: Patch GTA V RAGE setup func body at file_off 0x%" PRIx64 "-0x%" PRIx64
+			     " (%llu NOPs)\n", rage_func_start, rage_func_end,
+			     static_cast<unsigned long long>(rage_func_end - rage_func_start));
+		}
+	}
 	}
 }
 
