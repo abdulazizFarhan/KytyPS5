@@ -1782,7 +1782,46 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 				}
 			}
 		}
+	}// Cycle 0141do: Dump complete GTA V launcher code (0x70 to 0x200)
+	// Shows full launcher flow including what happens after main returns.
+	{
+		static bool dumped = false;
+		if (!dumped) {
+			dumped = true;
+			const uint64_t launcher_off = 0x70ULL;
+			const uint64_t launcher_size = 0x190ULL;
+			if (launcher_off + launcher_size <= size) {
+				auto* ptr = reinterpret_cast<uint8_t*>(address) + launcher_off;
+				LOGF("Cycle 0141do: GTA V launcher full code at file_off 0x%" PRIx64 "-0x%" PRIx64 ":\n", launcher_off, launcher_off + launcher_size);
+				for (uint32_t j = 0; j < launcher_size; j += 16) {
+					LOGF("  %03x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+					     j, ptr[j+0], ptr[j+1], ptr[j+2], ptr[j+3], ptr[j+4], ptr[j+5], ptr[j+6], ptr[j+7],
+					     ptr[j+8], ptr[j+9], ptr[j+10], ptr[j+11], ptr[j+12], ptr[j+13], ptr[j+14], ptr[j+15]);
+				}
+			}
+		}
+	}// Cycle 0141dp: Dump GTA V launcher-called function at 0x279430
+	// GTA V's launcher calls this function (file_off 0x279430, vaddr 0x90279430)
+	// at file_off 0x38. This is BEFORE GTA V's main at 0x294850.
+	// This is likely an init function that wraps main().
+	{
+		static bool dumped = false;
+		if (!dumped) {
+			dumped = true;
+			const uint64_t launcher_func_off = 0x279430ULL;
+			if (launcher_func_off + 64 <= size) {
+				auto* ptr = reinterpret_cast<uint8_t*>(address) + launcher_func_off;
+				LOGF("Cycle 0141dp: GTA V launcher-called function bytes at file_off 0x%" PRIx64 " (vaddr 0x%" PRIx64 "):\n", launcher_func_off, launcher_func_off + 0x900000000ULL);
+				for (uint32_t j = 0; j < 64; j += 16) {
+					LOGF("  %03x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+					     j, ptr[j+0], ptr[j+1], ptr[j+2], ptr[j+3], ptr[j+4], ptr[j+5], ptr[j+6], ptr[j+7],
+					     ptr[j+8], ptr[j+9], ptr[j+10], ptr[j+11], ptr[j+12], ptr[j+13], ptr[j+14], ptr[j+15]);
+				}
+			}
+		}
 	}
+
+
 
 
 
