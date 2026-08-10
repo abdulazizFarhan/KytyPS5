@@ -2188,7 +2188,40 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 				LOGF("Cycle 0141ei: If main runs at this vaddr, GTA V's main has unconventional entry\n");
 			}
 		}
+	}// Cycle 0141ej: Dump all call instructions in GTA V main range (0x294850-0x29e300)
+	{
+		static bool dumped = false;
+		if (!dumped) {
+			dumped = true;
+			std::string program_name = Common::PathToString(program->file_name);
+			if (program_name.find("eboot.bin") != std::string::npos) {
+				const uint64_t main_start = 0x294850ULL;
+				const uint64_t main_end = 0x29e300ULL;
+				if (main_end <= size) {
+					int call_count = 0;
+					LOGF("Cycle 0141ej: Calls in main range 0x%" PRIx64 "-0x%" PRIx64 ":\n", main_start, main_end);
+					for (uint64_t off = main_start; off < main_end - 5; ++off) {
+						uint8_t* p = reinterpret_cast<uint8_t*>(address) + off;
+						if (p[0] == 0xe8) {  // call rel32
+							int32_t rel32 = (int32_t)(p[1] | (p[2] << 8) | (p[3] << 16) | (p[4] << 24));
+							uint64_t target = (off + 5 + rel32) + 0x900000000ULL;
+							LOGF("  call at file_off 0x%" PRIx64 " -> vaddr 0x%" PRIx64 "\n", off, target);
+							call_count++;
+							if (call_count >= 30) {
+								LOGF("  ... (truncated, total %d)\n", call_count);
+								break;
+							}
+						}
+					}
+					if (call_count == 0) {
+						LOGF("  No calls found\n");
+					}
+				}
+			}
+		}
 	}
+
+	
 
 	
 
