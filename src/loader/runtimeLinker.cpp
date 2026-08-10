@@ -1647,7 +1647,24 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 				     address, size);
 			}
 		}
+	}// Cycle 0141dh: Log ALL PRX PatchProgram calls (full GTA V library loading map)
+	// Tracks every PRX's segment vaddr and size. Helps understand GTA V's loading pattern.
+	// GTA V has 4 programs: eboot + libc + libSceJobManager + libSceNpCppWebApi
+	{
+		static int patch_count = 0;
+		std::string program_name = Common::PathToString(program->file_name);
+		patch_count++;
+		// Only log first call per program (segment 0)
+		if (patch_count <= 20) {
+			const char* base = strrchr(program_name.c_str(), '/');
+			const char* winbase = strrchr(program_name.c_str(), '\\');
+			const char* short_name = (winbase > base ? winbase : base);
+			short_name = (short_name != nullptr ? short_name + 1 : program_name.c_str());
+			LOGF("Cycle 0141dh: PRX #%d [%s] vaddr=0x%" PRIx64 " size=%" PRIu64 " (file=%s)\n",
+			     patch_count, short_name, address, size, program_name.c_str());
+		}
 	}
+
 
 
 	// Cycle 0141ao: RE-ENABLE cycle 0141al (launcher_init backward loop NOP) AND keep
