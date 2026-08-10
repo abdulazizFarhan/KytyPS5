@@ -2092,7 +2092,29 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 				}
 			}
 		}
+	}// Cycle 0141ee: Dump GTA V main's exit area (file_off 0x29e300)
+	// Main's last call at 0x9029e2e0 -> 0x90575580. Dump area around main's return.
+	{
+		static bool dumped = false;
+		if (!dumped) {
+			dumped = true;
+			std::string program_name = Common::PathToString(program->file_name);
+			if (program_name.find("eboot.bin") != std::string::npos) {
+				const uint64_t main_exit_off = 0x29e2f0ULL;
+				if (main_exit_off + 128ULL <= size) {
+					auto* ptr = reinterpret_cast<uint8_t*>(address) + main_exit_off;
+					LOGF("Cycle 0141ee: GTA V main exit area at file_off 0x%" PRIx64 " (vaddr 0x%" PRIx64 "):\n", main_exit_off, main_exit_off + 0x900000000ULL);
+					for (uint32_t j = 0; j < 96; j += 16) {
+						LOGF("  %03x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+						     j, ptr[j+0], ptr[j+1], ptr[j+2], ptr[j+3], ptr[j+4], ptr[j+5], ptr[j+6], ptr[j+7],
+						     ptr[j+8], ptr[j+9], ptr[j+10], ptr[j+11], ptr[j+12], ptr[j+13], ptr[j+14], ptr[j+15]);
+					}
+				}
+			}
+		}
 	}
+
+	
 
 	
 
