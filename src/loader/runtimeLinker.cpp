@@ -36,6 +36,7 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#include <array>
 #endif
 
 namespace Libs::LibKernel {
@@ -1747,6 +1748,27 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 	}
 
 
+
+	// 	// Cycle 0141bu: Defensive NOP extension for additional NULL vtable AVs in GTA V's RAGE engine.
+	// Cycle 0141bs experiment showed that with cycle 0141ar disabled, GTA V's RAGE engine
+	// hits additional NULL vtable Write AVs at 0x902813cb0 and 0x902813d35 - both just past
+	// cycle 0141br's range (0x902813c20). Byte-level inspection (cycle 0141bw) showed the
+	// actual faulting instructions don't match the simple 'ff 50 48' or '49 89 8f' patterns
+	// we tried. Instead, extend cycle 0141br's NOP range by 0x120 bytes (0x902813c20 to
+	// 0x902813d40) - narrower than cycle 0141bt's 0x902813e00, which regressed GTA V at 2.28s.
+	// This is a defensive patch - no impact on today's runtime (cycle 0141ar keeps RAGE
+	// entry NOP+ret active, so 0141br's NOP range never executes).
+	{
+		constexpr uint64_t rage_func2_start = 0x2813c21ULL;  // After cycle 0141br's range
+		constexpr uint64_t rage_func2_end   = 0x2813d40ULL;  // Narrow extension
+		if (rage_func2_end <= size) {
+			auto* func2_ptr = reinterpret_cast<uint8_t*>(address) + rage_func2_start;
+			memset(func2_ptr, 0x90, rage_func2_end - rage_func2_start);
+			LOGF("Cycle 0141bu: Extend RAGE NOP range to file_off 0x%" PRIx64 "-0x%" PRIx64
+			     " (%llu additional NOPs)\n", rage_func2_start, rage_func2_end,
+			     static_cast<unsigned long long>(rage_func2_end - rage_func2_start));
+		}
+	}
 
 	// Cycle 0141br: Preemptively NOP the RAGE setup function body at file_off 0x2813b1a-0x2813c21.
 	// This complements cycle 0141av (which only NOPed the virtual call at 0x902813b29).
