@@ -1864,6 +1864,33 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 		}
 	}
 
+	// Cycle 0141cl: DEBUG - dump function pointer array at 0x900000070 (file_off 0x70)
+	// This is the function array GTA V's launcher iterates. Currently r14=rbx=0x900000070 (empty array).
+	{
+		// Dump the array region 0x70-0x1000 (lots of pointers)
+		const uint64_t array_off = 0x70ULL;
+		const uint32_t array_len = 0x100ULL - 0x70ULL;  // 0x90 bytes
+		if (array_off + array_len <= size) {
+			auto* ptr = reinterpret_cast<uint8_t*>(address) + array_off;
+			LOGF("[cycle 0141cl] Function pointer array at 0x%" PRIx64 ":\n", reinterpret_cast<uint64_t>(ptr));
+			// Print 8-byte aligned values
+			uint64_t* p64 = reinterpret_cast<uint64_t*>(ptr);
+			for (uint32_t i = 0; i < (array_len / 8); i++) {
+				LOGF("  [%02x] 0x%" PRIx64 "\n", i * 8, p64[i]);
+			}
+		}
+
+		// Dump the global at 0x90392A278 (the r14 source: file_off 0x392A278)
+		const uint64_t r14_global_off = 0x392A278ULL;
+		if (r14_global_off + 16 <= size) {
+			auto* ptr = reinterpret_cast<uint8_t*>(address) + r14_global_off;
+			LOGF("[cycle 0141cl] r14 global at 0x%" PRIx64 ":\n", reinterpret_cast<uint64_t>(ptr));
+			uint64_t v = *reinterpret_cast<uint64_t*>(ptr);
+			LOGF("  value = 0x%" PRIx64 "\n", v);
+		}
+	}
+
+
 
 
 
