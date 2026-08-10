@@ -1886,7 +1886,67 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 			LOGF("Cycle 0141dt: launcher_init forward loop call at 0x900000031 (file_off 0x31)\n");
 			LOGF("Cycle 0141dt: this would be invoked per function pointer entry\n");
 		}
+	}// Cycle 0141du: Dump GTA V wrapper function called before main
+	// Launcher calls this at file_off 0x38 (rel32 = 0x0027b951)
+	// target = 0x90000003d + 0x0027b951 = 0x90027b98e
+	// file_off = 0x27b98e
+	{
+		static bool dumped = false;
+		if (!dumped) {
+			dumped = true;
+			const uint64_t wrapper_off = 0x27b98eULL;
+			if (wrapper_off + 128 <= size) {
+				auto* ptr = reinterpret_cast<uint8_t*>(address) + wrapper_off;
+				LOGF("Cycle 0141du: GTA V wrapper bytes at file_off 0x%" PRIx64 " (vaddr 0x%" PRIx64 "):\n", wrapper_off, wrapper_off + 0x900000000ULL);
+				for (uint32_t j = 0; j < 128; j += 16) {
+					LOGF("  %03x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+					     j, ptr[j+0], ptr[j+1], ptr[j+2], ptr[j+3], ptr[j+4], ptr[j+5], ptr[j+6], ptr[j+7],
+					     ptr[j+8], ptr[j+9], ptr[j+10], ptr[j+11], ptr[j+12], ptr[j+13], ptr[j+14], ptr[j+15]);
+				}
+			}
+		}
+	}// Cycle 0141dv: Dump several offsets around 0x27b900 to find function entry
+	// The launcher calls file_off 0x38 -> vaddr 0x90027b98e area
+	// Could be int3 padding + actual function nearby
+	{
+		static bool dumped = false;
+		if (!dumped) {
+			dumped = true;
+			for (uint64_t off : {0x27b900ULL, 0x27b950ULL, 0x27b9a0ULL, 0x27ba00ULL}) {
+				if (off + 64 <= size) {
+					auto* ptr = reinterpret_cast<uint8_t*>(address) + off;
+					LOGF("Cycle 0141dv: GTA V file_off 0x%" PRIx64 " (vaddr 0x%" PRIx64 "):\n", off, off + 0x900000000ULL);
+					for (uint32_t j = 0; j < 64; j += 16) {
+						LOGF("  %03x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+						     j, ptr[j+0], ptr[j+1], ptr[j+2], ptr[j+3], ptr[j+4], ptr[j+5], ptr[j+6], ptr[j+7],
+						     ptr[j+8], ptr[j+9], ptr[j+10], ptr[j+11], ptr[j+12], ptr[j+13], ptr[j+14], ptr[j+15]);
+					}
+				}
+			}
+		}
+	}// Cycle 0141dw: Dump near file_off 0x3075ad (real PLT call target)
+	// The launcher call at file_off 0x40 -> target vaddr 0x903075ad
+	// file_off = 0x3075ad (in segment 0, before PLT)
+	{
+		static bool dumped = false;
+		if (!dumped) {
+			dumped = true;
+			for (uint64_t off : {0x307500ULL, 0x3075a0ULL, 0x307600ULL, 0x307700ULL, 0x307c00ULL}) {
+				if (off + 64 <= size) {
+					auto* ptr = reinterpret_cast<uint8_t*>(address) + off;
+					LOGF("Cycle 0141dw: GTA V file_off 0x%" PRIx64 " (vaddr 0x%" PRIx64 "):\n", off, off + 0x900000000ULL);
+					for (uint32_t j = 0; j < 64; j += 16) {
+						LOGF("  %03x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+						     j, ptr[j+0], ptr[j+1], ptr[j+2], ptr[j+3], ptr[j+4], ptr[j+5], ptr[j+6], ptr[j+7],
+						     ptr[j+8], ptr[j+9], ptr[j+10], ptr[j+11], ptr[j+12], ptr[j+13], ptr[j+14], ptr[j+15]);
+					}
+				}
+			}
+		}
 	}
+
+
+
 
 
 
