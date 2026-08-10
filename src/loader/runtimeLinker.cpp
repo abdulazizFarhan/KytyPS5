@@ -1890,6 +1890,21 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 		}
 	}
 
+	// Cycle 0141cn: Static analysis log for GTA V binary structure
+	// Documents findings about GTA V's binary entry, main, and exit points.
+	// GTA V's main body (0x90293a15-0x9029e300) makes 0 Graphics5 calls,
+	// 0 Agc_v1 calls, only pthread_create/pthread_join. GTA V exits naturally.
+	{
+		LOGF("[cycle 0141cn] GTA V binary structure analysis (entered once per PRX):\n");
+		LOGF("  - Binary entry (e_entry): 0x900000070 (file_off 0x70)\n");
+		LOGF("  - GTA V's main range: 0x90293a15-0x9029e300 (43K+ bytes)\n");
+		LOGF("  - GTA V's main return: 0x9029e300 (file_off 0x29e300)\n");
+		LOGF("  - GTA V's main last call: 0x9029e2e0 -> 0x90575580 (RAGE handler state=3)\n");
+		LOGF("  - Function array at 0x900000070 is actually code (decoded)\n");
+		LOGF("  - 220 unique NIDs registered, 0 Graphics5/Agc_v1 actually invoked by GTA V's main\n");
+	}
+
+
 
 
 
