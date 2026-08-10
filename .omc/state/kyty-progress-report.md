@@ -877,7 +877,7 @@ These are real NIDs from GTA V's binaries, not documentation:
 - 18 AgcDriver_v1 NIDs: Xq5WmbwPTnQ, SAfhzJPcjuk, FOwvmNlFLjM, etc.
 - 3 RazorCpu_v1 NIDs: KP+TBWGHlgs, dnEdyY4+klQ, 9FowWFMEIM8
 
-Build verified: cmake configure + build succeed, GTA V stable at 3/3 runs (avg 11.2s, 0 AVs).
+Build verified: cmake configure + build succeed, GTA V stable at 3/3 runs (fresh build avg 9.31s, 0 AVs).
 Unresolved PLT count reduced from 95 to 67 (these NIDs now have explicit stubs).
 
 LibSceJobManager.prx's module_start doesn't actually invoke these NIDs in GTA V's current 
