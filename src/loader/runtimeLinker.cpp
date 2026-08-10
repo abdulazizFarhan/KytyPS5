@@ -2233,7 +2233,24 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 				LOGF("Cycle 0141ek: Either GTA V doesn't reach it or kyty handles unmapped memory\n");
 			}
 		}
+	}// Cycle 0141el: NOP the ud2 instruction after PLT 0x32e in GTA V's launcher.
+// Originally 0f 0b (ud2) at file_off 0x4f. kyty's illegal-instruction handler
+// skips 16 bytes. NOPing the ud2 makes the launcher fall through naturally.
+	{
+		constexpr uint8_t UD2_PATTERN[2] = {0x0f, 0x0b};
+		const uint64_t launcher_ud2_off = 0x4fULL;
+		if (launcher_ud2_off + 2 <= size) {
+			auto* ptr = reinterpret_cast<uint8_t*>(address) + launcher_ud2_off;
+			if (memcmp(ptr, UD2_PATTERN, 2) == 0) {
+				ptr[0] = 0x90;
+				ptr[1] = 0x90;
+				LOGF("Cycle 0141el: NOP ud2 in GTA V launcher at 0x%" PRIx64 "\n",
+				     reinterpret_cast<uint64_t>(ptr));
+			}
+		}
 	}
+
+	
 
 	
 
