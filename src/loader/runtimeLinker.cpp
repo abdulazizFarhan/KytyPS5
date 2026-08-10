@@ -1801,6 +1801,23 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 		}
 	}
 
+	// Cycle 0141ca: Second NOP extension to cover further NULL vtable AVs.
+	// Cycle 0141bt experiment showed GTA V's RAGE hits additional NULL vtable AVs at
+	// file_off 0x2813e2a, 0x2813e3a, 0x2813e66 (vaddr 0x902813e2a, 0x902813e3a, 0x902813e66).
+	// These are past cycle 0141bu's range (0x2813d40). NOP a narrow range
+	// (0x2813d40 to 0x2813e70, 304 NOPs) to cover them.
+	{
+		constexpr uint64_t rage_func3_start = 0x2813d40ULL;  // After cycle 0141bu's range
+		constexpr uint64_t rage_func3_end   = 0x2813e70ULL;  // Cover 3 more AV sites
+		if (rage_func3_end <= size) {
+			auto* func3_ptr = reinterpret_cast<uint8_t*>(address) + rage_func3_start;
+			memset(func3_ptr, 0x90, rage_func3_end - rage_func3_start);
+			LOGF("Cycle 0141ca: Second RAGE NOP extension 0x%" PRIx64 "-0x%" PRIx64
+			     " (%llu additional NOPs)\n", rage_func3_start, rage_func3_end,
+			     static_cast<unsigned long long>(rage_func3_end - rage_func3_start));
+		}
+	}
+
 	// Cycle 0141br: Preemptively NOP the RAGE setup function body at file_off 0x2813b1a-0x2813c21.
 	// This complements cycle 0141av (which only NOPed the virtual call at 0x902813b29).
 	// The function has additional Write AVs at NULL vtable offsets: 0x902813b2c, 0x902813b40,
