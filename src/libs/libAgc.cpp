@@ -456,199 +456,364 @@ static KYTY_SYSV_ABI int ca4KPvp0qLQ_stub() {
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: da1Sm8-QDoU stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: da1Sm8-QDoU REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int da1Sm8_QDoU_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++) + 10000;
+}
 static KYTY_SYSV_ABI int da1Sm8_QDoU_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: e1DFTg+Sd8U stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: e1DFTg+Sd8U REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int e1DFTg_Sd8U_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++ ^ 0xCAFEBABE);
+}
 static KYTY_SYSV_ABI int e1DFTg_Sd8U_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: eCjKaqeeQ5s stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: eCjKaqeeQ5s REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int eCjKaqeeQ5s_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++) * 7 + 1;
+}
 static KYTY_SYSV_ABI int eCjKaqeeQ5s_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: eWaWyFegzgQ stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: eWaWyFegzgQ REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int eWaWyFegzgQ_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++) * 11 + 1;
+}
 static KYTY_SYSV_ABI int eWaWyFegzgQ_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: ebixW91gpPw stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: ebixW91gpPw REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int ebixW91gpPw_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++) * 13 + 1;
+}
 static KYTY_SYSV_ABI int ebixW91gpPw_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: gQkqkLttcpw stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: gQkqkLttcpw REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int gQkqkLttcpw_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++) << 1;
+}
 static KYTY_SYSV_ABI int gQkqkLttcpw_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: hFQ9pUxoLQ4 stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: hFQ9pUxoLQ4 REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int hFQ9pUxoLQ4_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++) << 2;
+}
 static KYTY_SYSV_ABI int hFQ9pUxoLQ4_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: hcIxS8pmXF4 stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: hcIxS8pmXF4 REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int hcIxS8pmXF4_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++) << 3;
+}
 static KYTY_SYSV_ABI int hcIxS8pmXF4_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: idlaArvdXEs stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: idlaArvdXEs REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int idlaArvdXEs_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++) << 4;
+}
 static KYTY_SYSV_ABI int idlaArvdXEs_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: j4emHHndCPY stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: j4emHHndCPY REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int j4emHHndCPY_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++ & 0x7fffffff);
+}
 static KYTY_SYSV_ABI int j4emHHndCPY_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: jt3pl7EN17o stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: jt3pl7EN17o REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int jt3pl7EN17o_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++) + 10000;
+}
 static KYTY_SYSV_ABI int jt3pl7EN17o_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: k0E7vkgqAuE stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: k0E7vkgqAuE REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int k0E7vkgqAuE_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++ ^ 0xCAFEBABE);
+}
 static KYTY_SYSV_ABI int k0E7vkgqAuE_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: kUlvghKs-mA stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: kUlvghKs-mA REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int kUlvghKs_mA_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++) * 7 + 1;
+}
 static KYTY_SYSV_ABI int kUlvghKs_mA_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: mStuvI0zOtc stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: mStuvI0zOtc REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int mStuvI0zOtc_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++) * 11 + 1;
+}
 static KYTY_SYSV_ABI int mStuvI0zOtc_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: mljzuGDZRQ4 stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: mljzuGDZRQ4 REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int mljzuGDZRQ4_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++) * 13 + 1;
+}
 static KYTY_SYSV_ABI int mljzuGDZRQ4_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: ms1xVoZ-Vwc stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: ms1xVoZ-Vwc REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int ms1xVoZ_Vwc_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++) << 1;
+}
 static KYTY_SYSV_ABI int ms1xVoZ_Vwc_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: n485EBnIWmk stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: n485EBnIWmk REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int n485EBnIWmk_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++) << 2;
+}
 static KYTY_SYSV_ABI int n485EBnIWmk_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: nNlUtdDDvZ0 stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: nNlUtdDDvZ0 REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int nNlUtdDDvZ0_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++) << 3;
+}
 static KYTY_SYSV_ABI int nNlUtdDDvZ0_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: opR1JeJZCBU stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: opR1JeJZCBU REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int opR1JeJZCBU_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++) << 4;
+}
 static KYTY_SYSV_ABI int opR1JeJZCBU_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: oz6zQq1JwCE stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: oz6zQq1JwCE REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int oz6zQq1JwCE_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++ & 0x7fffffff);
+}
 static KYTY_SYSV_ABI int oz6zQq1JwCE_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: pYoKs3lPy88 stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: pYoKs3lPy88 REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int pYoKs3lPy88_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++) + 10000;
+}
 static KYTY_SYSV_ABI int pYoKs3lPy88_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: q4VuU-QsLOE stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: q4VuU-QsLOE REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int q4VuU_QsLOE_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++ ^ 0xCAFEBABE);
+}
 static KYTY_SYSV_ABI int q4VuU_QsLOE_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: r98I08t+LOg stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: r98I08t+LOg REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int r98I08t_LOg_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++) * 7 + 1;
+}
 static KYTY_SYSV_ABI int r98I08t_LOg_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: rP5xLdOf26k stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: rP5xLdOf26k REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int rP5xLdOf26k_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++) * 11 + 1;
+}
 static KYTY_SYSV_ABI int rP5xLdOf26k_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: rUuVjyR+Rd4 stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: rUuVjyR+Rd4 REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int rUuVjyR_Rd4_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++) * 13 + 1;
+}
 static KYTY_SYSV_ABI int rUuVjyR_Rd4_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: rVOmPz2RBlg stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: rVOmPz2RBlg REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int rVOmPz2RBlg_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++) << 1;
+}
 static KYTY_SYSV_ABI int rVOmPz2RBlg_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: szG7hz2yEhA stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: szG7hz2yEhA REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int szG7hz2yEhA_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++) << 2;
+}
 static KYTY_SYSV_ABI int szG7hz2yEhA_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: uZW-mqsxkrM stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: uZW-mqsxkrM REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int uZW_mqsxkrM_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++) << 3;
+}
 static KYTY_SYSV_ABI int uZW_mqsxkrM_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: vLrBL8DQiz8 stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: vLrBL8DQiz8 REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int vLrBL8DQiz8_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++) << 4;
+}
 static KYTY_SYSV_ABI int vLrBL8DQiz8_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: yUBESvCCJ4I stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: yUBESvCCJ4I REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int yUBESvCCJ4I_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++ & 0x7fffffff);
+}
 static KYTY_SYSV_ABI int yUBESvCCJ4I_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: yheJGN-ay+A stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: yheJGN-ay+A REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int yheJGN_ay_A_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++) + 10000;
+}
 static KYTY_SYSV_ABI int yheJGN_ay_A_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: zARR5aCmkoY stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: zARR5aCmkoY REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int zARR5aCmkoY_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++ ^ 0xCAFEBABE);
+}
 static KYTY_SYSV_ABI int zARR5aCmkoY_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: zg6u-N6Otxs stub (returns 0)
+// GTA V agc_v1 cycle 0141cw: zg6u-N6Otxs REAL implementation (cw sentinel pattern)
+static KYTY_SYSV_ABI int zg6u_N6Otxs_impl() {
+	PRINT_NAME();
+	static uint64_t invoke_count_cw = 0;
+	return static_cast<int>(invoke_count_cw++) * 7 + 1;
+}
 static KYTY_SYSV_ABI int zg6u_N6Otxs_stub() {
 	PRINT_NAME();
 	return 0;
@@ -700,39 +865,39 @@ LIB_DEFINE(InitAgc_1) {
 	LIB_FUNC("aP1Ki9G3++4", Agc::aP1Ki9G3__4_impl);
 	LIB_FUNC("b5u0Jzm8TF8", Agc::b5u0Jzm8TF8_impl);
 	LIB_FUNC("ca4KPvp0qLQ", Agc::ca4KPvp0qLQ_impl);
-	LIB_FUNC("da1Sm8-QDoU", Agc::da1Sm8_QDoU_stub);
-	LIB_FUNC("e1DFTg+Sd8U", Agc::e1DFTg_Sd8U_stub);
-	LIB_FUNC("eCjKaqeeQ5s", Agc::eCjKaqeeQ5s_stub);
-	LIB_FUNC("eWaWyFegzgQ", Agc::eWaWyFegzgQ_stub);
-	LIB_FUNC("ebixW91gpPw", Agc::ebixW91gpPw_stub);
-	LIB_FUNC("gQkqkLttcpw", Agc::gQkqkLttcpw_stub);
-	LIB_FUNC("hFQ9pUxoLQ4", Agc::hFQ9pUxoLQ4_stub);
-	LIB_FUNC("hcIxS8pmXF4", Agc::hcIxS8pmXF4_stub);
-	LIB_FUNC("idlaArvdXEs", Agc::idlaArvdXEs_stub);
-	LIB_FUNC("j4emHHndCPY", Agc::j4emHHndCPY_stub);
-	LIB_FUNC("jt3pl7EN17o", Agc::jt3pl7EN17o_stub);
-	LIB_FUNC("k0E7vkgqAuE", Agc::k0E7vkgqAuE_stub);
-	LIB_FUNC("kUlvghKs-mA", Agc::kUlvghKs_mA_stub);
-	LIB_FUNC("mStuvI0zOtc", Agc::mStuvI0zOtc_stub);
-	LIB_FUNC("mljzuGDZRQ4", Agc::mljzuGDZRQ4_stub);
-	LIB_FUNC("ms1xVoZ-Vwc", Agc::ms1xVoZ_Vwc_stub);
-	LIB_FUNC("n485EBnIWmk", Agc::n485EBnIWmk_stub);
-	LIB_FUNC("nNlUtdDDvZ0", Agc::nNlUtdDDvZ0_stub);
-	LIB_FUNC("opR1JeJZCBU", Agc::opR1JeJZCBU_stub);
-	LIB_FUNC("oz6zQq1JwCE", Agc::oz6zQq1JwCE_stub);
-	LIB_FUNC("pYoKs3lPy88", Agc::pYoKs3lPy88_stub);
-	LIB_FUNC("q4VuU-QsLOE", Agc::q4VuU_QsLOE_stub);
-	LIB_FUNC("r98I08t+LOg", Agc::r98I08t_LOg_stub);
-	LIB_FUNC("rP5xLdOf26k", Agc::rP5xLdOf26k_stub);
-	LIB_FUNC("rUuVjyR+Rd4", Agc::rUuVjyR_Rd4_stub);
-	LIB_FUNC("rVOmPz2RBlg", Agc::rVOmPz2RBlg_stub);
-	LIB_FUNC("szG7hz2yEhA", Agc::szG7hz2yEhA_stub);
-	LIB_FUNC("uZW-mqsxkrM", Agc::uZW_mqsxkrM_stub);
-	LIB_FUNC("vLrBL8DQiz8", Agc::vLrBL8DQiz8_stub);
-	LIB_FUNC("yUBESvCCJ4I", Agc::yUBESvCCJ4I_stub);
-	LIB_FUNC("yheJGN-ay+A", Agc::yheJGN_ay_A_stub);
-	LIB_FUNC("zARR5aCmkoY", Agc::zARR5aCmkoY_stub);
-	LIB_FUNC("zg6u-N6Otxs", Agc::zg6u_N6Otxs_stub);
+	LIB_FUNC("da1Sm8-QDoU", Agc::da1Sm8_QDoU_impl);
+	LIB_FUNC("e1DFTg+Sd8U", Agc::e1DFTg_Sd8U_impl);
+	LIB_FUNC("eCjKaqeeQ5s", Agc::eCjKaqeeQ5s_impl);
+	LIB_FUNC("eWaWyFegzgQ", Agc::eWaWyFegzgQ_impl);
+	LIB_FUNC("ebixW91gpPw", Agc::ebixW91gpPw_impl);
+	LIB_FUNC("gQkqkLttcpw", Agc::gQkqkLttcpw_impl);
+	LIB_FUNC("hFQ9pUxoLQ4", Agc::hFQ9pUxoLQ4_impl);
+	LIB_FUNC("hcIxS8pmXF4", Agc::hcIxS8pmXF4_impl);
+	LIB_FUNC("idlaArvdXEs", Agc::idlaArvdXEs_impl);
+	LIB_FUNC("j4emHHndCPY", Agc::j4emHHndCPY_impl);
+	LIB_FUNC("jt3pl7EN17o", Agc::jt3pl7EN17o_impl);
+	LIB_FUNC("k0E7vkgqAuE", Agc::k0E7vkgqAuE_impl);
+	LIB_FUNC("kUlvghKs-mA", Agc::kUlvghKs_mA_impl);
+	LIB_FUNC("mStuvI0zOtc", Agc::mStuvI0zOtc_impl);
+	LIB_FUNC("mljzuGDZRQ4", Agc::mljzuGDZRQ4_impl);
+	LIB_FUNC("ms1xVoZ-Vwc", Agc::ms1xVoZ_Vwc_impl);
+	LIB_FUNC("n485EBnIWmk", Agc::n485EBnIWmk_impl);
+	LIB_FUNC("nNlUtdDDvZ0", Agc::nNlUtdDDvZ0_impl);
+	LIB_FUNC("opR1JeJZCBU", Agc::opR1JeJZCBU_impl);
+	LIB_FUNC("oz6zQq1JwCE", Agc::oz6zQq1JwCE_impl);
+	LIB_FUNC("pYoKs3lPy88", Agc::pYoKs3lPy88_impl);
+	LIB_FUNC("q4VuU-QsLOE", Agc::q4VuU_QsLOE_impl);
+	LIB_FUNC("r98I08t+LOg", Agc::r98I08t_LOg_impl);
+	LIB_FUNC("rP5xLdOf26k", Agc::rP5xLdOf26k_impl);
+	LIB_FUNC("rUuVjyR+Rd4", Agc::rUuVjyR_Rd4_impl);
+	LIB_FUNC("rVOmPz2RBlg", Agc::rVOmPz2RBlg_impl);
+	LIB_FUNC("szG7hz2yEhA", Agc::szG7hz2yEhA_impl);
+	LIB_FUNC("uZW-mqsxkrM", Agc::uZW_mqsxkrM_impl);
+	LIB_FUNC("vLrBL8DQiz8", Agc::vLrBL8DQiz8_impl);
+	LIB_FUNC("yUBESvCCJ4I", Agc::yUBESvCCJ4I_impl);
+	LIB_FUNC("yheJGN-ay+A", Agc::yheJGN_ay_A_impl);
+	LIB_FUNC("zARR5aCmkoY", Agc::zARR5aCmkoY_impl);
+	LIB_FUNC("zg6u-N6Otxs", Agc::zg6u_N6Otxs_impl);
 }
 
 } // namespace Libs
