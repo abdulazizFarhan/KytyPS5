@@ -3,6 +3,7 @@
 
 #include "common/abi.h"
 #include "common/common.h"
+#include "libs/imeDialog.h"
 
 namespace Libs::Dialog {
 
@@ -14,13 +15,13 @@ int KYTY_SYSV_ABI CommonDialogInitialize();
 
 namespace ImeDialog {
 
-int KYTY_SYSV_ABI ImeDialogInit(const void* param, const void* extended);
+int KYTY_SYSV_ABI ImeDialogInit(const ImeDialog::Param* param, const ImeDialog::ExtendedParam* extended);
 int KYTY_SYSV_ABI ImeDialogTerm();
 int KYTY_SYSV_ABI ImeDialogAbort();
-int KYTY_SYSV_ABI ImeDialogGetResult(void* result);
-int KYTY_SYSV_ABI ImeDialogGetPanelSize(const void* param, uint32_t* width, uint32_t* height);
-int KYTY_SYSV_ABI ImeDialogGetPanelSizeExtended(const void* param, const void* extended, uint32_t* width, uint32_t* height);
-int KYTY_SYSV_ABI ImeDialogGetPanelPositionAndForm(void* form);
+int KYTY_SYSV_ABI ImeDialogGetResult(ImeDialog::Result* result);
+int KYTY_SYSV_ABI ImeDialogGetPanelSize(const ImeDialog::Param* param, uint32_t* width, uint32_t* height);
+int KYTY_SYSV_ABI ImeDialogGetPanelSizeExtended(const ImeDialog::Param* param, const ImeDialog::ExtendedParam* extended, uint32_t* width, uint32_t* height);
+int KYTY_SYSV_ABI ImeDialogGetPanelPositionAndForm(ImeDialog::PositionAndForm* form);
 
 int KYTY_SYSV_ABI ImeDialogGetStatus();
 

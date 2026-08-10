@@ -24,69 +24,10 @@ int KYTY_SYSV_ABI CommonDialogInitialize() {
 } // namespace CommonDialog
 
 namespace ImeDialog {
-
-LIB_NAME("ImeDialog", "ImeDialog");
-
-constexpr int IME_STATUS_NONE = 0;
-
-int KYTY_SYSV_ABI ImeDialogGetStatus() {
-	PRINT_NAME();
-
-	return IME_STATUS_NONE;
-}
-int KYTY_SYSV_ABI ImeDialogInit(const void* param, const void* extended) {
-	PRINT_NAME();
-	return OK;
-}
-
-int KYTY_SYSV_ABI ImeDialogTerm() {
-	PRINT_NAME();
-	return OK;
-}
-
-int KYTY_SYSV_ABI ImeDialogAbort() {
-	PRINT_NAME();
-	return OK;
-}
-
-int KYTY_SYSV_ABI ImeDialogGetResult(void* result) {
-	PRINT_NAME();
-	return OK;
-}
-
-int KYTY_SYSV_ABI ImeDialogGetPanelSize(const void* param, uint32_t* width, uint32_t* height) {
-	PRINT_NAME();
-	if (width != nullptr)
-	{
-		*width = 0;
-	}
-	if (height != nullptr)
-	{
-		*height = 0;
-	}
-	return OK;
-}
-
-int KYTY_SYSV_ABI ImeDialogGetPanelSizeExtended(const void* param, const void* extended, uint32_t* width, uint32_t* height) {
-	PRINT_NAME();
-	if (width != nullptr)
-	{
-		*width = 0;
-	}
-	if (height != nullptr)
-	{
-		*height = 0;
-	}
-	return OK;
-}
-
-int KYTY_SYSV_ABI ImeDialogGetPanelPositionAndForm(void* form) {
-	PRINT_NAME();
-	return OK;
-}
-
-
+// ImeDialog implementations moved to libs/imeDialog.cpp (upstream)
 } // namespace ImeDialog
+
+// namespace ImeDialog
 
 namespace LoginDialog {
 

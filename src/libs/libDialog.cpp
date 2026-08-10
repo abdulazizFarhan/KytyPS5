@@ -21,7 +21,7 @@ namespace LibImeDialog {
 
 LIB_VERSION("ImeDialog", 1, "ImeDialog", 1, 1);
 
-namespace ImeDialog = Dialog::ImeDialog;
+namespace ImeDialog = Libs::Dialog::ImeDialog;
 
 LIB_DEFINE(InitDialog_1_ImeDialog) {
 	LIB_FUNC("CRD+jSErEJQ", ImeDialog::ImeDialogGetPanelSizeExtended);

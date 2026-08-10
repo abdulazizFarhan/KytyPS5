@@ -142,6 +142,11 @@ LIB_DEFINE(InitKeyboard_1);
 
 
 
+namespace Ime {
+LIB_DEFINE(InitPlatform_1_Ime);
+} // namespace Ime
+
+
 namespace LibUlt {
 
 
@@ -412,6 +417,8 @@ void InitAll(Loader::SymbolDatabase* s) {
 
 
 	LIB_LOAD(LibKeyboard::InitKeyboard_1);
+	LIB_LOAD(Ime::InitPlatform_1_Ime);
+	LIB_LOAD(Ime::InitPlatform_1_Ime);
 
 
 
