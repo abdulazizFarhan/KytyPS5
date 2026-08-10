@@ -2015,7 +2015,92 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 				}
 			}
 		}
+	}// Cycle 0141ea: Dump wrapper function called before main at 0x27b991
+	{
+		static bool dumped = false;
+		if (!dumped) {
+			dumped = true;
+			std::string program_name = Common::PathToString(program->file_name);
+			if (program_name.find("eboot.bin") != std::string::npos) {
+				const uint64_t wrapper_off = 0x27b991ULL;
+				if (wrapper_off + 128ULL <= size) {
+					auto* ptr = reinterpret_cast<uint8_t*>(address) + wrapper_off;
+					LOGF("Cycle 0141ea: wrapper function at file_off 0x%" PRIx64 " (vaddr 0x%" PRIx64 "):\n", wrapper_off, wrapper_off + 0x900000000ULL);
+					for (uint32_t j = 0; j < 128; j += 16) {
+						LOGF("  %03x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+						     j, ptr[j+0], ptr[j+1], ptr[j+2], ptr[j+3], ptr[j+4], ptr[j+5], ptr[j+6], ptr[j+7],
+						     ptr[j+8], ptr[j+9], ptr[j+10], ptr[j+11], ptr[j+12], ptr[j+13], ptr[j+14], ptr[j+15]);
+					}
+				}
+			}
+		}
+	}// Cycle 0141eb: Try to find function entry by scanning common patterns (55, cc padding)
+	{
+		static bool dumped = false;
+		if (!dumped) {
+			dumped = true;
+			std::string program_name = Common::PathToString(program->file_name);
+			if (program_name.find("eboot.bin") != std::string::npos) {
+				// Look for 55 (push rbp) near 0x27b991
+				for (int64_t delta : {-8LL, -4LL, -2LL, -1LL, 0LL, 1LL, 2LL, 4LL, 8LL}) {
+					int64_t off_test = 0x27b991LL + delta;
+					if (off_test < 0 || off_test + 8 > (int64_t)size) continue;
+					uint8_t* p = reinterpret_cast<uint8_t*>(address) + off_test;
+					if (p[0] == 0x55) {  // push rbp - likely function entry
+						LOGF("Cycle 0141eb: Found push rbp at file_off 0x%" PRIx64 " (delta=%" PRId64 ")\n", off_test, delta);
+					}
+				}
+			}
+		}
+	}// Cycle 0141ec: Wider search for function entry near 0x27b991
+	{
+		static bool dumped = false;
+		if (!dumped) {
+			dumped = true;
+			std::string program_name = Common::PathToString(program->file_name);
+			if (program_name.find("eboot.bin") != std::string::npos) {
+				// Scan wider range and log any 0x55 (push rbp)
+				for (int64_t delta = -64LL; delta <= 64LL; ++delta) {
+					int64_t off_test = 0x27b991LL + delta;
+					if (off_test < 0 || off_test >= (int64_t)size) continue;
+					uint8_t* p = reinterpret_cast<uint8_t*>(address) + off_test;
+					if (p[0] == 0x55 && p[1] == 0x48 && p[2] == 0x89 && p[3] == 0xe5) {
+						LOGF("Cycle 0141ec: Function entry (55 48 89 e5) at file_off 0x%" PRIx64 " (delta=%" PRId64 ")\n", off_test, delta);
+					}
+				}
+			}
+		}
+	}// Cycle 0141ed: Even wider search for function entry in 4KB area around 0x27b000
+	{
+		static bool dumped = false;
+		if (!dumped) {
+			dumped = true;
+			std::string program_name = Common::PathToString(program->file_name);
+			if (program_name.find("eboot.bin") != std::string::npos) {
+				int found = 0;
+				for (int64_t off = 0x27b800LL; off < 0x27c800LL; ++off) {
+					uint8_t* p = reinterpret_cast<uint8_t*>(address) + off;
+					if ((off + 4) > (int64_t)size) break;
+					if (p[0] == 0x55 && p[1] == 0x48 && p[2] == 0x89 && p[3] == 0xe5) {
+						LOGF("Cycle 0141ed: Function entry at file_off 0x%" PRIx64 "\n", off);
+						found++;
+						if (found >= 5) break;
+					}
+				}
+				if (found == 0) {
+					LOGF("Cycle 0141ed: No standard function entry found in 0x27b800-0x27c800\n");
+				}
+			}
+		}
 	}
+
+	
+
+	
+
+	
+
+	
 
 	
 
