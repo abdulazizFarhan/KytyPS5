@@ -1696,7 +1696,49 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 				     address, size, size / (1024.0 * 1024.0));
 			}
 		}
+	}// Cycle 0141dk: Dump GTA V's main's last call target (RAGE handler state=3)
+	// GTA V's main's last call at 0x9029e2e0 targets 0x90575580.
+	// Dump the bytes there to understand what function GTA V calls.
+	{
+		static bool dumped = false;
+		if (!dumped) {
+			dumped = true;
+			const uint64_t target_off = 0x575580ULL;  // vaddr 0x90575580 in segment 0
+			if (target_off + 64 <= size) {
+				auto* ptr = reinterpret_cast<uint8_t*>(address) + target_off;
+				LOGF("Cycle 0141dk: GTA V's main last call target (0x90575580) bytes at file_off 0x%" PRIx64 ":\n", target_off);
+				for (uint32_t j = 0; j < 64; j += 16) {
+					LOGF("  %03x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+					     j, ptr[j+0], ptr[j+1], ptr[j+2], ptr[j+3], ptr[j+4], ptr[j+5], ptr[j+6], ptr[j+7],
+					     ptr[j+8], ptr[j+9], ptr[j+10], ptr[j+11], ptr[j+12], ptr[j+13], ptr[j+14], ptr[j+15]);
+				}
+			}
+		}
+	}// Cycle 0141dl: Log segment count per PRX (helps detect BSS/data segments)
+	// GTA V's eboot might have multiple segments (code + data + BSS).
+	// Counts total PatchProgram calls per PRX to detect multi-segment binaries.
+	{
+		static std::map<std::string, int> segment_count;
+		std::string program_name = Common::PathToString(program->file_name);
+		std::string short_name = program_name;
+		// Extract just the basename
+		size_t last_slash = short_name.find_last_of("/\\");
+		if (last_slash != std::string::npos) {
+			short_name = short_name.substr(last_slash + 1);
+		}
+		segment_count[short_name]++;
+		// Log when first segment of a new PRX is loaded
+		if (segment_count[short_name] == 1) {
+			LOGF("Cycle 0141dl: PRX %s segment #1 loaded at 0x%" PRIx64 " size=%" PRIu64 "\n",
+			     short_name.c_str(), address, size);
+		} else {
+			// Additional segments - log them too
+			LOGF("Cycle 0141dl: PRX %s segment #%d loaded at 0x%" PRIx64 " size=%" PRIu64 "\n",
+			     short_name.c_str(), segment_count[short_name], address, size);
+		}
 	}
+
+
 
 
 
