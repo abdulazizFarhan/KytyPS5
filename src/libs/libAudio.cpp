@@ -126,6 +126,7 @@ LIB_DEFINE(InitAudio_1_AudioOut) {
 	LIB_FUNC("QOQtbeDqsT4", AudioOut::AudioOutOutput);
 	LIB_FUNC("s1--uE9mBFw", AudioOut::AudioOutClose);
 	LIB_FUNC("GrQ9s4IrNaQ", AudioOut::AudioOutGetPortState);
+	LIB_FUNC("wVwPU50pS1c", AudioOut::AudioOutClose);  // GTA V AudioOut_v1
 }
 
 } // namespace LibAudioOut
