@@ -2641,33 +2641,7 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 				     rage_setup_ext_start, rage_setup_ext_end,
 				     static_cast<unsigned long long>(rage_setup_ext_end - rage_setup_ext_start));
 			}
-						// Cycle 0141gf DEBUG: Dump loaded bytes 0x2a560f0-0x2a56270 (file_off != vaddr_offset)
-			{
-				const uint64_t dump_start = 0x2a560f0ULL;
-				const uint64_t dump_end = 0x2a56270ULL;
-				if (dump_end <= size) {
-					auto* dp = reinterpret_cast<uint8_t*>(address) + dump_start;
-					for (uint64_t j = 0; j < dump_end - dump_start; j += 16) {
-						LOGF("  gf %08" PRIx64 ": %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
-						     dump_start + j, dp[j+0], dp[j+1], dp[j+2], dp[j+3], dp[j+4], dp[j+5], dp[j+6], dp[j+7],
-						     dp[j+8], dp[j+9], dp[j+10], dp[j+11], dp[j+12], dp[j+13], dp[j+14], dp[j+15]);
-					}
-				}
-			}
-						// Cycle 0141gg DEBUG: Dump loaded bytes 0x2a56270-0x2a56500 (file_off != vaddr_offset)
-			{
-				const uint64_t dump_start = 0x2a56270ULL;
-				const uint64_t dump_end = 0x2a56500ULL;
-				if (dump_end <= size) {
-					auto* dp = reinterpret_cast<uint8_t*>(address) + dump_start;
-					for (uint64_t j = 0; j < dump_end - dump_start; j += 16) {
-						LOGF("  gg %08" PRIx64 ": %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
-						     dump_start + j, dp[j+0], dp[j+1], dp[j+2], dp[j+3], dp[j+4], dp[j+5], dp[j+6], dp[j+7],
-						     dp[j+8], dp[j+9], dp[j+10], dp[j+11], dp[j+12], dp[j+13], dp[j+14], dp[j+15]);
-					}
-				}
-			}
-			// Cycle 0141fv: NOP the indirect call at vaddr_offset 0x2a5613c (ff 50 50 = call [rax+0x50])
+																																	// Cycle 0141fv: NOP the indirect call at vaddr_offset 0x2a5613c (ff 50 50 = call [rax+0x50])
 			// This call goes through a vtable and likely triggers the AV chain leading to fast-skip loop
 			{
 				const uint64_t ind_call_off = 0x2a5613cULL;
@@ -2716,7 +2690,19 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 					}
 				}
 			}
-						// Cycle 0141gd: NOP real call at 0x2a56398 (e8 c3 2a 62 00 -> 0x2c78e60)
+			// Cycle 0141gi (corrected): NOP indirect call [rbx+0x48] at 0x2a565e8 (function 0x2a564e0)
+			// From gj dump: 02a565e0-02a565f0: ff 53 48 ... (call [rbx+0x48])
+			{
+				const uint64_t call_rbx48_off = 0x2a565e8ULL;
+				if (call_rbx48_off + 3 <= size) {
+					auto* ip = reinterpret_cast<uint8_t*>(address) + call_rbx48_off;
+					if (ip[0] == 0xff && ip[1] == 0x53 && ip[2] == 0x48) {
+						ip[0] = 0x90; ip[1] = 0x90; ip[2] = 0x90;
+						LOGF("Cycle 0141gi: NOP indirect call [rbx+0x48] at 0x%" PRIx64 "\n", call_rbx48_off);
+					}
+				}
+			}
+									// Cycle 0141gd: NOP real call at 0x2a56398 (e8 c3 2a 62 00 -> 0x2c78e60)
 			{
 				const uint64_t real_call_off = 0x2a56398ULL;
 				if (real_call_off + 5 <= size) {
