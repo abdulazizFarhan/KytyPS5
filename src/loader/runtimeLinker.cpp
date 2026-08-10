@@ -1608,22 +1608,34 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 			}
 		}
 	}
-// Cycle 0141de: Dump RAGE AV sites in decrypted memory
-	// When GTAV_RAGE_ENABLE=1, RAGE hits AVs at file_off 0x2813f05+
-	// This cycle dumps those AV sites to understand what RAGE is doing
+// // // Cycle 0141df: Dump RAGE NULL vtable AV sites (no patches - cycle 0141dd handles wide range)
+	// When GTAV_RAGE_ENABLE=1, RAGE hits AVs at specific sites past our NOP range.
+	// This cycle dumps those sites for analysis. Cycle 0141dd's wider NOP range covers them.
 	{
-		const uint64_t av_site1_off = 0x2813f00ULL;  // Near first AV
-		const uint64_t av_site1_size = 64;
-		if (av_site1_off + av_site1_size <= size) {
-			auto* ptr1 = reinterpret_cast<uint8_t*>(address) + av_site1_off;
-			LOGF("Cycle 0141de: RAGE AV site bytes at file_off 0x%" PRIx64 " (decrypted):\n", av_site1_off);
-			for (uint32_t j = 0; j < av_site1_size; j += 16) {
-				LOGF("  %03x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
-				     j, ptr1[j+0], ptr1[j+1], ptr1[j+2], ptr1[j+3], ptr1[j+4], ptr1[j+5], ptr1[j+6], ptr1[j+7],
-				     ptr1[j+8], ptr1[j+9], ptr1[j+10], ptr1[j+11], ptr1[j+12], ptr1[j+13], ptr1[j+14], ptr1[j+15]);
+		static int rage_enable_check = -1;
+		if (rage_enable_check < 0) {
+			const char* env = getenv("GTAV_RAGE_ENABLE");
+			rage_enable_check = (env != nullptr && env[0] == '1') ? 1 : 0;
+		}
+		if (rage_enable_check == 1) {
+			// Dump AV sites (no patches - cycle 0141dd handles this)
+			const uint64_t av_sites[] = {0x2814117ULL, 0x2814127ULL, 0x2814144ULL,
+			                              0x281419dULL, 0x28141b3ULL, 0x28141c3ULL};
+			for (int i = 0; i < 6; i++) {
+				uint64_t av_off = av_sites[i];
+				if (av_off + 32 <= size) {
+					auto* ptr = reinterpret_cast<uint8_t*>(address) + av_off;
+					LOGF("Cycle 0141df: AV site #%d at file_off 0x%" PRIx64 " (decrypted):\n", i, av_off);
+					for (uint32_t j = 0; j < 32; j += 16) {
+						LOGF("  %03x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+						     j, ptr[j+0], ptr[j+1], ptr[j+2], ptr[j+3], ptr[j+4], ptr[j+5], ptr[j+6], ptr[j+7],
+						     ptr[j+8], ptr[j+9], ptr[j+10], ptr[j+11], ptr[j+12], ptr[j+13], ptr[j+14], ptr[j+15]);
+					}
+				}
 			}
 		}
 	}
+
 	// Cycle 0141ao: RE-ENABLE cycle 0141al (launcher_init backward loop NOP) AND keep
 	// cycle 0141q disabled (let init() run). Cycle 0141an had both disabled, causing GTA V
 	// to enter launcher_init's broken backward loop and then get stuck in fast-skip loop.
@@ -1690,7 +1702,7 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 			rage_enable = (env != nullptr && env[0] == '1') ? 1 : 0;
 			if (rage_enable != 0) {
 				LOGF("Cycle 0141dc: GTAV_RAGE_ENABLE=1 -> cycles 0141ar+0141by DISABLED, RAGE will ACTUALLY RUN\n");
-				LOGF("Cycle 0141dd: GTAV_RAGE_ENABLE=1 -> extended RAGE NOP range 0x2813b1a-0x2814100 (1502 NOPs total)\n");
+				LOGF("Cycle 0141dd: GTAV_RAGE_ENABLE=1 -> extended RAGE NOP range 0x2813b1a-0x2814200 (1766 NOPs total)\n");
 			}
 		}
 		if (rage_enable == 1) {
@@ -1698,7 +1710,7 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 			// Cycle 0141dd: But extend the RAGE setup NOP range to cover AV sites
 			// found at 0x2813e80+ when RAGE actually runs.
 			constexpr uint64_t rage_setup_ext_start = 0x2813b1aULL;
-			constexpr uint64_t rage_setup_ext_end   = 0x2814100ULL;  // Extended range
+			constexpr uint64_t rage_setup_ext_end   = 0x2814200ULL;  // Extended range
 			if (rage_setup_ext_end <= size) {
 				auto* ext_ptr = reinterpret_cast<uint8_t*>(address) + rage_setup_ext_start;
 				memset(ext_ptr, 0x90, rage_setup_ext_end - rage_setup_ext_start);
