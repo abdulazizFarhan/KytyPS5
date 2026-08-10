@@ -1809,6 +1809,23 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 		}
 	}
 
+	// Cycle 0141ch: DEBUG - dump GTA V's main epilogue (before ret at 0x9029e300)
+	// Shows the instructions GTA V's main executes right before returning to GTA V's launcher.
+	{
+		// GTA V main epilogue - 0x9029e2c0 to 0x9029e300 (64 bytes before ret)
+		const uint64_t epilogue_off = 0x29e2c0ULL;
+		if (epilogue_off + 64 <= size) {
+			auto* ptr = reinterpret_cast<uint8_t*>(address) + epilogue_off;
+			LOGF("[cycle 0141ch] GTA V main epilogue bytes at 0x%" PRIx64 ":\n", reinterpret_cast<uint64_t>(ptr));
+			for (uint32_t i = 0; i < 64; i += 16) {
+				LOGF("  %03x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+			     i, ptr[i+0], ptr[i+1], ptr[i+2], ptr[i+3], ptr[i+4], ptr[i+5], ptr[i+6], ptr[i+7],
+			     ptr[i+8], ptr[i+9], ptr[i+10], ptr[i+11], ptr[i+12], ptr[i+13], ptr[i+14], ptr[i+15]);
+			}
+		}
+	}
+
+
 
 
 
