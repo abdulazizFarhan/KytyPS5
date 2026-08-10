@@ -2219,7 +2219,23 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 				}
 			}
 		}
+	}// Cycle 0141ek: Verify whether 0x903078f30 (PLT 0x789 heavy call) is reachable
+	// This vaddr is past GTA V's segment 0 (0x3071000 size). Either GTA V doesn't
+	// reach this call, or kyty handles it somehow.
+	{
+		static bool dumped = false;
+		if (!dumped) {
+			dumped = true;
+			std::string program_name = Common::PathToString(program->file_name);
+			if (program_name.find("eboot.bin") != std::string::npos) {
+				LOGF("Cycle 0141ek: PLT 0x789 vaddr 0x903078f30 is past GTA V segment 0 (size=0x3071000)\n");
+				LOGF("Cycle 0141ek: GTA V's main calls this 6+ times (heaviest PLT call)\n");
+				LOGF("Cycle 0141ek: Either GTA V doesn't reach it or kyty handles unmapped memory\n");
+			}
+		}
 	}
+
+	
 
 	
 
