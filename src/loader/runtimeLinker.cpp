@@ -1629,18 +1629,21 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 			0x55, 0x48, 0x89, 0xe5, 0x41, 0x57, 0x41, 0x56, 0x41, 0x55, 0x41, 0x54, 0x53,
 			0x48, 0x83
 		};
-		// Cycle 0141bx: Env var toggle to disable cycle 0141ar for experiments.
-		// Set GTAV_RAGE_DISABLE=1 to disable RAGE entry NOP and let GTA V actually run RAGE.
-		// This is for testing - normally cycle 0141ar is needed to bypass RAGE NULL vtable AVs.
+		// Cycle 0141bx: Env var toggle for cycle 0141ar / 0141by (GTAV_RAGE_DISABLE).
+		// When GTAV_RAGE_DISABLE=1, cycle 0141ar's narrow NOP+ret is replaced with a wider
+		// NOP range (cycle 0141by) so GTA V's RAGE Main Thread entry function is mostly
+		// empty and returns naturally without triggering NULL vtable AVs.
+		// Set GTAV_RAGE_DISABLE=1 for experimentation; default (0) keeps GTA V stable.
 		static int rage_disable = -1;
 		if (rage_disable < 0) {
 			const char* env = getenv("GTAV_RAGE_DISABLE");
 			rage_disable = (env != nullptr && env[0] == '1') ? 1 : 0;
 			if (rage_disable != 0) {
-				LOGF("Cycle 0141bx: GTAV_RAGE_DISABLE=1 -> cycle 0141ar DISABLED for this run\n");
+				LOGF("Cycle 0141bx: GTAV_RAGE_DISABLE=1 -> cycle 0141ar DISABLED, cycle 0141by wider NOP ACTIVE\n");
 			}
 		}
 		if (rage_disable == 0) {
+			// Default: cycle 0141ar narrow NOP+ret
 			const uint64_t rage_entry_file_off = 0x28b0950ULL;
 			if (rage_entry_file_off + 15 <= size) {
 				auto* rage_ptr = reinterpret_cast<uint8_t*>(address) + rage_entry_file_off;
@@ -1651,10 +1654,25 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 					     reinterpret_cast<uint64_t>(rage_ptr));
 				}
 			}
+		} else {
+			// Cycle 0141by: Wider NOP when GTAV_RAGE_DISABLE=1.
+			// NOP the first 1024 bytes of the RAGE Main Thread entry function so
+			// GTA V's RIP jumps past the NULL vtable AV cluster in <16 iterations.
+			// GTA V's RAGE Main Thread returns naturally after the NOPs.
+			constexpr uint64_t rage_entry_wide_start = 0x28b0950ULL;
+			constexpr uint64_t rage_entry_wide_end   = 0x28b0d50ULL;  // 1024 bytes
+			if (rage_entry_wide_end <= size) {
+				auto* wide_ptr = reinterpret_cast<uint8_t*>(address) + rage_entry_wide_start;
+				memset(wide_ptr, 0x90, rage_entry_wide_end - rage_entry_wide_start);
+				wide_ptr[rage_entry_wide_end - rage_entry_wide_start] = 0xc3;  // ret at end
+				LOGF("Cycle 0141by: Wide NOP RAGE Main Thread entry 0x%" PRIx64 "-0x%" PRIx64 " (%llu NOPs + ret)\n",
+				     rage_entry_wide_start, rage_entry_wide_end,
+				     static_cast<unsigned long long>(rage_entry_wide_end - rage_entry_wide_start));
+			}
 		}
 	}
 
-	// Cycle 0141aw: NOP GTA V's RAGE setup function entry at 0x902813560 with ret.
+// Cycle 0141aw: NOP GTA V's RAGE setup function entry at 0x902813560 with ret.
 	// The function at vaddr 0x902813560 (file_off 0x2813560) is the RAGE setup function
 	// that has multiple AVs due to NULL vtable. Patching the entry with ret makes the
 	// function return immediately when called from any of its 3 callers:
