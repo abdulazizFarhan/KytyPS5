@@ -1727,6 +1727,45 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 			}
 		}
 	}
+	// Cycle 0141cd: DEBUG - dump GTA V's main entry function bytes (decrypted)
+	// This is a diagnostic cycle that logs the actual decrypted bytes at GTA V's main
+	// entry address so we can understand what GTA V's main does. No patches applied.
+	{
+		// GTA V main entry (vaddr 0x90294850, file_off 0x294850)
+		const uint64_t main_entry_off = 0x294850ULL;
+		if (main_entry_off + 128 <= size) {
+			auto* ptr = reinterpret_cast<uint8_t*>(address) + main_entry_off;
+			LOGF("[cycle 0141cd] GTA V main entry bytes at 0x%" PRIx64 ":\n", reinterpret_cast<uint64_t>(ptr));
+			for (uint32_t i = 0; i < 128; i += 16) {
+				LOGF("  %03x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+			     i, ptr[i+0], ptr[i+1], ptr[i+2], ptr[i+3], ptr[i+4], ptr[i+5], ptr[i+6], ptr[i+7],
+			     ptr[i+8], ptr[i+9], ptr[i+10], ptr[i+11], ptr[i+12], ptr[i+13], ptr[i+14], ptr[i+15]);
+			}
+		}
+		// GTA V main body start (vaddr 0x90293a15, file_off 0x293a15)
+		const uint64_t main_body_off = 0x293a15ULL;
+		if (main_body_off + 128 <= size) {
+			auto* ptr2 = reinterpret_cast<uint8_t*>(address) + main_body_off;
+			LOGF("[cycle 0141cd] GTA V main body bytes at 0x%" PRIx64 ":\n", reinterpret_cast<uint64_t>(ptr2));
+			for (uint32_t i = 0; i < 128; i += 16) {
+				LOGF("  %03x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+			     i, ptr2[i+0], ptr2[i+1], ptr2[i+2], ptr2[i+3], ptr2[i+4], ptr2[i+5], ptr2[i+6], ptr2[i+7],
+			     ptr2[i+8], ptr2[i+9], ptr2[i+10], ptr2[i+11], ptr2[i+12], ptr2[i+13], ptr2[i+14], ptr2[i+15]);
+			}
+		}
+		// GTA V main return (vaddr 0x9029e346, file_off 0x29e346)
+		const uint64_t main_ret_off = 0x29e346ULL;
+		if (main_ret_off + 16 <= size) {
+			auto* ptr3 = reinterpret_cast<uint8_t*>(address) + main_ret_off;
+			LOGF("[cycle 0141cd] GTA V main return bytes at 0x%" PRIx64 ":\n", reinterpret_cast<uint64_t>(ptr3));
+			for (uint32_t i = 0; i < 16; i += 16) {
+				LOGF("  %03x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+			     i, ptr3[i+0], ptr3[i+1], ptr3[i+2], ptr3[i+3], ptr3[i+4], ptr3[i+5], ptr3[i+6], ptr3[i+7],
+			     ptr3[i+8], ptr3[i+9], ptr3[i+10], ptr3[i+11], ptr3[i+12], ptr3[i+13], ptr3[i+14], ptr3[i+15]);
+			}
+		}
+	}
+
 
 	// Cycle 0141av: NOP GTA V's RAGE setup virtual call at 0x902813b29.
 	// Root cause: GTA V's RAGE setup function at 0x902813b1a does:
