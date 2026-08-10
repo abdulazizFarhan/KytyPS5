@@ -1793,6 +1793,23 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 		}
 	}
 
+	// Cycle 0141cf: DEBUG - dump GTA V's main return area to find actual ret instruction
+	// Looks for the real ret instruction in GTA V's main function around the cycle 0139 reference.
+	{
+		// GTA V main return area (cycle 0139 reference 0x9029e346, file_off 0x29e346)
+		const uint64_t main_ret_off = 0x29e300ULL;
+		if (main_ret_off + 256 <= size) {
+			auto* ptr = reinterpret_cast<uint8_t*>(address) + main_ret_off;
+			LOGF("[cycle 0141cf] GTA V main return area bytes at 0x%" PRIx64 ":\n", reinterpret_cast<uint64_t>(ptr));
+			for (uint32_t i = 0; i < 256; i += 16) {
+				LOGF("  %03x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+			     i, ptr[i+0], ptr[i+1], ptr[i+2], ptr[i+3], ptr[i+4], ptr[i+5], ptr[i+6], ptr[i+7],
+			     ptr[i+8], ptr[i+9], ptr[i+10], ptr[i+11], ptr[i+12], ptr[i+13], ptr[i+14], ptr[i+15]);
+			}
+		}
+	}
+
+
 
 
 	// Cycle 0141av: NOP GTA V's RAGE setup virtual call at 0x902813b29.
