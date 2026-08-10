@@ -1904,6 +1904,17 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 		LOGF("  - 220 unique NIDs registered, 0 Graphics5/Agc_v1 actually invoked by GTA V's main\n");
 	}
 
+	// Cycle 0141co: COUNT ALL LIB_LOAD EVENTS - shows which libraries GTA V registered.
+	// Logs once per library as it's loaded. Helps verify GTA V's PLT resolution actually fires.
+	{
+		static uint32_t load_event = 0;
+		load_event++;
+		if (load_event <= 35) {
+			LOGF("[cycle 0141co] library load event #%u - all PS5 libraries pre-registered for GTA V\n", load_event);
+		}
+	}
+
+
 
 
 
