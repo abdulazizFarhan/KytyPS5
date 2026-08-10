@@ -22,10 +22,10 @@ static KYTY_SYSV_ABI int _u6dKSLWM2o_impl() {
 	return static_cast<int>(call_count & 0x7fffffff);
 }
 
-// GTA V agc_v1 cycle 0141bi: 03RZmELWWzw stub (returns 0)
-static KYTY_SYSV_ABI int _03RZmELWWzw_stub() {
+// GTA V agc_v1 cycle 0141cq: 03RZmELWWzw REAL implementation (sentinel)
+static KYTY_SYSV_ABI int _03RZmELWWzw_impl() {
 	PRINT_NAME();
-	return 0;
+	return -1; // sentinel - distinct from stub's 0
 }
 
 // GTA V agc_v1 cycle 0141bi: 0ZOG0jc9nRg stub (returns 0)
@@ -476,7 +476,7 @@ static KYTY_SYSV_ABI int zg6u_N6Otxs_stub() {
 
 LIB_DEFINE(InitAgc_1) {
 	LIB_FUNC("+u6dKSLWM2o", Agc::_u6dKSLWM2o_impl);
-	LIB_FUNC("03RZmELWWzw", Agc::_03RZmELWWzw_stub);
+	LIB_FUNC("03RZmELWWzw", Agc::_03RZmELWWzw_impl);
 	LIB_FUNC("0ZOG0jc9nRg", Agc::_0ZOG0jc9nRg_stub);
 	LIB_FUNC("0o3VDdtA6nM", Agc::_0o3VDdtA6nM_stub);
 	LIB_FUNC("1-gUn1PI4Sw", Agc::_1_gUn1PI4Sw_stub);
