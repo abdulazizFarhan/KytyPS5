@@ -2406,7 +2406,50 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 				}
 			}
 		}
+	}// Cycle 0141ey: Scan PLT range (0x903075300-0x903077100) to count entries
+	// whose GOT lookup is PAST segment 0. PLT entry size = 16 bytes.
+	// Range = 7680 bytes / 16 = 480 entries
+	{
+		static bool dumped = false;
+		if (!dumped) {
+			dumped = true;
+			std::string program_name = Common::PathToString(program->file_name);
+			if (program_name.find("eboot.bin") != std::string::npos) {
+				const uint64_t plt_start = 0x3075300ULL;
+				const uint64_t plt_end = 0x3077100ULL;
+				if (plt_end <= size) {
+					auto* ptr = reinterpret_cast<uint8_t*>(address);
+					int total = 0;
+					int past_seg = 0;
+					int has_jmp = 0;
+					int other_pattern = 0;
+					for (uint64_t off = plt_start; off < plt_end; off += 16) {
+						total++;
+						// Check for jmp [rip+offset] pattern (ff 25)
+						if (ptr[off] == 0xff && ptr[off+1] == 0x25) {
+							has_jmp++;
+							uint32_t rip_off = (uint32_t)ptr[off+2] | ((uint32_t)ptr[off+3] << 8) | ((uint32_t)ptr[off+4] << 16) | ((uint32_t)ptr[off+5] << 24);
+							uint64_t got_off = off + 6 + (int32_t)rip_off;
+							if (got_off + 8 > size) {
+								past_seg++;
+							}
+						} else {
+							other_pattern++;
+						}
+					}
+					LOGF("Cycle 0141ey: PLT range 0x3075300-0x3077100 (%d entries total):\n", total);
+					LOGF("Cycle 0141ey:   Has jmp [rip+xxx] pattern: %d\n", has_jmp);
+					LOGF("Cycle 0141ey:   Other pattern: %d\n", other_pattern);
+					LOGF("Cycle 0141ey:   Of jmp entries, GOT past segment 0: %d (%.1f%%)\n",
+					     past_seg, 100.0f * past_seg / (has_jmp > 0 ? has_jmp : 1));
+				}
+			}
+		}
 	}
+
+	
+
+	
 
 	
 
