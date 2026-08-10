@@ -1819,7 +1819,45 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 				}
 			}
 		}
+	}// Cycle 0141dq: Dump GTA V launcher_init function (file_off 0x10)
+	// launcher_init at vaddr 0x900000010 walks a function pointer array.
+	// Show the code so we can understand the iteration pattern.
+	{
+		static bool dumped = false;
+		if (!dumped) {
+			dumped = true;
+			const uint64_t launcher_init_off = 0x10ULL;
+			if (launcher_init_off + 64 <= size) {
+				auto* ptr = reinterpret_cast<uint8_t*>(address) + launcher_init_off;
+				LOGF("Cycle 0141dq: GTA V launcher_init bytes at file_off 0x%" PRIx64 " (vaddr 0x%" PRIx64 "):\n", launcher_init_off, launcher_init_off + 0x900000000ULL);
+				for (uint32_t j = 0; j < 64; j += 16) {
+					LOGF("  %03x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+					     j, ptr[j+0], ptr[j+1], ptr[j+2], ptr[j+3], ptr[j+4], ptr[j+5], ptr[j+6], ptr[j+7],
+					     ptr[j+8], ptr[j+9], ptr[j+10], ptr[j+11], ptr[j+12], ptr[j+13], ptr[j+14], ptr[j+15]);
+				}
+			}
+		}
+	}// Cycle 0141dr: Dump GTA V launcher_init bytes past file_off 0x45 (the patched area)
+	// The patch (cycle 0141ax) replaces bytes 0x45-0x65 with NOPs.
+	// Show what was in that area.
+	{
+		static bool dumped = false;
+		if (!dumped) {
+			dumped = true;
+			const uint64_t launcher_init_off = 0x40ULL;
+			if (launcher_init_off + 64 <= size) {
+				auto* ptr = reinterpret_cast<uint8_t*>(address) + launcher_init_off;
+				LOGF("Cycle 0141dr: GTA V launcher_init bytes at file_off 0x%" PRIx64 " (patch area 0x45-0x65):\n", launcher_init_off);
+				for (uint32_t j = 0; j < 64; j += 16) {
+					LOGF("  %03x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+					     j, ptr[j+0], ptr[j+1], ptr[j+2], ptr[j+3], ptr[j+4], ptr[j+5], ptr[j+6], ptr[j+7],
+					     ptr[j+8], ptr[j+9], ptr[j+10], ptr[j+11], ptr[j+12], ptr[j+13], ptr[j+14], ptr[j+15]);
+				}
+			}
+		}
 	}
+
+
 
 
 
