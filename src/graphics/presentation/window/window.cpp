@@ -246,7 +246,7 @@ WindowContext* g_window_ctx = nullptr;
 
 constexpr const char* KYTY_SDL_WINDOW_CAPTION = "Game";
 constexpr uint32_t    KYTY_SDL_WINDOW_FLAGS =
-    (static_cast<uint32_t>(SDL_WINDOW_HIDDEN) | static_cast<uint32_t>(SDL_WINDOW_VULKAN));
+    (static_cast<uint32_t>(SDL_WINDOW_VULKAN));
 constexpr int KYTY_SDL_WINDOWPOS_CENTERED = SDL_WINDOWPOS_CENTERED; /*NOLINT(hicpp-signed-bitwise)*/
 
 static void CalcFrameTime(WindowGame* game, double game_time_s) {
