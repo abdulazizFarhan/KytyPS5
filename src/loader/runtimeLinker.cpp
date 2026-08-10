@@ -1592,31 +1592,19 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 		(void)size;
 		LOGF("Patch GTA V main->init call: 0 sites (DISABLED - letting init() run)\n");
 	}
-	// // // // Cycle 0141da: GTA V binary mapping exploration (decryption analysis)
-	// Goal: understand how raw file offsets map to decrypted memory offsets.
-	// The previous cycles found that the binary at file_off 0x28c8cd0 (init() in raw file)
-	// shows different bytes in decrypted memory. This cycle dumps both to investigate.
+	// // // // // // // Cycle 0141db: GTA V launcher code area dump (find actual code)
+	// Dump bytes 0-0x200 to identify where the actual launcher code is
+	// (vs data tables at file_off 0x70-0xb8).
 	{
-		// Dump bytes at file_off 0x28c8cd0 (init() function start in raw file)
-		const uint64_t init_file_off = 0x28c8cd0ULL;
-		if (init_file_off + 32 <= size) {
-			auto* ptr = reinterpret_cast<uint8_t*>(address) + init_file_off;
-			LOGF("Cycle 0141da: bytes at file_off 0x%" PRIx64 " (init() in raw file, decrypted in memory):\n", init_file_off);
-			for (uint32_t j = 0; j < 32; j += 16) {
+		const uint64_t launcher_start = 0x0ULL;
+		const uint64_t launcher_size = 0x100ULL;
+		if (launcher_start + launcher_size <= size) {
+			auto* ptr = reinterpret_cast<uint8_t*>(address) + launcher_start;
+			LOGF("Cycle 0141db: GTA V binary start area file_off 0x0-0x%" PRIx64 " (decrypted):\n", launcher_size);
+			for (uint32_t j = 0; j < launcher_size; j += 16) {
 				LOGF("  %03x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
 				     j, ptr[j+0], ptr[j+1], ptr[j+2], ptr[j+3], ptr[j+4], ptr[j+5], ptr[j+6], ptr[j+7],
 				     ptr[j+8], ptr[j+9], ptr[j+10], ptr[j+11], ptr[j+12], ptr[j+13], ptr[j+14], ptr[j+15]);
-			}
-		}
-		// Dump bytes at file_off 0x294897 (init() call site in raw file)
-		const uint64_t call_site_off = 0x294897ULL;
-		if (call_site_off + 32 <= size) {
-			auto* ptr2 = reinterpret_cast<uint8_t*>(address) + call_site_off;
-			LOGF("Cycle 0141da: bytes at file_off 0x%" PRIx64 " (init() call site in raw file, decrypted in memory):\n", call_site_off);
-			for (uint32_t j = 0; j < 32; j += 16) {
-				LOGF("  %03x: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
-				     j, ptr2[j+0], ptr2[j+1], ptr2[j+2], ptr2[j+3], ptr2[j+4], ptr2[j+5], ptr2[j+6], ptr2[j+7],
-				     ptr2[j+8], ptr2[j+9], ptr2[j+10], ptr2[j+11], ptr2[j+12], ptr2[j+13], ptr2[j+14], ptr2[j+15]);
 			}
 		}
 	}
