@@ -10,10 +10,16 @@ LIB_VERSION("Agc", 1, "Agc", 1, 1);
 
 namespace Agc {
 
-// GTA V agc_v1 cycle 0141bi: +u6dKSLWM2o stub (returns 0)
-static KYTY_SYSV_ABI int _u6dKSLWM2o_stub() {
+// GTA V agc_v1 cycle 0141cp: +u6dKSLWM2o REAL implementation (returns invocation count)
+// First Agc_v1 function moved from stub to real implementation. Tracks how many times called.
+static KYTY_SYSV_ABI int _u6dKSLWM2o_impl() {
 	PRINT_NAME();
-	return 0;
+	static uint64_t call_count = 0;
+	call_count++;
+	if ((call_count & 0xFFF) == 1) {
+		LOGF("[cycle 0141cp] _u6dKSLWM2o_invoked_count=%" PRIu64 "\n", call_count);
+	}
+	return static_cast<int>(call_count & 0x7fffffff);
 }
 
 // GTA V agc_v1 cycle 0141bi: 03RZmELWWzw stub (returns 0)
@@ -469,7 +475,7 @@ static KYTY_SYSV_ABI int zg6u_N6Otxs_stub() {
 } // namespace Agc
 
 LIB_DEFINE(InitAgc_1) {
-	LIB_FUNC("+u6dKSLWM2o", Agc::_u6dKSLWM2o_stub);
+	LIB_FUNC("+u6dKSLWM2o", Agc::_u6dKSLWM2o_impl);
 	LIB_FUNC("03RZmELWWzw", Agc::_03RZmELWWzw_stub);
 	LIB_FUNC("0ZOG0jc9nRg", Agc::_0ZOG0jc9nRg_stub);
 	LIB_FUNC("0o3VDdtA6nM", Agc::_0o3VDdtA6nM_stub);
