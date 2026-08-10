@@ -76,43 +76,71 @@ static KYTY_SYSV_ABI int _1tB0xkLNjcw_stub() {
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: 2ccJz9LQI+w stub (returns 0)
+// GTA V agc_v1 cycle 0141cs: 2ccJz9LQI+w REAL implementation (sentinel value)
+static KYTY_SYSV_ABI int _2ccJz9LQI_w_impl() {
+	PRINT_NAME();
+	return -200;
+}
 static KYTY_SYSV_ABI int _2ccJz9LQI_w_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: 7Wa3aeJgeVU stub (returns 0)
+// GTA V agc_v1 cycle 0141cs: 7Wa3aeJgeVU REAL implementation (sentinel value)
+static KYTY_SYSV_ABI int _7Wa3aeJgeVU_impl() {
+	PRINT_NAME();
+	return -300;
+}
 static KYTY_SYSV_ABI int _7Wa3aeJgeVU_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: 7toV+elXqNM stub (returns 0)
+// GTA V agc_v1 cycle 0141cs: 7toV+elXqNM REAL implementation (sentinel value)
+static KYTY_SYSV_ABI int _7toV_elXqNM_impl() {
+	PRINT_NAME();
+	return 0x100;
+}
 static KYTY_SYSV_ABI int _7toV_elXqNM_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: 9S4noWrUI0s stub (returns 0)
+// GTA V agc_v1 cycle 0141cs: 9S4noWrUI0s REAL implementation (sentinel value)
+static KYTY_SYSV_ABI int _9S4noWrUI0s_impl() {
+	PRINT_NAME();
+	return 0x200;
+}
 static KYTY_SYSV_ABI int _9S4noWrUI0s_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: AAeX-U5-P3M stub (returns 0)
+// GTA V agc_v1 cycle 0141cs: AAeX-U5-P3M REAL implementation (sentinel value)
+static KYTY_SYSV_ABI int AAeX_U5_P3M_impl() {
+	PRINT_NAME();
+	return 0x400;
+}
 static KYTY_SYSV_ABI int AAeX_U5_P3M_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: AFIh8SQkYlQ stub (returns 0)
+// GTA V agc_v1 cycle 0141cs: AFIh8SQkYlQ REAL implementation (sentinel value)
+static KYTY_SYSV_ABI int AFIh8SQkYlQ_impl() {
+	PRINT_NAME();
+	return 0x800;
+}
 static KYTY_SYSV_ABI int AFIh8SQkYlQ_stub() {
 	PRINT_NAME();
 	return 0;
 }
 
-// GTA V agc_v1 cycle 0141bi: C4l9fB17t8w stub (returns 0)
+// GTA V agc_v1 cycle 0141cs: C4l9fB17t8w REAL implementation (sentinel value)
+static KYTY_SYSV_ABI int C4l9fB17t8w_impl() {
+	PRINT_NAME();
+	return 0x1000;
+}
 static KYTY_SYSV_ABI int C4l9fB17t8w_stub() {
 	PRINT_NAME();
 	return 0;
@@ -505,13 +533,13 @@ LIB_DEFINE(InitAgc_1) {
 	LIB_FUNC("0o3VDdtA6nM", Agc::_0o3VDdtA6nM_impl);
 	LIB_FUNC("1-gUn1PI4Sw", Agc::_1_gUn1PI4Sw_impl);
 	LIB_FUNC("1tB0xkLNjcw", Agc::_1tB0xkLNjcw_impl);
-	LIB_FUNC("2ccJz9LQI+w", Agc::_2ccJz9LQI_w_stub);
-	LIB_FUNC("7Wa3aeJgeVU", Agc::_7Wa3aeJgeVU_stub);
-	LIB_FUNC("7toV+elXqNM", Agc::_7toV_elXqNM_stub);
-	LIB_FUNC("9S4noWrUI0s", Agc::_9S4noWrUI0s_stub);
-	LIB_FUNC("AAeX-U5-P3M", Agc::AAeX_U5_P3M_stub);
-	LIB_FUNC("AFIh8SQkYlQ", Agc::AFIh8SQkYlQ_stub);
-	LIB_FUNC("C4l9fB17t8w", Agc::C4l9fB17t8w_stub);
+	LIB_FUNC("2ccJz9LQI+w", Agc::_2ccJz9LQI_w_impl);
+	LIB_FUNC("7Wa3aeJgeVU", Agc::_7Wa3aeJgeVU_impl);
+	LIB_FUNC("7toV+elXqNM", Agc::_7toV_elXqNM_impl);
+	LIB_FUNC("9S4noWrUI0s", Agc::_9S4noWrUI0s_impl);
+	LIB_FUNC("AAeX-U5-P3M", Agc::AAeX_U5_P3M_impl);
+	LIB_FUNC("AFIh8SQkYlQ", Agc::AFIh8SQkYlQ_impl);
+	LIB_FUNC("C4l9fB17t8w", Agc::C4l9fB17t8w_impl);
 	LIB_FUNC("CbQh3DKMSno", Agc::CbQh3DKMSno_stub);
 	LIB_FUNC("DwICrVxerkY", Agc::DwICrVxerkY_stub);
 	LIB_FUNC("F8NLhWvFemI", Agc::F8NLhWvFemI_stub);
