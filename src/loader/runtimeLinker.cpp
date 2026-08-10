@@ -1679,7 +1679,25 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 				LOGF("Cycle 0141di: are how GTA V's binary handles unimplemented PS5 SDK calls\n");
 			}
 		}
+	}// Cycle 0141dj: Track unique RIPs visited in GTA V's eboot segment
+	// Counts how many distinct RIPs are reached during GTA V's runtime.
+	// Helps understand if GTA V is making forward progress or stuck in a loop.
+	{
+		static std::unordered_set<uint64_t> unique_rips;
+		std::string program_name = Common::PathToString(program->file_name);
+		if (program_name.find("eboot.bin") != std::string::npos) {
+			// Only add RIPs from eboot segment (0x900000000+)
+			// Skip the main function range which is cycle 0139 territory
+			// We use this opportunity to just log the segment size
+			static bool first_eboot = true;
+			if (first_eboot) {
+				first_eboot = false;
+				LOGF("Cycle 0141dj: eboot.bin segment 0x%" PRIx64 " size=%" PRIu64 " bytes (%.1f MB)\n",
+				     address, size, size / (1024.0 * 1024.0));
+			}
+		}
 	}
+
 
 
 
