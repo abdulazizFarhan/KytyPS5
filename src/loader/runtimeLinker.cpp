@@ -2624,7 +2624,7 @@ static void PatchProgram(Program* program, uint64_t address, uint64_t size) {
 			rage_enable = (env != nullptr && env[0] == '0') ? 0 : 1;  // Cycle 0141ff: DEFAULT = 1 (window shown!)
 			if (rage_enable != 0) {
 				LOGF("Cycle 0141dc: GTAV_RAGE_ENABLE=1 -> cycles 0141ar+0141by DISABLED, RAGE will ACTUALLY RUN\n");
-				LOGF("Cycle 0141dd: GTAV_RAGE_ENABLE=1 -> extended RAGE NOP range 0x2813b1a-0x2814500 (2520 NOPs total)\n");
+				LOGF("Cycle 0141dd: GTAV_RAGE_ENABLE=1 -> extended RAGE NOP range 0x2813b1a-0x281622a (10000 NOPs total)\n");
 			}
 		}
 		if (rage_enable == 1) {
