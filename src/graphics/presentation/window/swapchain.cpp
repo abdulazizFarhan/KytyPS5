@@ -421,6 +421,8 @@ PreparedFrame* WindowPrepareBlankFrame(CommandBuffer* buffer, uint32_t width, ui
 	ConfigurePreparedFrame(frame, {width, height}, format);
 	// Cycle 0141ib: Allow override of clear color via GTAV_TEST_CLEAR env var
 	// Format: "r,g,b" with values 0.0-1.0 (e.g., GTAV_TEST_CLEAR=1.0,0.0,0.0 for red)
+	// Cycle 0141ih: Optional time-based color cycling via GTAV_COLOR_CYCLE=1
+	//   Cycles through RED, GREEN, BLUE, WHITE, YELLOW, MAGENTA, CYAN, BLACK (1s each)
 	VkClearColorValue clear {{0.0f, 0.0f, 0.0f, opaque ? 1.0f : 0.0f}};
 	static bool logged = false;
 	const char* env = std::getenv("GTAV_TEST_CLEAR");
@@ -432,7 +434,31 @@ PreparedFrame* WindowPrepareBlankFrame(CommandBuffer* buffer, uint32_t width, ui
 			LOGF("[0141ib] Using GTAV_TEST_CLEAR color: %f,%f,%f\n", r, g, b);
 			logged = true;
 		}
-	}
+	} else {
+		const char* cycle_env = std::getenv("GTAV_COLOR_CYCLE");
+		if (cycle_env != nullptr && cycle_env[0] != '0' && cycle_env[0] != 0) {
+			static const float cycle_colors[][3] = {
+				{1.0f, 0.0f, 0.0f}, // RED
+				{0.0f, 1.0f, 0.0f}, // GREEN
+				{0.0f, 0.0f, 1.0f}, // BLUE
+				{1.0f, 1.0f, 1.0f}, // WHITE
+				{1.0f, 1.0f, 0.0f}, // YELLOW
+				{1.0f, 0.0f, 1.0f}, // MAGENTA
+				{0.0f, 1.0f, 1.0f}, // CYAN
+				{0.0f, 0.0f, 0.0f}, // BLACK
+			};
+			constexpr int kColorCount = sizeof(cycle_colors) / sizeof(cycle_colors[0]);
+			constexpr int kCycleTimeMs = 1000;
+				auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+					std::chrono::steady_clock::now().time_since_epoch()).count();
+				int idx = static_cast<int>((now_ms / kCycleTimeMs) % kColorCount);
+				clear = {{cycle_colors[idx][0], cycle_colors[idx][1], cycle_colors[idx][2], opaque ? 1.0f : 0.0f}};
+				if (!logged) {
+					LOGF("[0141ih] GTAV_COLOR_CYCLE active (8 colors, 1s each)\n");
+					logged = true;
+				}
+			}
+		}
 	UtilClearColorImage(buffer, &frame->image, clear);
 	return frame;
 }
