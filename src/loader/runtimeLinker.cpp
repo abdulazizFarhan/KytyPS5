@@ -1003,18 +1003,25 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 				// Cycle 0141hx: Terminate RAGE thread to unblock GTA V's PthreadJoin
 				// EXPERIMENT 0141hy: Don't call std::quick_exit - let GTA V continue
 				// Cycle 0141ie: Allow override of watchdog time via GTAV_WATCHDOG_MS env var
+				// Cycle 0141if: Allow disabling RAGE termination via GTAV_NO_RAGE_TERMINATE env var
 				int watchdog_ms = 500;
 				const char* wd_env = std::getenv("GTAV_WATCHDOG_MS");
 				if (wd_env != nullptr && wd_env[0] != 0) {
 					watchdog_ms = atoi(wd_env);
 					LOGF("[0141ie] Using GTAV_WATCHDOG_MS=%d\n", watchdog_ms);
 				}
+				const char* no_term_env = std::getenv("GTAV_NO_RAGE_TERMINATE");
+				const bool no_terminate = no_term_env != nullptr && no_term_env[0] != '0' && no_term_env[0] != 0;
+			if (no_terminate) {
+					LOGF("[0141if] GTAV_NO_RAGE_TERMINATE active - watchdog will NOT terminate RAGE\n");
+				} else {
 				std::thread([nopped_count = hd_nopped.size(), watchdog_ms]() {
 					std::this_thread::sleep_for(std::chrono::milliseconds(watchdog_ms));
 					int terminated = Libs::LibKernel::PthreadTerminateByName("RAGE");
 					LOGF("[0141ho] Watchdog: %dms elapsed, terminating RAGE (%d thread(s)), NOT exiting (0141hd pages=%zu)\n", watchdog_ms, terminated, nopped_count);
 					// std::quick_exit(0); -- disabled for 0141hy experiment
 				}).detach();
+				}
 				LOGF("[0141ho] Watchdog thread started, will terminate RAGE in %dms\n", watchdog_ms);
 			}
 		}
