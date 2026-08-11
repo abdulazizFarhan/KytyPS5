@@ -361,12 +361,31 @@ void GameShowWindow(WindowGame* game, const Common::Timer& timer) {
 			if (count == 1 || count % 100 == 0) {
 				LOGF("[0141hs] GameShowWindow iteration #%" PRIu64 "\n", count);
 			}
+			// Cycle 0141ia: Test render path - open VideoOut and submit BLANK flip
+			static std::atomic<int> test_video_handle {-1};
+			if (test_video_handle.load() < 0 && count == 1) {
+				LOGF("[0141ia] Opening VideoOut handle for test render\n");
+				int h = VideoOut::VideoOutOpen(255, 0, 0, nullptr);
+				LOGF("[0141ia] VideoOutOpen returned %d\n", h);
+				test_video_handle.store(h);
+			}
+			int h = test_video_handle.load();
+			if (h >= 0) {
+				// Submit a BLANK flip with valid mode (VSYNC=1)
+				int flip_ret = VideoOut::VideoOutSubmitFlip(h, -1, 1, 0);
+				if (count == 1) {
+					LOGF("[0141ia] VideoOutSubmitFlip(BLANK, mode=VSYNC) returned %d\n", flip_ret);
+				}
+			}
 			VideoOut::VideoOutBeginVblank();
 			bool flip_ok = VideoOut::VideoOutFlipWindow(0);
 			if (flip_ok) {
 				CalcFrameTime(game, timer.GetTimeS());
 				if (count % 100 == 0) {
 					LOGF("[0141hs] Flip returned true at iteration #%" PRIu64 "\n", count);
+				}
+				if (count == 1) {
+					LOGF("[0141ia] First flip succeeded!\n");
 				}
 			}
 			VideoOut::VideoOutEndVblank();
