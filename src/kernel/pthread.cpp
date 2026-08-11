@@ -760,6 +760,13 @@ static void FreeGuestStack(PthreadAttr attr) {
 }
 
 static KYTY_SYSV_ABI void* RunOnGuestStack(void* arg, pthread_entry_func_t func, void* stack_top) {
+	// Cycle 0141hu: Log entry of pthread runner (one-shot for RAGE)
+	static std::atomic<bool> hu_entry_logged {false};
+	if (g_pthread_self != nullptr && g_pthread_self->name.find("RAGE") != std::string::npos) {
+		if (!hu_entry_logged.exchange(true)) {
+			LOGF("[0141hu] RunOnGuestStack ENTRY for RAGE, func=0x%016" PRIx64 "\n", reinterpret_cast<uint64_t>(func));
+		}
+	}
 #if defined(__x86_64__) || defined(_M_X64)
 	void*      ret       = nullptr;
 	const auto aligned_stack_top =
@@ -833,6 +840,14 @@ static KYTY_SYSV_ABI void* RunOnGuestStack(void* arg, pthread_entry_func_t func,
 	             : "cc", "memory", "rcx", "rdx", "r8", "r9", "r10", "r11", "xmm0", "xmm1", "xmm2",
 	               "xmm3", "xmm4", "xmm5", "xmm6", "xmm7", "xmm8", "xmm9", "xmm10", "xmm11",
 	               "xmm12", "xmm13", "xmm14", "xmm15");
+
+	// Cycle 0141hu: Log when RAGE thread returns cleanly (one-shot)
+	if (g_pthread_self != nullptr && g_pthread_self->name.find("RAGE") != std::string::npos) {
+		static std::atomic<bool> hu_exit_logged {false};
+		if (!hu_exit_logged.exchange(true)) {
+			LOGF("[0141hu] RAGE pthread returned cleanly, ret=0x%016" PRIx64 "\n", reinterpret_cast<uint64_t>(ret));
+		}
+	}
 
 	g_guest_entry_return_rsp = 0;
 	if (g_pthread_self != nullptr) {
