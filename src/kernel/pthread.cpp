@@ -797,6 +797,16 @@ static KYTY_SYSV_ABI void* RunOnGuestStack(void* arg, pthread_entry_func_t func,
 				if (p[0] == 0x55 && p[1] == 0x48 && p[2] == 0x89 && p[3] == 0xe5) {
 					LOGF("[0141in] RAGE function entry at 0x%016" PRIx64 " (offset %" PRId64 ")\n",
 					     reinterpret_cast<uint64_t>(p), off);
+					// Cycle 0141io: Dump first 32 bytes of both function entry and pthread entry
+					uint8_t func_bytes[32], entry_bytes[32];
+					memcpy(func_bytes, p, sizeof(func_bytes));
+					memcpy(entry_bytes, func, sizeof(entry_bytes));
+					LOGF("[0141io] RAGE function entry bytes:  ");
+					for (int j = 0; j < 32; j++) LOGF("%02x ", func_bytes[j]);
+					LOGF("\n");
+					LOGF("[0141io] RAGE pthread entry bytes:   ");
+					for (int j = 0; j < 32; j++) LOGF("%02x ", entry_bytes[j]);
+					LOGF("\n");
 					break;
 				}
 			}
