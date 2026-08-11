@@ -459,6 +459,24 @@ PreparedFrame* WindowPrepareBlankFrame(CommandBuffer* buffer, uint32_t width, ui
 				}
 			}
 		}
+		// Cycle 0141ik: Optional animated gradient via GTAV_GRADIENT=1
+		//   Smooth color cycling using sin/cos for continuous transitions
+		const char* grad_env = std::getenv("GTAV_GRADIENT");
+		if (grad_env != nullptr && grad_env[0] != '0' && grad_env[0] != 0) {
+			static auto start_time = std::chrono::steady_clock::now();
+			auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+				std::chrono::steady_clock::now() - start_time).count();
+			double t = elapsed_ms / 1000.0;
+			// Smooth RGB cycling using sin/cos with phase offsets
+			float r = static_cast<float>(0.5f + 0.5f * std::sin(t * 0.7f));
+			float g = static_cast<float>(0.5f + 0.5f * std::sin(t * 0.7f + 2.094f));  // 2*pi/3
+			float b = static_cast<float>(0.5f + 0.5f * std::sin(t * 0.7f + 4.188f));  // 4*pi/3
+			clear = {{r, g, b, opaque ? 1.0f : 0.0f}};
+			if (!logged) {
+				LOGF("[0141ik] GTAV_GRADIENT active (smooth RGB cycling)\n");
+				logged = true;
+			}
+		}
 	UtilClearColorImage(buffer, &frame->image, clear);
 	return frame;
 }
