@@ -75,6 +75,14 @@ const char** GetArgv() {
 static KYTY_SYSV_ABI void exit(int code) {
 	PRINT_NAME();
 
+	// Cycle 0141id: Allow override of exit() via GTAV_NO_EXIT env var
+	// Useful for visual inspection - keeps emulator alive after GTA V's main returns
+	const char* no_exit_env = std::getenv("GTAV_NO_EXIT");
+	if (no_exit_env != nullptr && no_exit_env[0] != '0' && no_exit_env[0] != 0) {
+		LOGF("[0141id] GTAV_NO_EXIT active - skipping exit(%d) call\n", code);
+		LOGF("[0141id] Emulator stays alive - close window to actually exit\n");
+		return;  // Don't actually exit, just return
+	}
 	::exit(code);
 }
 
