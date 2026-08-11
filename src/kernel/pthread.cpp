@@ -807,6 +807,17 @@ static KYTY_SYSV_ABI void* RunOnGuestStack(void* arg, pthread_entry_func_t func,
 					LOGF("[0141io] RAGE pthread entry bytes:   ");
 					for (int j = 0; j < 32; j++) LOGF("%02x ", entry_bytes[j]);
 					LOGF("\n");
+					// Cycle 0141iq: Dump bytes from RAGE pthread call targets
+					// pthread function calls 0x9030613e and 0x903bc5e6
+					// Note: 0x903bc5e6 may be in unmapped gap, handle with care
+					uint8_t target1_bytes[16];
+					// Actual call target = pthread_entry + 25 + rel32 = 0x903076150
+					uint8_t* target1 = reinterpret_cast<uint8_t*>(0x903076150ULL);
+					memcpy(target1_bytes, target1, sizeof(target1_bytes));
+					LOGF("[0141iq] Call target (0x903076150): ");
+					LOGF("[0141iq] Call target (0x903076150): ");
+					for (int j = 0; j < 16; j++) LOGF("%02x ", target1_bytes[j]);
+					LOGF("\n");
 					break;
 				}
 			}
