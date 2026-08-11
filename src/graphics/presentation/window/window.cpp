@@ -355,9 +355,19 @@ void GameShowWindow(WindowGame* game, const Common::Timer& timer) {
 			p->skip_frames--;
 			LOGF("skip frame %d\n", p->skip_frames);
 		} else {
+			// Cycle 0141hs: Log GameShowWindow iteration count and frame time
+			static std::atomic<uint64_t> show_window_count {0};
+			uint64_t count = show_window_count.fetch_add(1) + 1;
+			if (count == 1 || count % 100 == 0) {
+				LOGF("[0141hs] GameShowWindow iteration #%" PRIu64 "\n", count);
+			}
 			VideoOut::VideoOutBeginVblank();
-			if (VideoOut::VideoOutFlipWindow(0)) {
+			bool flip_ok = VideoOut::VideoOutFlipWindow(0);
+			if (flip_ok) {
 				CalcFrameTime(game, timer.GetTimeS());
+				if (count % 100 == 0) {
+					LOGF("[0141hs] Flip returned true at iteration #%" PRIu64 "\n", count);
+				}
 			}
 			VideoOut::VideoOutEndVblank();
 		}
