@@ -357,8 +357,10 @@ void GameShowWindow(WindowGame* game, const Common::Timer& timer) {
 		} else {
 			// Cycle 0141hs: Log GameShowWindow iteration count and frame time
 			// Cycle 0141ig: Track FPS over time (every 100 iterations)
+			// Cycle 0141ii: Runtime summary every 1000 iterations
 			static std::atomic<uint64_t> show_window_count {0};
 			static std::chrono::steady_clock::time_point last_fps_log = std::chrono::steady_clock::now();
+			static std::chrono::steady_clock::time_point start_time = std::chrono::steady_clock::now();
 			static uint64_t last_fps_count = 0;
 			uint64_t count = show_window_count.fetch_add(1) + 1;
 			if (count == 1 || count % 100 == 0) {
@@ -369,6 +371,12 @@ void GameShowWindow(WindowGame* game, const Common::Timer& timer) {
 				LOGF("[0141hs] GameShowWindow iteration #%" PRIu64 " (fps=%.1f, %lldms for last %" PRIu64 " frames)\n", count, fps, (long long)elapsed_ms, iters);
 				last_fps_log = now;
 				last_fps_count = count;
+			}
+			if (count > 0 && count % 1000 == 0) {
+				auto now = std::chrono::steady_clock::now();
+				auto total_runtime_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
+				double avg_fps = (total_runtime_ms > 0) ? (count * 1000.0 / total_runtime_ms) : 0.0;
+				LOGF("[0141ii] Runtime summary: %lldms elapsed, %" PRIu64 " frames rendered, avg FPS %.1f\n", (long long)total_runtime_ms, count, avg_fps);
 			}
 			// Cycle 0141ia: Test render path - open VideoOut and submit BLANK flip
 			static std::atomic<int> test_video_handle {-1};
