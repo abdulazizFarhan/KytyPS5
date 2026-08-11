@@ -814,7 +814,9 @@ static KYTY_SYSV_ABI void* RunOnGuestStack(void* arg, pthread_entry_func_t func,
 					// Actual call target = pthread_entry + 25 + rel32 = 0x903076150
 					uint8_t* target1 = reinterpret_cast<uint8_t*>(0x903076150ULL);
 					memcpy(target1_bytes, target1, sizeof(target1_bytes));
-					LOGF("[0141iq] Call target (0x903076150): ");
+					// Cycle 0141ir: Also dump the GOT entry at 0x90392a9f0
+					uint64_t got_value = *reinterpret_cast<uint64_t*>(0x90392a9f0ULL);
+					LOGF("[0141ir] GOT entry at 0x90392a9f0 = 0x%016" PRIx64 "\n", got_value);
 					LOGF("[0141iq] Call target (0x903076150): ");
 					for (int j = 0; j < 16; j++) LOGF("%02x ", target1_bytes[j]);
 					LOGF("\n");
