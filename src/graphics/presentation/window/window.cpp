@@ -553,7 +553,16 @@ void GameEventResize(WindowGame* game, uint32_t new_width, uint32_t new_height) 
 
 static void ProcessWindowEvent(WindowGame* game, SDL_WindowEvent window) {
 	switch (window.event) {
-		case SDL_WINDOWEVENT_SHOWN: LOGF("Window %" PRIu32 " shown\n", window.windowID); break;
+		case SDL_WINDOWEVENT_SHOWN:
+			LOGF("Window %" PRIu32 " shown\n", window.windowID);
+			// Cycle 0141hr: Log render state when window becomes visible
+			// This helps verify the Vulkan pipeline is initialized correctly
+			if (g_window_ctx != nullptr) {
+				LOGF("[0141hr] Window context: swapchain=%p width=%u height=%u\n",
+				     static_cast<void*>(g_window_ctx->swapchain), g_window_ctx->graphic_ctx.screen_width,
+				     g_window_ctx->graphic_ctx.screen_height);
+			}
+			break;
 
 		case SDL_WINDOWEVENT_HIDDEN: LOGF("Window %" PRIu32 " hidden\n", window.windowID); break;
 
