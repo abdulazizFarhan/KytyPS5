@@ -358,11 +358,32 @@ void GameShowWindow(WindowGame* game, const Common::Timer& timer) {
 			// Cycle 0141hs: Log GameShowWindow iteration count and frame time
 			// Cycle 0141ig: Track FPS over time (every 100 iterations)
 			// Cycle 0141ii: Runtime summary every 1000 iterations
+			// Cycle 0141ij: Optional frame limit via GTAV_FRAME_LIMIT env var
 			static std::atomic<uint64_t> show_window_count {0};
 			static std::chrono::steady_clock::time_point last_fps_log = std::chrono::steady_clock::now();
 			static std::chrono::steady_clock::time_point start_time = std::chrono::steady_clock::now();
 			static uint64_t last_fps_count = 0;
+			static int frame_limit = -1;
+			static bool limit_logged = false;
+			if (frame_limit < 0) {
+				const char* limit_env = std::getenv("GTAV_FRAME_LIMIT");
+				if (limit_env != nullptr && limit_env[0] != 0) {
+					frame_limit = atoi(limit_env);
+					LOGF("[0141ij] Using GTAV_FRAME_LIMIT=%d\n", frame_limit);
+				} else {
+					frame_limit = 0;  // 0 = no limit
+				}
+			}
 			uint64_t count = show_window_count.fetch_add(1) + 1;
+			if (frame_limit > 0 && count > static_cast<uint64_t>(frame_limit)) {
+				if (!limit_logged) {
+					LOGF("[0141ij] Frame limit %d reached, requesting exit\n", frame_limit);
+					limit_logged = true;
+				}
+				game->m_game_need_exit = true;
+				p->mutex.Unlock();
+				return;
+			}
 			if (count == 1 || count % 100 == 0) {
 				auto now = std::chrono::steady_clock::now();
 				auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_fps_log).count();
