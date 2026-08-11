@@ -769,7 +769,28 @@ static KYTY_SYSV_ABI void* RunOnGuestStack(void* arg, pthread_entry_func_t func,
 	static std::atomic<bool> hu_entry_logged {false};
 	if (g_pthread_self != nullptr && g_pthread_self->name.find("RAGE") != std::string::npos) {
 		if (!hu_entry_logged.exchange(true)) {
-			LOGF("[0141hu] RunOnGuestStack ENTRY for RAGE, func=0x%016" PRIx64 "\n", reinterpret_cast<uint64_t>(func));
+			uint64_t func_addr = reinterpret_cast<uint64_t>(func);
+			LOGF("[0141hu] RunOnGuestStack ENTRY for RAGE, func=0x%016" PRIx64 "\n", func_addr);
+			// Cycle 0141il: Log PT_LOAD section containing RAGE entry
+			// GTA V addresses have 0x900000000 prefix - mask off for section check
+			uint64_t raw_addr = func_addr & 0xFFFFFFFF;
+			const char* section = "unknown";
+			if (raw_addr < 0x307a43c) {
+				section = "PT_LOAD[0] code (executable)";
+			} else if (raw_addr < 0x307a43c + 0x711088 + 0x10000) {
+				section = "PT_LOAD[1] data (read-only)";
+			} else if (raw_addr >= 0x3790000 && raw_addr < 0x3790000 + 0x19d048) {
+				section = "PT_LOAD[3] data (RW)";
+			} else {
+				section = "outside known PT_LOADs";
+			}
+			LOGF("[0141il] RAGE entry section: %s\n", section);
+			// Log first 8 bytes of function for prologue analysis
+			uint8_t prologue[8];
+			memcpy(prologue, func, sizeof(prologue));
+			LOGF("[0141il] RAGE prologue bytes: %02x %02x %02x %02x %02x %02x %02x %02x\n",
+				prologue[0], prologue[1], prologue[2], prologue[3],
+				prologue[4], prologue[5], prologue[6], prologue[7]);
 		}
 	}
 #if defined(__x86_64__) || defined(_M_X64)
