@@ -1465,6 +1465,13 @@ static void KYTY_SYSV_ABI KernelDebugRaiseException(int /*c1*/, int /*c2*/) {
 static void KYTY_SYSV_ABI exit(int code) {
 	PRINT_NAME();
 
+	// Cycle 0141if: Allow override of exit() via GTAV_NO_EXIT env var
+	const char* no_exit_env = std::getenv("GTAV_NO_EXIT");
+	if (no_exit_env != nullptr && no_exit_env[0] != '0' && no_exit_env[0] != 0) {
+		LOGF("[0141if] LibKernel::exit: GTAV_NO_EXIT active - skipping exit(%d) call\n", code);
+		LOGF("[0141if] LibKernel::exit: Emulator stays alive - close window to actually exit\n");
+		return;  // Don't actually exit, just return
+	}
 	::exit(code);
 }
 
