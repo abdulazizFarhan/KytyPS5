@@ -992,17 +992,17 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 			} else {
 				LOGF("[0141hd] skip NOP for fault_ip=0x%" PRIx64 " (not mapped, av_addr=0x%" PRIx64 ")\n", info->exception_address, info->access_violation_vaddr);
 			}
-			// Cycle 0141hi: Watchdog thread - exit 8s after first 0141hd NOP.
+			// Cycle 0141ho: Watchdog thread - exit 1s after first 0141hd NOP.
 			// GTA V's pthread is in an infinite loop of NOPs, main thread is at PthreadJoin.
 			// After window shown, main thread is in window event loop waiting for events.
 			// Without watchdog, the emulator hangs forever.
 			if (!hd_watchdog_set.exchange(true)) {
 				std::thread([]() {
-					std::this_thread::sleep_for(std::chrono::seconds(8));
-					LOGF("[0141hi] Watchdog: 8 seconds elapsed since first 0141hd NOP, exiting emulator\n");
+					std::this_thread::sleep_for(std::chrono::seconds(1));
+					LOGF("[0141ho] Watchdog: 1 second elapsed since first 0141hd NOP, exiting emulator\n");
 					std::quick_exit(0);
 				}).detach();
-				LOGF("[0141hi] Watchdog thread started, will exit in 8 seconds\n");
+				LOGF("[0141ho] Watchdog thread started, will exit in 1 second\n");
 			}
 		}
 		return true;
