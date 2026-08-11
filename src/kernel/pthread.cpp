@@ -621,6 +621,11 @@ public:
 
 	void FreeDetachedThreads();
 
+	// Cycle 0141hw: Cancel threads by name (used by watchdog to unblock GTA V's PthreadJoin)
+	int CancelByName(const char* name);
+	// Cycle 0141hx: Terminate threads by name (Windows-specific, forcibly kills thread)
+	int TerminateByName(const char* name);
+
 private:
 	std::vector<Pthread> m_threads;
 	Common::Mutex        m_mutex;
@@ -1438,6 +1443,52 @@ void PthreadPool::FreeDetachedThreads() {
 			PthreadJoin(p, nullptr);
 		}
 	}
+}
+
+// Cycle 0141hw: Cancel threads by name. Returns count of threads cancelled.
+int PthreadPool::CancelByName(const char* name) {
+	if (name == nullptr) {
+		return 0;
+	}
+	Common::LockGuard lock(m_mutex);
+
+	int count = 0;
+	for (auto* p: m_threads) {
+		if (p != nullptr && p->name.find(name) != std::string::npos && !p->free) {
+			LOGF("[0141hw] Cancelling pthread '%s' id=%d\n", p->name.c_str(), p->unique_id);
+			pthread_cancel(p->p);
+			count++;
+		}
+	}
+	return count;
+}
+
+// Cycle 0141hx: Terminate threads by name using TerminateThread (Windows).
+// This is a nuclear option - forcibly kills the thread without cleanup.
+// Used to unblock GTA V's PthreadJoin when RAGE pthread is stuck.
+int PthreadPool::TerminateByName(const char* name) {
+	if (name == nullptr) {
+		return 0;
+	}
+	Common::LockGuard lock(m_mutex);
+
+	int count = 0;
+	for (auto* p: m_threads) {
+		if (p != nullptr && p->name.find(name) != std::string::npos && !p->free) {
+			LOGF("[0141hx] Terminating pthread '%s' id=%d host_thread_id=%" PRIu64 "\n", p->name.c_str(), p->unique_id, p->host_thread_id);
+#if KYTY_PLATFORM == KYTY_PLATFORM_WINDOWS
+			// Cycle 0141hx: Windows-specific TerminateThread
+			// This forcibly kills the thread without cleanup - host pthread_join will return immediately
+			HANDLE h = OpenThread(THREAD_TERMINATE, FALSE, static_cast<DWORD>(p->host_thread_id));
+			if (h != nullptr) {
+				TerminateThread(h, 0);
+				CloseHandle(h);
+			}
+#endif
+			count++;
+		}
+	}
+	return count;
 }
 
 bool PthreadKeys::Create(int* key, pthread_key_destructor_func_t destructor) {
@@ -3373,6 +3424,30 @@ int KYTY_SYSV_ABI PthreadCancel(Pthread thread) {
 		case ESRCH: return KERNEL_ERROR_ESRCH;
 		default: return KERNEL_ERROR_EINVAL;
 	}
+}
+
+// Cycle 0141hw: Cancel pthreads whose name contains the given substring
+int PthreadCancelByName(const char* name) {
+	if (name == nullptr || g_pthread_context == nullptr) {
+		return 0;
+	}
+	auto* pool = g_pthread_context->GetPthreadPool();
+	if (pool == nullptr) {
+		return 0;
+	}
+	return pool->CancelByName(name);
+}
+
+// Cycle 0141hx: Terminate pthreads whose name contains the given substring
+int PthreadTerminateByName(const char* name) {
+	if (name == nullptr || g_pthread_context == nullptr) {
+		return 0;
+	}
+	auto* pool = g_pthread_context->GetPthreadPool();
+	if (pool == nullptr) {
+		return 0;
+	}
+	return pool->TerminateByName(name);
 }
 
 int KYTY_SYSV_ABI PthreadSetaffinity(Pthread thread, KernelCpumask mask) {

@@ -1000,13 +1000,15 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 			// After window shown, main thread is in window event loop waiting for events.
 			// Without watchdog, the emulator hangs forever.
 			if (!hd_watchdog_set.exchange(true)) {
-				// Cycle 0141ht: Capture hd_nopped count at watchdog launch for diagnostics
+				// Cycle 0141hx: Terminate RAGE thread to unblock GTA V's PthreadJoin
+				// EXPERIMENT 0141hy: Don't call std::quick_exit - let GTA V continue
 				std::thread([nopped_count = hd_nopped.size()]() {
 					std::this_thread::sleep_for(std::chrono::milliseconds(500));
-					LOGF("[0141ho] Watchdog: 500ms elapsed since first 0141hd NOP, exiting emulator (0141hd pages=%zu)\n", nopped_count);
-					std::quick_exit(0);
+					int terminated = Libs::LibKernel::PthreadTerminateByName("RAGE");
+					LOGF("[0141ho] Watchdog: 500ms elapsed, terminating RAGE (%d thread(s)), NOT exiting (0141hd pages=%zu)\n", terminated, nopped_count);
+					// std::quick_exit(0); -- disabled for 0141hy experiment
 				}).detach();
-				LOGF("[0141ho] Watchdog thread started, will exit in 500ms\n");
+				LOGF("[0141ho] Watchdog thread started, will terminate RAGE in 500ms\n");
 			}
 		}
 		return true;

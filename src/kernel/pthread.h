@@ -93,6 +93,8 @@ int KYTY_SYSV_ABI     PthreadCreate(Pthread* thread, const PthreadAttr* attr,
 int KYTY_SYSV_ABI     PthreadDetach(Pthread thread);
 int KYTY_SYSV_ABI     PthreadJoin(Pthread thread, void** value);
 int KYTY_SYSV_ABI     PthreadCancel(Pthread thread);
+int                  PthreadCancelByName(const char* name);
+int                  PthreadTerminateByName(const char* name);
 int KYTY_SYSV_ABI     PthreadSetcancelstate(int state, int* old_state);
 int KYTY_SYSV_ABI     PthreadSetcanceltype(int type, int* old_type);
 int KYTY_SYSV_ABI     PthreadGetprio(Pthread thread, int* prio);
