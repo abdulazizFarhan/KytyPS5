@@ -998,11 +998,11 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 			// Without watchdog, the emulator hangs forever.
 			if (!hd_watchdog_set.exchange(true)) {
 				std::thread([]() {
-					std::this_thread::sleep_for(std::chrono::seconds(1));
-					LOGF("[0141ho] Watchdog: 1 second elapsed since first 0141hd NOP, exiting emulator\n");
+					std::this_thread::sleep_for(std::chrono::milliseconds(500));
+					LOGF("[0141ho] Watchdog: 500ms elapsed since first 0141hd NOP, exiting emulator\n");
 					std::quick_exit(0);
 				}).detach();
-				LOGF("[0141ho] Watchdog thread started, will exit in 1 second\n");
+				LOGF("[0141ho] Watchdog thread started, will exit in 500ms\n");
 			}
 		}
 		return true;
