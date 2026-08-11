@@ -371,10 +371,20 @@ void GameShowWindow(WindowGame* game, const Common::Timer& timer) {
 			}
 			int h = test_video_handle.load();
 			if (h >= 0) {
-				// Submit a BLANK flip with valid mode (VSYNC=1)
-				int flip_ret = VideoOut::VideoOutSubmitFlip(h, -1, 1, 0);
+				// Cycle 0141ic: Allow override of flip mode via GTAV_FLIP_MODE env var
+				// Default mode=1 (VSYNC). Set GTAV_FLIP_MODE=4 for VSYNC_MULTI (faster, no vsync wait)
+				int flip_mode = 1;
+				const char* mode_env = std::getenv("GTAV_FLIP_MODE");
+				if (mode_env != nullptr && mode_env[0] != 0) {
+					flip_mode = atoi(mode_env);
+					if (count == 1) {
+						LOGF("[0141ic] Using GTAV_FLIP_MODE=%d\n", flip_mode);
+					}
+				}
+				// Submit a BLANK flip
+				int flip_ret = VideoOut::VideoOutSubmitFlip(h, -1, flip_mode, 0);
 				if (count == 1) {
-					LOGF("[0141ia] VideoOutSubmitFlip(BLANK, mode=VSYNC) returned %d\n", flip_ret);
+					LOGF("[0141ia] VideoOutSubmitFlip(BLANK, mode=%d) returned %d\n", flip_mode, flip_ret);
 				}
 			}
 			VideoOut::VideoOutBeginVblank();
