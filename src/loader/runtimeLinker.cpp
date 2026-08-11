@@ -1000,9 +1000,10 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 			// After window shown, main thread is in window event loop waiting for events.
 			// Without watchdog, the emulator hangs forever.
 			if (!hd_watchdog_set.exchange(true)) {
-				std::thread([]() {
+				// Cycle 0141ht: Capture hd_nopped count at watchdog launch for diagnostics
+				std::thread([nopped_count = hd_nopped.size()]() {
 					std::this_thread::sleep_for(std::chrono::milliseconds(500));
-					LOGF("[0141ho] Watchdog: 500ms elapsed since first 0141hd NOP, exiting emulator\n");
+					LOGF("[0141ho] Watchdog: 500ms elapsed since first 0141hd NOP, exiting emulator (0141hd pages=%zu)\n", nopped_count);
 					std::quick_exit(0);
 				}).detach();
 				LOGF("[0141ho] Watchdog thread started, will exit in 500ms\n");
