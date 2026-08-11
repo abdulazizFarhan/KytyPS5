@@ -962,6 +962,9 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 	// in PT_LOAD[1] data. Catching this AV lets GTA V continue past this junk to the next
 	// NOPed chunk.
 	// Action: NOP 4096 bytes (one page) at the AV site, one-shot per page.
+	// Cycle 0141hp experiment: 64KB NOP tested in 2026-08-11, REVERTED. 64KB NOP let RAGE thread
+	// skip too much, window event loop never logged "Window 1 shown" before watchdog.
+	// 4096 bytes is the safe sweet spot - keeps GTA V progressing while preserving window shown event.
 	// Conditions:
 	//   - av_type == Read
 	//   - fault_ip in PT_LOAD[1] data (0x90307c000..0x90378d088)
