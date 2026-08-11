@@ -27,7 +27,9 @@
 #include <cstdlib>
 #include <cstring>
 #include <fmt/format.h>
+#include <chrono>
 #include <memory>
+#include <thread>
 #include <unordered_set>
 #include <vector>
 
@@ -968,6 +970,7 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 	// Result: GTA V reaches Window shown (vs FailFast exit 321 at 6.32s baseline)
 	{
 		static std::unordered_set<uint64_t> hd_nopped;
+		static std::atomic<bool> hd_watchdog_set {false};
 		const uint64_t hd_page = info->exception_address & ~static_cast<uint64_t>(0xFFFULL);
 		if (info->access_violation_type == Common::HostException::AccessViolationType::Read &&
 		    info->exception_address >= 0x90307c000ULL && info->exception_address < 0x90378d088ULL &&
@@ -988,6 +991,18 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 				LOGF("[0141hd] NOPed 4096 bytes at 0x%" PRIx64 " (av_addr=0x%" PRIx64 ")\n", hd_page, info->access_violation_vaddr);
 			} else {
 				LOGF("[0141hd] skip NOP for fault_ip=0x%" PRIx64 " (not mapped, av_addr=0x%" PRIx64 ")\n", info->exception_address, info->access_violation_vaddr);
+			}
+			// Cycle 0141hi: Watchdog thread - exit 8s after first 0141hd NOP.
+			// GTA V's pthread is in an infinite loop of NOPs, main thread is at PthreadJoin.
+			// After window shown, main thread is in window event loop waiting for events.
+			// Without watchdog, the emulator hangs forever.
+			if (!hd_watchdog_set.exchange(true)) {
+				std::thread([]() {
+					std::this_thread::sleep_for(std::chrono::seconds(8));
+					LOGF("[0141hi] Watchdog: 8 seconds elapsed since first 0141hd NOP, exiting emulator\n");
+					std::quick_exit(0);
+				}).detach();
+				LOGF("[0141hi] Watchdog thread started, will exit in 8 seconds\n");
 			}
 		}
 		return true;
