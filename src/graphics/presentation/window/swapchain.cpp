@@ -419,7 +419,20 @@ PreparedFrame* WindowPrepareBlankFrame(CommandBuffer* buffer, uint32_t width, ui
 	auto*             frame  = pool->Acquire();
 	Common::LockGuard render_lock(g_render_ctx->GetMutex());
 	ConfigurePreparedFrame(frame, {width, height}, format);
-	const VkClearColorValue clear {{0.0f, 0.0f, 0.0f, opaque ? 1.0f : 0.0f}};
+	// Cycle 0141ib: Allow override of clear color via GTAV_TEST_CLEAR env var
+	// Format: "r,g,b" with values 0.0-1.0 (e.g., GTAV_TEST_CLEAR=1.0,0.0,0.0 for red)
+	VkClearColorValue clear {{0.0f, 0.0f, 0.0f, opaque ? 1.0f : 0.0f}};
+	static bool logged = false;
+	const char* env = std::getenv("GTAV_TEST_CLEAR");
+	if (env != nullptr && env[0] != 0) {
+		float r = 0.5f, g = 0.0f, b = 0.0f;
+		sscanf(env, "%f,%f,%f", &r, &g, &b);
+		clear = {{r, g, b, opaque ? 1.0f : 0.0f}};
+		if (!logged) {
+			LOGF("[0141ib] Using GTAV_TEST_CLEAR color: %f,%f,%f\n", r, g, b);
+			logged = true;
+		}
+	}
 	UtilClearColorImage(buffer, &frame->image, clear);
 	return frame;
 }
