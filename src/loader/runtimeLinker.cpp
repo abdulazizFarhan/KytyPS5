@@ -685,6 +685,37 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 				     info->access_violation_vaddr);
 			}
 
+			// Cycle 0141gx: ONE-SHOT debug - dump first Execute AV context to find the bad JMP source.
+			// Identifies the GTA V instruction that triggered the bad JMP to PT_LOAD[1] data.
+			{
+				static std::atomic<int> g_gx_dumped {0};
+				if (g_gx_dumped.fetch_add(1) == 0 &&
+				    info->access_violation_type == Common::HostException::AccessViolationType::Execute &&
+				    ctx != nullptr)
+				{
+					LOGF("[0141gx] FIRST Execute AV fault_ip=0x%" PRIx64 " ctx_rip=0x%" PRIx64 " av_addr=0x%" PRIx64 "\n",
+					     fault_ip, reinterpret_cast<uint64_t>(ctx->Rip), info->access_violation_vaddr);
+					LOGF("[0141gx] RSP=0x%" PRIx64 " RBP=0x%" PRIx64 "\n", ctx->Rsp, ctx->Rbp);
+					LOGF("[0141gx] RAX=0x%" PRIx64 " RBX=0x%" PRIx64 " RCX=0x%" PRIx64 "\n", ctx->Rax, ctx->Rbx, ctx->Rcx);
+					LOGF("[0141gx] RDX=0x%" PRIx64 " RDI=0x%" PRIx64 " RSI=0x%" PRIx64 "\n", ctx->Rdx, ctx->Rdi, ctx->Rsi);
+					LOGF("[0141gx] R8=0x%" PRIx64 " R9=0x%" PRIx64 "\n", ctx->R8, ctx->R9);
+					LOGF("[0141gx] R12=0x%" PRIx64 " R13=0x%" PRIx64 " R14=0x%" PRIx64 " R15=0x%" PRIx64 "\n",
+					     ctx->R12, ctx->R13, ctx->R14, ctx->R15);
+					for (uint64_t sp_off = 0; sp_off < 0x100; sp_off += 8) {
+						__try {
+							uint64_t* stack_p = reinterpret_cast<uint64_t*>(ctx->Rsp + sp_off);
+							uint64_t val = *stack_p;
+							LOGF("[0141gx] stack[%u]=0x%" PRIx64 "\n",
+							     static_cast<unsigned>(sp_off), val);
+						} __except (1) {
+							LOGF("[0141gx] stack[%u]=UNREAD\n", static_cast<unsigned>(sp_off));
+							break;
+						}
+					}
+				}
+			}
+
+
 			if (fault_ip != 0) {
 				// 32-byte aligned patch site (covers call + jmp [rip+rel32]
 				// worst-case = 14 bytes, then a few more bytes of trailing
@@ -719,6 +750,33 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 					// loop never executes the post-call code, but this
 					// lets GTA V's progress through the address space.
 					static uint64_t fast_skip_count = 0;
+
+					// Cycle 0141gw: Try to NOP the AV site at fault_ip before fast-skip.
+					// For Execute AVs, fault_ip is where CPU tried to execute.
+					// Briefly make it RWE, write 32 NOPs, restore protection.
+					// Next iteration of GTA V's pthread would execute NOPs (harmless).
+					{
+						static std::unordered_set<uint64_t> gw_nopped;
+						uint64_t gw_site = fault_ip & ~static_cast<uint64_t>(0x1FULL);
+						if (gw_nopped.insert(gw_site).second) {
+							MEMORY_BASIC_INFORMATION gmi {};
+							if (VirtualQuery(reinterpret_cast<LPCVOID>(gw_site), &gmi, sizeof(gmi)) != 0 &&
+							    gmi.State == MEM_COMMIT &&
+							    (gmi.Protect & (PAGE_GUARD | PAGE_NOACCESS)) == 0) {
+								Common::VirtualMemory::Mode gw_old {};
+								Common::VirtualMemory::Protect(gw_site, 32, Common::VirtualMemory::Mode::ExecuteReadWrite, &gw_old);
+								uint8_t gwnops[32] {};
+								for (uint32_t i = 0; i < 32; i++) {
+									gwnops[i] = 0x90;
+								}
+								memcpy(reinterpret_cast<void*>(gw_site), gwnops, 32);
+								Common::VirtualMemory::FlushInstructionCache(gw_site, 32);
+								LOGF("[0141gw] NOPed Execute AV site at 0x%" PRIx64 "\n", gw_site);
+							} else {
+								LOGF("[0141gw] skip NOP for fault_ip=0x%" PRIx64 " (not mapped)\n", fault_ip);
+							}
+						}
+					}
 					fast_skip_count++;
 					if ((fast_skip_count & 0x3FF) == 1) {
 						LOGF("[M1W2 v1.7] fast-skip #%" PRIu64 " at [%016" PRIx64 "]\n", fast_skip_count, fault_ip);
