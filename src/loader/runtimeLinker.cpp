@@ -953,6 +953,46 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 		}
 	}
 
+	// Cycle 0141hd: Catch bogus Read AVs from GTA V's pthread executing junk in PT_LOAD[1] data.
+	// After cycle 0141gw NOPs Execute AV sites, GTA V's RIP advances past the NOP region
+	// to RIP=0x349839d (32 bytes past NOP end). At that offset, the bytes load from
+	// av_addr=0x19fa6d4818 (~111GB) - clearly bogus. GTA V's pthread is executing junk bytes
+	// in PT_LOAD[1] data. Catching this AV lets GTA V continue past this junk to the next
+	// NOPed chunk.
+	// Action: NOP 4096 bytes (one page) at the AV site, one-shot per page.
+	// Conditions:
+	//   - av_type == Read
+	//   - fault_ip in PT_LOAD[1] data (0x90307c000..0x90378d088)
+	//   - av_addr > 0x1000000000ULL (64GB threshold - clearly bogus addresses)
+	// This handles Read AVs that don't match existing conditions.
+	// Result: GTA V reaches Window shown (vs FailFast exit 321 at 6.32s baseline)
+	{
+		static std::unordered_set<uint64_t> hd_nopped;
+		const uint64_t hd_page = info->exception_address & ~static_cast<uint64_t>(0xFFFULL);
+		if (info->access_violation_type == Common::HostException::AccessViolationType::Read &&
+		    info->exception_address >= 0x90307c000ULL && info->exception_address < 0x90378d088ULL &&
+		    info->access_violation_vaddr > 0x1000000000ULL &&
+		    hd_nopped.insert(hd_page).second) {
+			MEMORY_BASIC_INFORMATION hmi {};
+			if (VirtualQuery(reinterpret_cast<LPCVOID>(hd_page), &hmi, sizeof(hmi)) != 0 &&
+			    hmi.State == MEM_COMMIT &&
+			    (hmi.Protect & (PAGE_GUARD | PAGE_NOACCESS)) == 0) {
+				Common::VirtualMemory::Mode hd_old {};
+				Common::VirtualMemory::Protect(hd_page, 4096, Common::VirtualMemory::Mode::ExecuteReadWrite, &hd_old);
+				uint8_t hdnops[4096] {};
+				for (uint32_t i = 0; i < 4096; i++) {
+					hdnops[i] = 0x90;
+				}
+				memcpy(reinterpret_cast<void*>(hd_page), hdnops, 4096);
+				Common::VirtualMemory::FlushInstructionCache(hd_page, 4096);
+				LOGF("[0141hd] NOPed 4096 bytes at 0x%" PRIx64 " (av_addr=0x%" PRIx64 ")\n", hd_page, info->access_violation_vaddr);
+			} else {
+				LOGF("[0141hd] skip NOP for fault_ip=0x%" PRIx64 " (not mapped, av_addr=0x%" PRIx64 ")\n", info->exception_address, info->access_violation_vaddr);
+			}
+		}
+		return true;
+	}
+
 	LOGF("kyty_exception_handler: %016" PRIx64 "\n", info->exception_address);
 #if KYTY_PLATFORM == KYTY_PLATFORM_WINDOWS
 	HMODULE owner_module = nullptr;
